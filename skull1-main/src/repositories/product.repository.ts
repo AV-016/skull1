@@ -1,0 +1,185 @@
+import { prisma } from '../config/database';
+import { Product, Prisma } from '@prisma/client';
+import { ProductQueryFilters, CreateProductInput } from '../types/product.types';
+import { ProductWithDetails } from '../dto/product.dto';
+
+export class ProductRepository {
+  async findById(id: string): Promise<ProductWithDetails | null> {
+    return prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        images: true,
+        tags: true,
+        reviews: true,
+      },
+    }) as Promise<ProductWithDetails | null>;
+  }
+
+  async findBySlug(slug: string): Promise<ProductWithDetails | null> {
+    return prisma.product.findUnique({
+      where: { slug },
+      include: {
+        category: true,
+        images: true,
+        tags: true,
+        reviews: true,
+      },
+    }) as Promise<ProductWithDetails | null>;
+  }
+
+  async findFeatured(): Promise<ProductWithDetails[]> {
+    return prisma.product.findMany({
+      where: { isFeatured: true, isActive: true },
+      include: {
+        category: true,
+        images: true,
+        tags: true,
+        reviews: true,
+      },
+    }) as Promise<ProductWithDetails[]>;
+  }
+
+  async findWithFilters(filters: ProductQueryFilters): Promise<{ products: ProductWithDetails[]; total: number }> {
+    const {
+      page = 1,
+      limit = 10,
+      featured,
+      category,
+      tag,
+      minPrice,
+      maxPrice,
+      sort,
+      q,
+      categoryId,
+      tagId,
+    } = filters;
+
+    const skip = (page - 1) * limit;
+
+    const whereClause: Prisma.ProductWhereInput = {
+      isActive: true,
+    };
+
+    if (featured !== undefined) {
+      whereClause.isFeatured = featured;
+    }
+
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    } else if (category) {
+      whereClause.category = { slug: category };
+    }
+
+    if (tagId) {
+      whereClause.tags = { some: { id: tagId } };
+    } else if (tag) {
+      whereClause.tags = { some: { slug: tag } };
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      whereClause.price = {};
+      if (minPrice !== undefined) whereClause.price.gte = minPrice;
+      if (maxPrice !== undefined) whereClause.price.lte = maxPrice;
+    }
+
+    if (q) {
+      whereClause.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+    if (sort === 'price_asc') {
+      orderBy = { price: 'asc' };
+    } else if (sort === 'price_desc') {
+      orderBy = { price: 'desc' };
+    }
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: whereClause,
+        include: {
+          category: true,
+          images: true,
+          tags: true,
+          reviews: true,
+        },
+        skip,
+        take: limit,
+        orderBy,
+      }),
+      prisma.product.count({ where: whereClause }),
+    ]);
+
+    return {
+      products: products as ProductWithDetails[],
+      total,
+    };
+  }
+
+  async create(data: CreateProductInput): Promise<Product> {
+    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [] } = data;
+    
+    // Generate slug from name
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+    return prisma.product.create({
+      data: {
+        name,
+        slug,
+        description,
+        price,
+        compareAtPrice,
+        stock,
+        categoryId,
+        tags: {
+          connect: tags.map((id) => ({ id })),
+        },
+        images: {
+          create: images.map((url, index) => ({
+            url,
+            isPrimary: index === 0,
+          })),
+        },
+      },
+    });
+  }
+
+  async update(id: string, data: Prisma.ProductUpdateInput): Promise<Product> {
+    const { images, ...updateData } = data as any;
+    
+    return prisma.$transaction(async (tx) => {
+      if (images && Array.isArray(images)) {
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        if (images.length > 0) {
+          await tx.productImage.createMany({
+            data: images.map((url, index) => ({
+              productId: id,
+              url,
+              isPrimary: index === 0,
+            })),
+          });
+        }
+      }
+      
+      return tx.product.update({
+        where: { id },
+        data: updateData,
+      });
+    });
+  }
+
+  async delete(id: string): Promise<Product> {
+    return prisma.product.delete({
+      where: { id },
+    });
+  }
+
+  async count(): Promise<number> {
+    return prisma.product.count();
+  }
+}
+
+export default ProductRepository;

@@ -1,0 +1,200 @@
+'use client'
+
+import { motion } from 'framer-motion'
+import Link from 'next/link'
+import { Star, ShieldAlert, BadgeInfo, ShoppingCart } from 'lucide-react'
+import { mockProducts, sanitizeProducts } from '@/lib/mockProducts'
+import { useProducts } from '@/hooks/useProducts'
+import { useSettings } from '@/context/SettingsContext'
+
+export function BestSellersSection() {
+  const { formatPrice } = useSettings()
+
+  // Fetch products from database
+  const { data: serverProducts = [] } = useProducts()
+  const sanitizedServer = sanitizeProducts(serverProducts)
+
+  // Select the Shogun Cyber-Oni Figure as the large featured product
+  const heroProduct = sanitizedServer.find((p) => p.slug === 'shogun-cyber-oni-figure') 
+    || sanitizedServer[0] 
+    || mockProducts.find((p) => p.slug === 'shogun-cyber-oni-figure') 
+    || mockProducts[0]
+
+  // Default supporting items
+  const defaultSupporting = [
+    mockProducts.find((p) => p.slug === 'fractal-kinetic-sculpture') || mockProducts[1],
+    mockProducts.find((p) => p.slug === 'parametric-origami-vase') || mockProducts[4],
+    mockProducts.find((p) => p.slug === 'articulated-crystal-dragon') || mockProducts[3],
+    mockProducts.find((p) => p.slug === 'cyberpunk-artisan-keycaps') || mockProducts[2]
+  ]
+
+  // Select 4 supporting products (checking database first)
+  const supportingProducts = serverProducts.length > 1
+    ? [
+        sanitizedServer.find((p) => p.slug === 'fractal-kinetic-sculpture') || sanitizedServer[1] || defaultSupporting[0],
+        sanitizedServer.find((p) => p.slug === 'parametric-origami-vase') || sanitizedServer[2] || defaultSupporting[1],
+        sanitizedServer.find((p) => p.slug === 'articulated-crystal-dragon') || sanitizedServer[3] || defaultSupporting[2],
+        sanitizedServer.find((p) => p.slug === 'cyberpunk-artisan-keycaps') || sanitizedServer[4] || defaultSupporting[3],
+      ]
+    : defaultSupporting
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: 'easeOut' as const }
+    }
+  }
+
+  return (
+    <section id="best-sellers" className="py-24 bg-secondary border-b border-border">
+      <div className="container mx-auto px-4 md:px-6">
+        
+        {/* Section Heading */}
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-3">Popular Choice</h2>
+          <h3 className="heading-2 text-primary-text mb-4">The Best Sellers</h3>
+          <p className="text-secondary-text text-base">
+            Explore our most popular customer favorites, engineered to perfection.
+          </p>
+        </div>
+
+        {/* Apple-Style Grid Layout */}
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.1 }}
+        >
+          {/* Left Block: 1 Huge Featured Product */}
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-6 bg-card border border-border hover:border-primary/20 rounded-3xl overflow-hidden group flex flex-col justify-between shadow-2xl relative"
+          >
+            {/* Image Section */}
+            <div className="h-72 sm:h-96 w-full relative bg-secondary overflow-hidden">
+              <img
+                src={heroProduct.image}
+                alt={heroProduct.name}
+                className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700 ease-out"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+              <span className="absolute top-6 left-6 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-lg">
+                Best Seller
+              </span>
+            </div>
+
+            {/* Description & Details */}
+            <div className="p-8 space-y-6 flex-1 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start gap-4">
+                  <div>
+                    <span className="text-xs text-primary font-semibold tracking-wider uppercase">
+                      {heroProduct.category}
+                    </span>
+                    <h4 className="text-2xl font-black text-primary-text mt-1 group-hover:text-primary transition-colors duration-300">
+                      {heroProduct.name}
+                    </h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-primary-text block">
+                      {formatPrice(heroProduct.price)}
+                    </span>
+                    <span className="text-[10px] text-muted-text font-semibold uppercase">Inclusive of Taxes</span>
+                  </div>
+                </div>
+
+                <p className="text-secondary-text text-sm mt-4 leading-relaxed">
+                  {heroProduct.description}
+                </p>
+
+                {/* Tech specifications highlight */}
+                <div className="mt-6 grid grid-cols-3 gap-3">
+                  {Object.entries(heroProduct.specifications || {}).slice(0, 3).map(([k, v]) => (
+                    <div key={k} className="bg-secondary p-3 rounded-xl border border-border">
+                      <span className="text-muted-text block text-[9px] uppercase tracking-wider font-semibold">{k}</span>
+                      <span className="text-primary-text text-xs font-medium truncate block mt-0.5">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-6 border-t border-border flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-4 h-4 text-primary fill-primary" />
+                  <span className="text-primary-text text-sm font-semibold">{heroProduct.rating}</span>
+                  <span className="text-muted-text text-xs">({heroProduct.reviewsCount} reviews)</span>
+                </div>
+                <Link
+                  href={`/products/${heroProduct.slug}`}
+                  className="px-6 py-3 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl transition-all duration-300 shadow-md flex items-center gap-2"
+                >
+                  View Product
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Right Block: 4 Supporting Products */}
+          <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
+            {supportingProducts.map((product) => (
+              <motion.div
+                key={product.id}
+                variants={itemVariants}
+                className="bg-card border border-border hover:border-primary/20 rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-lg"
+              >
+                <Link href={`/products/${product.slug}`} className="block flex-1 flex flex-col justify-between">
+                  {/* Image container */}
+                  <div className="h-44 w-full bg-secondary overflow-hidden relative">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent opacity-30" />
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1 mb-1.5">
+                        <Star className="w-3 h-3 text-primary fill-primary" />
+                        <span className="text-[10px] text-primary-text font-bold">{product.rating}</span>
+                      </div>
+                      <h4 className="text-primary-text font-bold text-base group-hover:text-primary transition-colors duration-300 truncate">
+                        {product.name}
+                      </h4>
+                      <p className="text-muted-text text-[11px] mt-1 line-clamp-2 leading-normal">
+                        {product.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                      <span className="text-primary-text font-extrabold text-base">
+                        {formatPrice(product.price)}
+                      </span>
+                      <span className="text-primary text-xs font-semibold group-hover:translate-x-1 transition-transform duration-300">
+                        View Details →
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
+}

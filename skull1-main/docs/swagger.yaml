@@ -1,0 +1,57 @@
+openapi: 3.0.0
+info:
+  title: Skulture API Documentation
+  description: Production-ready Node.js + Express + TypeScript + Prisma e-commerce backend for 3D printing services.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api
+    description: Local Development Server
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: Server is operational and database connection is healthy
+  /auth/register:
+    post:
+      summary: Register a new customer user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Registration successful
+  /auth/login:
+    post:
+      summary: Log in with credentials and receive a JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful, token returned

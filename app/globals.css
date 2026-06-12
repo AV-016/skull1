@@ -1,0 +1,260 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-geist-sans), 'Geist Fallback';
+  --font-mono: var(--font-geist-mono), 'Geist Mono Fallback';
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-primary-text: var(--text-primary);
+  --color-secondary-text: var(--text-secondary);
+  --color-muted-text: var(--text-muted);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+}
+
+/* Skulture Premium Monochrome Design System */
+:root {
+  /* Architect Mat Colors & Accents */
+  --mat-accent: rgba(250, 245, 215, 0.1); /* Pale yellow/cream mat markings */
+  --grid-line: rgba(250, 245, 215, 0.045); /* Cream grid lines */
+  
+  /* Primary Colors */
+  --bg-primary: #1C1F22;
+  --bg-secondary: #15181A;
+  --bg-card: #23272B;
+  --bg-elevated: #1E2225;
+  --text-primary: #FFFFFF;
+  --text-secondary: #CFCFCF;
+  --text-muted: #9CA3AF;
+  --border-default: rgba(250, 245, 215, 0.12);
+  --border-hover: rgba(250, 245, 215, 0.22);
+  
+  /* Default Theme (Architect Mat Dark) */
+  --background: #1C1F22;
+  --foreground: #FFFFFF;
+  --card: #23272B;
+  --card-foreground: #FFFFFF;
+  --popover: #23272B;
+  --popover-foreground: #FFFFFF;
+  --primary: #14B8A6;
+  --primary-foreground: #FFFFFF;
+  --secondary: #15181A;
+  --secondary-foreground: #CFCFCF;
+  --muted: #9CA3AF;
+  --muted-foreground: #9CA3AF;
+  --accent: #14B8A6;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --border: rgba(250, 245, 215, 0.12);
+  --input: rgba(250, 245, 215, 0.12);
+  --ring: #14B8A6;
+  --chart-1: #14B8A6;
+  --chart-2: #2DD4BF;
+  --chart-3: #A1A1AA;
+  --chart-4: #71717A;
+  --chart-5: #52525B;
+  --radius: 0px;
+  --sidebar: #15181A;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #14B8A6;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #23272B;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(250, 245, 215, 0.12);
+  --sidebar-ring: #14B8A6;
+}
+
+:root.light {
+  --mat-accent: rgba(0, 0, 0, 0.08);
+  --grid-line: rgba(0, 0, 0, 0.04);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-hover: rgba(0, 0, 0, 0.22);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Technical Drafting Paper Grid Background */
+    background-image: 
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-position: center center;
+  }
+  html {
+    @apply font-sans;
+  }
+
+
+}
+
+/* Glassmorphism & Premium Effects */
+@layer utilities {
+  .glassmorphic {
+    @apply backdrop-blur-xl border border-border rounded-lg bg-card/20;
+  }
+  
+  .glass-card {
+    @apply bg-card/40 backdrop-blur-md border border-border rounded-xl;
+  }
+  
+  .premium-shadow {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  }
+  
+  .premium-shadow-lg {
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7);
+  }
+  
+  .premium-glow {
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.05);
+  }
+
+  .accent-glow {
+    box-shadow: 0 0 30px rgba(20, 184, 166, 0.15);
+  }
+
+  .accent-glow-lg {
+    box-shadow: 0 0 55px rgba(20, 184, 166, 0.25);
+  }
+  
+  /* Smooth Transitions */
+  .smooth-transition {
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  /* Typography */
+  .heading-1 {
+    @apply text-5xl md:text-7xl font-bold tracking-tight;
+  }
+  
+  .heading-2 {
+    @apply text-4xl md:text-5xl font-bold tracking-tight;
+  }
+  
+  .heading-3 {
+    @apply text-3xl md:text-4xl font-bold tracking-tight;
+  }
+  
+  .subheading {
+    @apply text-lg md:text-xl text-secondary leading-relaxed;
+  }
+  
+  .body-text {
+    @apply text-base leading-relaxed;
+  }
+  
+  /* Grid Utilities */
+  .grid-responsive {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+  
+  /* Animations - Framer Motion compatible */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  .animate-fade-up {
+    animation: fade-up 0.6s ease-out;
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+}
+
+/* Accessibility Preferences */
+body.reduced-motion,
+body.reduced-motion * {
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  scroll-behavior: auto !important;
+  transform: none !important;
+}
+
+body.compact-layout section {
+  padding-top: 3rem !important;
+  padding-bottom: 3rem !important;
+}
+
+body.compact-layout .py-24 {
+  padding-top: 3rem !important;
+  padding-bottom: 3rem !important;
+}
+
+body.compact-layout .py-28 {
+  padding-top: 3.5rem !important;
+  padding-bottom: 3.5rem !important;
+}
+
+body.compact-layout .mb-16 {
+  margin-bottom: 2rem !important;
+}
+
+body.compact-layout .mb-20 {
+  margin-bottom: 2.5rem !important;
+}
+
+body.compact-layout .mb-12 {
+  margin-bottom: 1.5rem !important;
+}

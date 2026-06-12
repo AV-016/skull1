@@ -1,0 +1,93 @@
+import { prisma } from '../config/database';
+import { Review, Prisma } from '@prisma/client';
+import { ReviewWithDetails } from '../dto/review.dto';
+
+export class ReviewRepository {
+  async findById(id: string): Promise<ReviewWithDetails | null> {
+    return prisma.review.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        images: true,
+        product: true,
+      },
+    }) as Promise<ReviewWithDetails | null>;
+  }
+
+  async findByProductId(productId: string): Promise<ReviewWithDetails[]> {
+    return prisma.review.findMany({
+      where: { productId, isHidden: false },
+      include: {
+        user: true,
+        images: true,
+        product: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }) as Promise<ReviewWithDetails[]>;
+  }
+
+  async findAll(page: number = 1, limit: number = 10): Promise<{ reviews: ReviewWithDetails[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        include: {
+          user: true,
+          images: true,
+          product: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.review.count(),
+    ]);
+
+    return {
+      reviews: reviews as ReviewWithDetails[],
+      total,
+    };
+  }
+
+  async create(data: {
+    productId: string;
+    userId: string;
+    rating: number;
+    comment?: string;
+    images?: string[];
+  }): Promise<Review> {
+    const { productId, userId, rating, comment, images = [] } = data;
+    return prisma.review.create({
+      data: {
+        productId,
+        userId,
+        rating,
+        comment,
+        images: {
+          create: images.map((url) => ({ url })),
+        },
+      },
+    });
+  }
+
+  async update(id: string, data: Prisma.ReviewUpdateInput): Promise<Review> {
+    return prisma.review.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async delete(id: string): Promise<Review> {
+    return prisma.review.delete({
+      where: { id },
+    });
+  }
+
+  async setVisibility(id: string, isHidden: boolean): Promise<Review> {
+    return prisma.review.update({
+      where: { id },
+      data: { isHidden },
+    });
+  }
+}
+
+export default ReviewRepository;

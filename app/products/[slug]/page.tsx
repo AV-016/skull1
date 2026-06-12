@@ -1,0 +1,700 @@
+'use client'
+
+import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
+import { Navbar } from '@/components/layout/Navbar'
+import { Footer } from '@/components/layout/Footer'
+import { useProductDetail, useProducts } from '@/hooks/useProducts'
+import React, { useState, useEffect } from 'react'
+import { sanitizeProducts } from '@/lib/mockProducts'
+import { useSettings } from '@/context/SettingsContext'
+import { ShoppingCart, Star, Calendar, Heart, MessageSquare, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import api from '@/lib/api'
+import { ProductCard } from '@/components/products/ProductCard'
+import { useAuth } from '@/context/AuthContext'
+
+export default function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const resolvedParams = React.use(params)
+  const slug = resolvedParams.slug
+  
+  const { data: product, isLoading, error } = useProductDetail(slug)
+  const { formatPrice } = useSettings()
+
+  const sanitizedProduct = product 
+    ? sanitizeProducts([product])[0]
+    : null
+
+  const [quantity, setQuantity] = useState(1)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [reviews, setReviews] = useState<any[]>([])
+  const [loadingReviews, setLoadingReviews] = useState(true)
+  const router = useRouter()
+  const [isDescExpanded, setIsDescExpanded] = useState(false)
+  const { user } = useAuth()
+
+  // Support Modal States
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false)
+  const [supportFormData, setSupportFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  })
+  const [isSupportSubmitting, setIsSupportSubmitting] = useState(false)
+  const [supportSuccess, setSupportSuccess] = useState(false)
+
+  // Initialize subject once product is loaded
+  useEffect(() => {
+    if (product) {
+      setSupportFormData(prev => ({
+        ...prev,
+        subject: `Product Support: ${product.name}`
+      }))
+    }
+  }, [product])
+
+  // Prefill user details
+  useEffect(() => {
+    if (user) {
+      setSupportFormData(prev => ({
+        ...prev,
+        name: user.name || '',
+        email: user.email || ''
+      }))
+    }
+  }, [user])
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!sanitizedProduct) return
+    try {
+      setIsSupportSubmitting(true)
+      await api.post('/inquiries', {
+        name: supportFormData.name,
+        email: supportFormData.email,
+        subject: supportFormData.subject,
+        message: supportFormData.message,
+        productId: sanitizedProduct.id,
+        userId: user?.id || undefined
+      })
+      setSupportSuccess(true)
+      setTimeout(() => {
+        setIsSupportModalOpen(false)
+        setSupportSuccess(false)
+        setSupportFormData(prev => ({ ...prev, message: '' }))
+      }, 2000)
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to submit support request')
+    } finally {
+      setIsSupportSubmitting(false)
+    }
+  }
+
+
+  const [isInWishlist, setIsInWishlist] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sanitizedProduct?.id) {
+      const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]')
+      setIsInWishlist(wishlist.some((item: any) => item.id === sanitizedProduct.id))
+    }
+  }, [sanitizedProduct?.id])
+
+  const toggleWishlist = () => {
+    if (!sanitizedProduct) return
+    if (typeof window !== 'undefined') {
+      const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]')
+      let updatedWishlist = []
+      
+      if (isInWishlist) {
+        updatedWishlist = wishlist.filter((item: any) => item.id !== sanitizedProduct.id)
+        setIsInWishlist(false)
+      } else {
+        updatedWishlist = [...wishlist, sanitizedProduct]
+        setIsInWishlist(true)
+      }
+      
+      localStorage.setItem('wishlist', JSON.stringify(updatedWishlist))
+      window.dispatchEvent(new Event('wishlist-updated'))
+    }
+  }
+
+  const { data: allProducts = [] } = useProducts()
+
+  const recommendedProducts = (sanitizedProduct && allProducts.length > 0)
+    ? (() => {
+        const dbProducts = sanitizeProducts(allProducts)
+        const otherProducts = dbProducts.filter(p => p.id !== sanitizedProduct.id)
+        return [
+          ...otherProducts.filter(p => {
+            const pCat = typeof p.category === 'object' && p.category !== null ? (p.category as any).name : p.category
+            const sCat = typeof sanitizedProduct.category === 'object' && sanitizedProduct.category !== null ? (sanitizedProduct.category as any).name : sanitizedProduct.category
+            return pCat === sCat
+          }),
+          ...otherProducts.filter(p => {
+            const pCat = typeof p.category === 'object' && p.category !== null ? (p.category as any).name : p.category
+            const sCat = typeof sanitizedProduct.category === 'object' && sanitizedProduct.category !== null ? (sanitizedProduct.category as any).name : sanitizedProduct.category
+            return pCat !== sCat
+          })
+        ].slice(0, 4)
+      })()
+    : []
+
+  useEffect(() => {
+    if (sanitizedProduct?.id) {
+      setLoadingReviews(true)
+      api.get(`/products/${sanitizedProduct.id}/reviews`)
+        .then((res) => {
+          if (res.data?.success && res.data?.data) {
+            setReviews(res.data.data)
+          }
+        })
+        .catch((err) => console.error('Error fetching product reviews:', err))
+        .finally(() => setLoadingReviews(false))
+    }
+  }, [sanitizedProduct?.id])
+
+  const handleAddToCart = () => {
+    if (!sanitizedProduct) return
+
+    const stock = sanitizedProduct.stock ?? 0
+    if (stock <= 0) {
+      setToastMessage(`Sorry, "${sanitizedProduct.name}" is out of stock!`)
+      setTimeout(() => setToastMessage(null), 3000)
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const currentCart = JSON.parse(localStorage.getItem('cart') || '[]')
+      const existing = currentCart.find((item: any) => item.id === sanitizedProduct.id)
+      
+      const currentQty = existing ? existing.quantity : 0
+      if (currentQty + quantity > stock) {
+        const allowed = stock - currentQty
+        if (allowed <= 0) {
+          setToastMessage(`Cannot add more. You already have all ${stock} available items in your cart.`)
+        } else {
+          if (existing) {
+            existing.quantity = stock
+          } else {
+            currentCart.push({
+              id: sanitizedProduct.id,
+              name: sanitizedProduct.name,
+              slug: sanitizedProduct.slug,
+              price: sanitizedProduct.price,
+              image: sanitizedProduct.image || '/placeholder.jpg',
+              category: sanitizedProduct.category,
+              quantity: stock
+            })
+          }
+          localStorage.setItem('cart', JSON.stringify(currentCart))
+          window.dispatchEvent(new Event('cart-updated'))
+          setToastMessage(`Only ${allowed} more items could be added. Cart now has max stock of ${stock}.`)
+        }
+        setTimeout(() => setToastMessage(null), 3000)
+        return
+      }
+
+      if (existing) {
+        existing.quantity += quantity
+      } else {
+        currentCart.push({
+          id: sanitizedProduct.id,
+          name: sanitizedProduct.name,
+          slug: sanitizedProduct.slug,
+          price: sanitizedProduct.price,
+          image: sanitizedProduct.image || '/placeholder.jpg',
+          category: sanitizedProduct.category,
+          quantity: quantity
+        })
+      }
+      localStorage.setItem('cart', JSON.stringify(currentCart))
+      window.dispatchEvent(new Event('cart-updated'))
+    }
+
+    setToastMessage(`"${sanitizedProduct.name}" (${quantity} ${quantity === 1 ? 'item' : 'items'}) added to cart!`)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 3000)
+  }
+
+  const handleBuyNow = () => {
+    if (!sanitizedProduct) return
+
+    const stock = sanitizedProduct.stock ?? 0
+    if (stock <= 0) {
+      setToastMessage(`Sorry, "${sanitizedProduct.name}" is out of stock!`)
+      setTimeout(() => setToastMessage(null), 3000)
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const currentCart = JSON.parse(localStorage.getItem('cart') || '[]')
+      const existing = currentCart.find((item: any) => item.id === sanitizedProduct.id)
+      
+      const targetQty = existing ? existing.quantity + quantity : quantity
+      const finalQty = Math.min(targetQty, stock)
+
+      if (existing) {
+        existing.quantity = finalQty
+      } else {
+        currentCart.push({
+          id: sanitizedProduct.id,
+          name: sanitizedProduct.name,
+          slug: sanitizedProduct.slug,
+          price: sanitizedProduct.price,
+          image: sanitizedProduct.image || '/placeholder.jpg',
+          category: sanitizedProduct.category,
+          quantity: finalQty
+        })
+      }
+      localStorage.setItem('cart', JSON.stringify(currentCart))
+      window.dispatchEvent(new Event('cart-updated'))
+      
+      router.push('/checkout')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
+        <Navbar />
+        <div className="pt-32 pb-12 container mx-auto px-4 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div className="aspect-square bg-secondary rounded-lg animate-pulse" />
+            <div className="space-y-4">
+              <div className="h-8 bg-secondary rounded animate-pulse w-3/4" />
+              <div className="h-6 bg-secondary rounded animate-pulse w-1/2" />
+              <div className="space-y-2 mt-6">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-4 bg-secondary rounded animate-pulse" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  if (error || !sanitizedProduct) {
+    return (
+      <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
+        <Navbar />
+        <div className="pt-32 pb-12 container mx-auto px-4 md:px-6 text-center">
+          <p className="text-destructive">Product not found</p>
+          <Link href="/products" className="text-primary-text hover:text-primary mt-4 inline-block">
+            Back to Products
+          </Link>
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
+      <Navbar />
+
+      {/* Product Detail */}
+      <div className="pt-32 pb-12 md:pb-16">
+        <div className="container mx-auto px-4 md:px-6">
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 gap-12"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+          >
+            {/* Image */}
+            <div>
+              <div className="aspect-square rounded-lg overflow-hidden bg-secondary border border-border">
+                <img
+                  src={sanitizedProduct.image}
+                  alt={sanitizedProduct.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Details */}
+            <div className="flex flex-col justify-between">
+              <div>
+                {/* Breadcrumb */}
+                <Link href="/products" className="text-secondary-text hover:text-primary text-sm smooth-transition">
+                  ← Products
+                </Link>
+
+                 {/* Title & Wishlist */}
+                 <div className="flex items-center justify-between gap-4 mt-4 mb-2">
+                   <h1 className="heading-2 text-primary-text">{sanitizedProduct.name}</h1>
+                   <button
+                     type="button"
+                     onClick={toggleWishlist}
+                     className="p-2.5 border border-border text-primary-text rounded-full hover:bg-secondary smooth-transition cursor-pointer flex items-center justify-center"
+                     title={isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                   >
+                     <Heart
+                       className={`w-5 h-5 transition-colors ${
+                         isInWishlist ? 'fill-red-500 text-red-500' : 'text-secondary-text'
+                       }`}
+                     />
+                   </button>
+                 </div>
+
+                {/* Rating below title */}
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex text-primary">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${
+                          i < Math.floor(sanitizedProduct.rating)
+                            ? 'fill-primary text-primary'
+                            : 'text-white/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-secondary-text font-medium">
+                    {sanitizedProduct.rating} / 5 ({sanitizedProduct.reviewsCount} {sanitizedProduct.reviewsCount === 1 ? 'review' : 'reviews'})
+                  </span>
+                </div>
+
+                {/* Category */}
+                <span className="text-xs bg-secondary text-primary border border-border px-3 py-1 rounded-full inline-block mb-6 font-semibold">
+                  {sanitizedProduct.category}
+                </span>
+
+                {/* Description */}
+                <div className="text-secondary-text leading-relaxed mb-8">
+                  {sanitizedProduct.description.length > 250 ? (
+                    <p>
+                      {isDescExpanded
+                        ? sanitizedProduct.description
+                        : `${sanitizedProduct.description.slice(0, 250)}...`}
+                      <button
+                        type="button"
+                        onClick={() => setIsDescExpanded(!isDescExpanded)}
+                        className="text-primary hover:underline font-bold ml-2 focus:outline-none inline-block cursor-pointer"
+                      >
+                        {isDescExpanded ? 'Read Less' : 'Read More'}
+                      </button>
+                    </p>
+                  ) : (
+                    <p>{sanitizedProduct.description}</p>
+                  )}
+                </div>
+
+                {/* Specifications */}
+                {sanitizedProduct.specifications && Object.keys(sanitizedProduct.specifications).length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="font-semibold text-primary-text mb-4">Specifications</h3>
+                    <div className="space-y-3">
+                      {Object.entries(sanitizedProduct.specifications).map(([key, value]) => (
+                        <div key={key} className="flex justify-between border-b border-border pb-2">
+                          <span className="text-secondary-text capitalize">{key}</span>
+                          <span className="text-primary-text font-medium">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Purchase Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">
+                {/* Left Side: Pricing & Quantity */}
+                <div className="space-y-4">
+                  {/* Price */}
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold text-primary-text">
+                      {formatPrice(sanitizedProduct.price)}
+                    </span>
+                    <span className="text-secondary-text">per unit</span>
+                  </div>
+
+                  {/* Stock Info */}
+                  <div className="text-sm">
+                    {sanitizedProduct.stock <= 0 ? (
+                      <span className="text-red-500 font-semibold">Out of Stock</span>
+                    ) : sanitizedProduct.stock <= 5 ? (
+                      <span className="text-orange-500 font-semibold">Only {sanitizedProduct.stock} left in stock!</span>
+                    ) : (
+                      <span className="text-green-500 font-semibold">{sanitizedProduct.stock} items available</span>
+                    )}
+                  </div>
+
+                  {/* Quantity */}
+                  {sanitizedProduct.stock > 0 && (
+                    <div className="flex items-center gap-4">
+                      <label className="text-sm font-medium text-primary-text">Quantity:</label>
+                      <div className="flex items-center border border-border rounded-lg bg-secondary/35">
+                        <button
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
+                        >
+                          −
+                        </button>
+                        <span className="px-6 py-2 text-primary-text border-l border-r border-border">
+                          {quantity}
+                        </span>
+                        <button
+                          onClick={() => setQuantity(Math.min(sanitizedProduct.stock, quantity + 1))}
+                          className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Side: Stacked Add to Cart and Buy Now Buttons */}
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={sanitizedProduct.stock <= 0}
+                    className="w-full px-6 py-3.5 bg-white text-black font-semibold rounded-lg hover:bg-gray-100 disabled:bg-gray-100/50 disabled:text-black/40 disabled:cursor-not-allowed smooth-transition cursor-pointer text-center text-xs sm:text-sm uppercase tracking-wider font-bold"
+                  >
+                    {sanitizedProduct.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+                  </button>
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={sanitizedProduct.stock <= 0}
+                    className="w-full px-6 py-3.5 border border-border text-primary-text font-semibold rounded-lg hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed smooth-transition cursor-pointer text-center text-xs sm:text-sm uppercase tracking-wider font-bold"
+                  >
+                    Buy Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSupportModalOpen(true)}
+                    className="w-full px-6 py-3.5 border border-border/80 text-secondary-text hover:text-primary-text font-semibold rounded-lg hover:bg-secondary/60 smooth-transition cursor-pointer text-center text-xs sm:text-sm uppercase tracking-wider font-bold mt-1.5 flex items-center justify-center gap-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Support for Product</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Ratings & Reviews Section */}
+      <div className="border-t border-border mt-16 py-16 bg-secondary/5">
+        <div className="container mx-auto px-4 md:px-6">
+          <h2 className="heading-3 mb-8">Ratings & Reviews</h2>
+          
+          {loadingReviews ? (
+            <p className="text-secondary-text">Loading reviews...</p>
+          ) : reviews.length === 0 ? (
+            <p className="text-secondary-text italic bg-secondary/10 p-6 rounded-lg border border-border">No reviews yet for this product. Be the first to leave one!</p>
+          ) : (
+            <div className="space-y-6 max-w-3xl">
+              {reviews.map((review: any) => (
+                <div key={review.id} className="bg-card border border-border p-6 rounded-xl space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-primary">
+                        {review.user?.name ? review.user.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-primary-text">{review.user?.name || 'Anonymous User'}</h4>
+                        <p className="text-xs text-muted-text flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex text-primary gap-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < review.rating ? 'fill-primary text-primary' : 'text-white/10'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <p className="text-secondary-text text-sm leading-relaxed whitespace-pre-wrap pl-1">
+                    {review.comment || 'No comment provided.'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recommended Products Section */}
+      {recommendedProducts.length > 0 && (
+        <div className="border-t border-border py-16 bg-background">
+          <div className="container mx-auto px-4 md:px-6">
+            <h2 className="heading-3 mb-8">Recommended Products</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              {recommendedProducts.map((prod: any) => (
+                <ProductCard key={prod.id} product={prod} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Add To Cart Toast */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-8 right-8 z-50 bg-popover border border-border rounded-xl px-5 py-4 shadow-2xl flex items-center gap-3 accent-glow"
+          >
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+              <ShoppingCart className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-primary-text text-sm font-bold">Product Added</p>
+              <p className="text-muted-text text-xs mt-0.5">{toastMessage}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Support Ticket Modal */}
+      <AnimatePresence>
+        {isSupportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSupportModalOpen(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-popover border border-border p-6 shadow-2xl z-10 space-y-6 max-h-[95vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center pb-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-primary" />
+                  <h3 className="font-bold text-sm uppercase tracking-widest text-primary-text">
+                    Ask about this Product
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsSupportModalOpen(false)}
+                  className="text-muted-text hover:text-primary-text smooth-transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {supportSuccess ? (
+                <div className="py-6 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center mx-auto text-xl font-bold">✓</div>
+                  <h4 className="font-bold text-sm text-green-400">Inquiry Sent Successfully</h4>
+                  <p className="text-xs text-muted-text">We have created a support thread. You can check replies in your dashboard.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSupportSubmit} className="space-y-4 text-xs">
+                  <div className="p-3 bg-secondary/40 border border-border/50 rounded-lg flex items-center gap-3">
+                    <img
+                      src={sanitizedProduct.image}
+                      alt={sanitizedProduct.name}
+                      className="w-12 h-12 object-cover rounded-md border border-border/60"
+                    />
+                    <div>
+                      <p className="font-bold text-xs text-primary-text truncate max-w-[250px]">{sanitizedProduct.name}</p>
+                      <p className="text-[10px] text-muted-text uppercase tracking-widest">ID: {sanitizedProduct.id}</p>
+                    </div>
+                  </div>
+
+                  {/* Name */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Your Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={supportFormData.name}
+                      onChange={(e) => setSupportFormData({ ...supportFormData, name: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
+                      disabled={isSupportSubmitting}
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Your Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={supportFormData.email}
+                      onChange={(e) => setSupportFormData({ ...supportFormData, email: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
+                      disabled={isSupportSubmitting}
+                    />
+                  </div>
+
+                  {/* Subject */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Subject</label>
+                    <input
+                      type="text"
+                      required
+                      value={supportFormData.subject}
+                      onChange={(e) => setSupportFormData({ ...supportFormData, subject: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
+                      disabled={isSupportSubmitting}
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">How can we help you?</label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={supportFormData.message}
+                      onChange={(e) => setSupportFormData({ ...supportFormData, message: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 resize-none"
+                      placeholder="Ask questions about specifications, availability, printing process..."
+                      disabled={isSupportSubmitting}
+                    />
+                  </div>
+
+                  {/* Submit */}
+                  <div className="pt-3 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsSupportModalOpen(false)}
+                      className="px-5 py-2.5 border border-border text-primary-text hover:bg-secondary smooth-transition uppercase tracking-widest text-[10px] font-bold cursor-pointer"
+                      disabled={isSupportSubmitting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSupportSubmitting}
+                      className="px-6 py-2.5 bg-primary text-white hover:bg-primary/95 smooth-transition uppercase tracking-widest text-[10px] font-bold flex items-center gap-2 cursor-pointer"
+                    >
+                      {isSupportSubmitting ? 'Sending...' : 'Send Inquiry'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <Footer />
+    </main>
+  )
+}
