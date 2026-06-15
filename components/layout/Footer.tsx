@@ -111,9 +111,10 @@ export const Footer = () => {
                 Premium 3D printed products & custom prototyping solutions.
               </p>
             </div>
-            <p className="text-muted-text text-sm order-last md:order-none">
-              © {currentYear} Skulture. All rights reserved.
-            </p>
+            <div className="text-muted-text text-sm order-last md:order-none text-center md:text-left flex flex-col gap-1.5">
+              <span>© {currentYear} Skulture. All rights reserved.</span>
+              <span className="text-[10px] text-muted-text/80 uppercase tracking-widest font-black block">Created by Team Orion</span>
+            </div>
             <div className="flex gap-6">
               <a href="#twitter" className="text-secondary-text hover:text-primary smooth-transition text-sm">Twitter</a>
               <a href="#instagram" className="text-secondary-text hover:text-primary smooth-transition text-sm">Instagram</a>
