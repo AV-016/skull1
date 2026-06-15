@@ -14,13 +14,31 @@ export function BestSellersSection() {
   const { data: serverProducts = [] } = useProducts()
   const sanitizedServer = sanitizeProducts(serverProducts)
 
-  // Select the Shogun Cyber-Oni Figure as the large featured product
-  const heroProduct = sanitizedServer.find((p) => p.slug === 'shogun-cyber-oni-figure') 
+  // Filter active featured products from the database
+  const featuredDbProducts = sanitizedServer.filter((p) => p.isActive && p.isFeatured)
+
+  // Select the large featured hero product
+  const heroProduct = featuredDbProducts[0]
+    || sanitizedServer.find((p) => p.slug === 'shogun-cyber-oni-figure') 
     || sanitizedServer[0] 
     || mockProducts.find((p) => p.slug === 'shogun-cyber-oni-figure') 
     || mockProducts[0]
 
-  // Default supporting items
+  // Select supporting products (up to 4 items)
+  const supportingProducts: any[] = []
+  
+  // 1. Add remaining featured products (after the hero)
+  supportingProducts.push(...featuredDbProducts.slice(1))
+
+  // 2. Add other active database products to fill up slots if needed
+  if (supportingProducts.length < 4) {
+    const otherDbProducts = sanitizedServer.filter(
+      (p) => p.id !== heroProduct.id && !supportingProducts.some((sp) => sp.id === p.id) && p.isActive
+    )
+    supportingProducts.push(...otherDbProducts)
+  }
+
+  // 3. Fallback to mock popular products if we still have fewer than 4 items
   const defaultSupporting = [
     mockProducts.find((p) => p.slug === 'fractal-kinetic-sculpture') || mockProducts[1],
     mockProducts.find((p) => p.slug === 'parametric-origami-vase') || mockProducts[4],
@@ -28,15 +46,20 @@ export function BestSellersSection() {
     mockProducts.find((p) => p.slug === 'cyberpunk-artisan-keycaps') || mockProducts[2]
   ]
 
-  // Select 4 supporting products (checking database first)
-  const supportingProducts = serverProducts.length > 1
-    ? [
-        sanitizedServer.find((p) => p.slug === 'fractal-kinetic-sculpture') || sanitizedServer[1] || defaultSupporting[0],
-        sanitizedServer.find((p) => p.slug === 'parametric-origami-vase') || sanitizedServer[2] || defaultSupporting[1],
-        sanitizedServer.find((p) => p.slug === 'articulated-crystal-dragon') || sanitizedServer[3] || defaultSupporting[2],
-        sanitizedServer.find((p) => p.slug === 'cyberpunk-artisan-keycaps') || sanitizedServer[4] || defaultSupporting[3],
-      ]
-    : defaultSupporting
+  let fallbackIdx = 0
+  while (supportingProducts.length < 4 && fallbackIdx < defaultSupporting.length) {
+    const fallbackItem = defaultSupporting[fallbackIdx]
+    if (
+      fallbackItem.id !== heroProduct.id && 
+      fallbackItem.slug !== heroProduct.slug &&
+      !supportingProducts.some((sp) => sp.id === fallbackItem.id || sp.slug === fallbackItem.slug)
+    ) {
+      supportingProducts.push(fallbackItem)
+    }
+    fallbackIdx++
+  }
+
+  const finalSupporting = supportingProducts.slice(0, 4)
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -148,7 +171,7 @@ export function BestSellersSection() {
 
           {/* Right Block: 4 Supporting Products */}
           <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
-            {supportingProducts.map((product) => (
+            {finalSupporting.map((product) => (
               <motion.div
                 key={product.id}
                 variants={itemVariants}

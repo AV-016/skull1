@@ -63,17 +63,32 @@ export class OrderService {
         throw new AppError(404, `Product not found: ${cartItem.productId}`);
       }
 
-      if (product.stock < cartItem.quantity) {
-        throw new AppError(400, `Insufficient stock for product: ${product.name}`);
+      let itemPrice = product.price;
+      if (cartItem.variantId) {
+        const variant = product.variants?.find((v: any) => v.id === cartItem.variantId);
+        if (!variant) {
+          throw new AppError(404, `Variant not found: ${cartItem.variantId} for product ${product.name}`);
+        }
+        if (variant.stock < cartItem.quantity) {
+          throw new AppError(400, `Insufficient stock for option ${variant.name} of product ${product.name}`);
+        }
+        if (variant.price !== null && variant.price !== undefined) {
+          itemPrice = variant.price;
+        }
+      } else {
+        if (product.stock < cartItem.quantity) {
+          throw new AppError(400, `Insufficient stock for product: ${product.name}`);
+        }
       }
 
-      const itemTotal = product.price * cartItem.quantity;
+      const itemTotal = itemPrice * cartItem.quantity;
       totalAmount += itemTotal;
 
       items.push({
         productId: product.id,
+        variantId: cartItem.variantId || null,
         quantity: cartItem.quantity,
-        price: product.price,
+        price: itemPrice,
       });
     }
 
@@ -125,11 +140,24 @@ export class OrderService {
 
     // 4. Update stock in database
     for (const item of items) {
-      const currentProduct = await productRepository.findById(item.productId);
-      if (currentProduct) {
-        await productRepository.update(item.productId, {
-          stock: currentProduct.stock - item.quantity,
-        });
+      if (item.variantId) {
+        const currentProduct = await productRepository.findById(item.productId);
+        if (currentProduct) {
+          const variant = currentProduct.variants?.find((v: any) => v.id === item.variantId);
+          if (variant) {
+            await prisma.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: variant.stock - item.quantity },
+            });
+          }
+        }
+      } else {
+        const currentProduct = await productRepository.findById(item.productId);
+        if (currentProduct) {
+          await productRepository.update(item.productId, {
+            stock: currentProduct.stock - item.quantity,
+          });
+        }
       }
     }
 
@@ -167,12 +195,22 @@ export class OrderService {
 
       // Restock items
       for (const item of order.items) {
-        const prod = await tx.product.findUnique({ where: { id: item.productId } });
-        if (prod) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: prod.stock + item.quantity },
-          });
+        if (item.variantId) {
+          const varItem = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+          if (varItem) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: varItem.stock + item.quantity },
+            });
+          }
+        } else {
+          const prod = await tx.product.findUnique({ where: { id: item.productId } });
+          if (prod) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: prod.stock + item.quantity },
+            });
+          }
         }
       }
 

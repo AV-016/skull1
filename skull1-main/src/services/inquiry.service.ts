@@ -14,6 +14,8 @@ export class InquiryService {
         productId: data.productId || null,
         orderId: data.orderId || null,
         status: InquiryStatus.PENDING,
+        isReadByCustomer: true,
+        isReadByAdmin: false,
       },
     });
   }
@@ -56,7 +58,7 @@ export class InquiryService {
     };
   }
 
-  async getInquiryById(id: string): Promise<Inquiry> {
+  async getInquiryById(id: string, user?: any): Promise<Inquiry> {
     const inquiry = await prisma.inquiry.findUnique({
       where: { id },
       include: {
@@ -89,6 +91,24 @@ export class InquiryService {
     if (!inquiry) {
       throw new AppError(404, 'Inquiry not found');
     }
+
+    // Mark as read based on who is viewing
+    if (user) {
+      if (user.role === 'ADMIN') {
+        await prisma.inquiry.update({
+          where: { id },
+          data: { isReadByAdmin: true },
+        });
+        (inquiry as any).isReadByAdmin = true;
+      } else if (inquiry.userId === user.id) {
+        await prisma.inquiry.update({
+          where: { id },
+          data: { isReadByCustomer: true },
+        });
+        (inquiry as any).isReadByCustomer = true;
+      }
+    }
+
     return inquiry;
   }
 
@@ -127,12 +147,24 @@ export class InquiryService {
       },
     });
 
-    // Automatically mark inquiry as PENDING/OPEN if customer replied, or keep active
+    // Automatically update read status
     if (senderRole === Role.ADMIN) {
-      // Set to RESOLVED or answered status if desired, here we just keep it PENDING or update updated time
       await prisma.inquiry.update({
         where: { id: inquiryId },
-        data: { updatedAt: new Date() },
+        data: { 
+          isReadByCustomer: false,
+          isReadByAdmin: true,
+          updatedAt: new Date()
+        },
+      });
+    } else {
+      await prisma.inquiry.update({
+        where: { id: inquiryId },
+        data: { 
+          isReadByCustomer: true,
+          isReadByAdmin: false,
+          updatedAt: new Date()
+        },
       });
     }
 

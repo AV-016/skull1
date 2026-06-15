@@ -13,6 +13,11 @@ export class CartRepository {
                 images: true,
               },
             },
+            variant: {
+              include: {
+                images: true,
+              },
+            },
           },
         },
       },
@@ -30,6 +35,11 @@ export class CartRepository {
                   images: true,
                 },
               },
+              variant: {
+                include: {
+                  images: true,
+                },
+              },
             },
           },
         },
@@ -39,11 +49,14 @@ export class CartRepository {
     return cart;
   }
 
-  async addItem(userId: string, productId: string, quantity: number = 1): Promise<CartItem> {
+  async addItem(userId: string, productId: string, quantity: number = 1, variantId?: string | null): Promise<CartItem> {
     const cart = await this.findByUserId(userId);
 
-    // Check if item already in cart
-    const existingItem = cart.items.find((item: any) => item.productId === productId);
+    // Check if item already in cart with same product AND variant
+    const existingItem = cart.items.find((item: any) => 
+      item.productId === productId && 
+      (variantId ? item.variantId === variantId : !item.variantId)
+    );
 
     if (existingItem) {
       return prisma.cartItem.update({
@@ -56,6 +69,7 @@ export class CartRepository {
       data: {
         cartId: cart.id,
         productId,
+        variantId: variantId || null,
         quantity,
       },
     });

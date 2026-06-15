@@ -12,6 +12,8 @@ import { useAuth } from '@/context/AuthContext'
 
 interface CartItem {
   id: string
+  productId?: string
+  variantId?: string | null
   name: string
   slug: string
   price: number
@@ -208,7 +210,8 @@ export default function CheckoutPage() {
       await api.delete('/cart/clear')
       for (const item of cartItems) {
         await api.post('/cart/items', {
-          productId: item.id,
+          productId: item.productId || item.id,
+          variantId: item.variantId || null,
           quantity: item.quantity
         })
       }

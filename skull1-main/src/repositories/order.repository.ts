@@ -17,6 +17,7 @@ export class OrderRepository {
                 images: true,
               },
             },
+            variant: true,
           },
         },
         statusHistory: {
@@ -39,6 +40,7 @@ export class OrderRepository {
                 images: true,
               },
             },
+            variant: true,
           },
         },
         statusHistory: {
@@ -60,6 +62,7 @@ export class OrderRepository {
                 images: true,
               },
             },
+            variant: true,
           },
         },
         statusHistory: {
@@ -92,6 +95,7 @@ export class OrderRepository {
                   images: true,
                 },
               },
+              variant: true,
             },
           },
           statusHistory: {
@@ -115,7 +119,7 @@ export class OrderRepository {
     userId: string;
     addressId: string;
     totalAmount: number;
-    items: { productId: string; quantity: number; price: number }[];
+    items: { productId: string; quantity: number; price: number; variantId?: string | null }[];
     paymentMethod?: string;
     codCharge?: number;
   }): Promise<Order> {
@@ -137,6 +141,7 @@ export class OrderRepository {
           items: {
             create: items.map((item) => ({
               productId: item.productId,
+              variantId: item.variantId || null,
               quantity: item.quantity,
               price: item.price,
             })),

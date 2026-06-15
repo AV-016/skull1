@@ -10,17 +10,27 @@ export class CartService {
     return cartRepository.findByUserId(userId);
   }
 
-  async addToCart(userId: string, productId: string, quantity: number = 1): Promise<any> {
+  async addToCart(userId: string, productId: string, quantity: number = 1, variantId?: string | null): Promise<any> {
     const product = await productRepository.findById(productId);
     if (!product) {
       throw new AppError(404, 'Product not found');
     }
 
-    if (product.stock < quantity) {
-      throw new AppError(400, 'Insufficient product stock');
+    if (variantId) {
+      const variant = product.variants?.find((v: any) => v.id === variantId);
+      if (!variant) {
+        throw new AppError(404, 'Product variant not found');
+      }
+      if (variant.stock < quantity) {
+        throw new AppError(400, `Insufficient stock for variant ${variant.name}`);
+      }
+    } else {
+      if (product.stock < quantity) {
+        throw new AppError(400, 'Insufficient product stock');
+      }
     }
 
-    await cartRepository.addItem(userId, productId, quantity);
+    await cartRepository.addItem(userId, productId, quantity, variantId);
     return this.getCart(userId);
   }
 

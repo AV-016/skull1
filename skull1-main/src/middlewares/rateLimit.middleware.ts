@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 
-const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+const isDev = process.env.NODE_ENV !== 'production';
 
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

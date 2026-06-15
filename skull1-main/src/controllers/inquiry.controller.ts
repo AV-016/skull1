@@ -36,7 +36,7 @@ export class InquiryController {
 
   async getInquiryById(req: Request, res: Response, next: NextFunction) {
     try {
-      const inquiry = await inquiryService.getInquiryById(req.params.id);
+      const inquiry = await inquiryService.getInquiryById(req.params.id, (req as any).user);
       res.status(200).json({
         success: true,
         message: 'Inquiry details retrieved',

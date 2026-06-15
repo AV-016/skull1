@@ -3,40 +3,37 @@ import { Product, Prisma } from '@prisma/client';
 import { ProductQueryFilters, CreateProductInput } from '../types/product.types';
 import { ProductWithDetails } from '../dto/product.dto';
 
+const productInclude = {
+  category: true,
+  images: true,
+  variants: {
+    include: {
+      images: true,
+    },
+  },
+  tags: true,
+  reviews: true,
+};
+
 export class ProductRepository {
   async findById(id: string): Promise<ProductWithDetails | null> {
     return prisma.product.findUnique({
       where: { id },
-      include: {
-        category: true,
-        images: true,
-        tags: true,
-        reviews: true,
-      },
+      include: productInclude,
     }) as Promise<ProductWithDetails | null>;
   }
 
   async findBySlug(slug: string): Promise<ProductWithDetails | null> {
     return prisma.product.findUnique({
       where: { slug },
-      include: {
-        category: true,
-        images: true,
-        tags: true,
-        reviews: true,
-      },
+      include: productInclude,
     }) as Promise<ProductWithDetails | null>;
   }
 
   async findFeatured(): Promise<ProductWithDetails[]> {
     return prisma.product.findMany({
       where: { isFeatured: true, isActive: true },
-      include: {
-        category: true,
-        images: true,
-        tags: true,
-        reviews: true,
-      },
+      include: productInclude,
     }) as Promise<ProductWithDetails[]>;
   }
 
@@ -100,12 +97,7 @@ export class ProductRepository {
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where: whereClause,
-        include: {
-          category: true,
-          images: true,
-          tags: true,
-          reviews: true,
-        },
+        include: productInclude,
         skip,
         take: limit,
         orderBy,
@@ -120,7 +112,7 @@ export class ProductRepository {
   }
 
   async create(data: CreateProductInput): Promise<Product> {
-    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [] } = data;
+    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [], variants = [] } = data;
     
     // Generate slug from name
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -143,14 +135,27 @@ export class ProductRepository {
             isPrimary: index === 0,
           })),
         },
+        variants: {
+          create: variants.map((v) => ({
+            name: v.name,
+            price: v.price,
+            stock: v.stock,
+            images: {
+              create: (v.images || []).map((url) => ({
+                url,
+              })),
+            },
+          })),
+        },
       },
     });
   }
 
   async update(id: string, data: Prisma.ProductUpdateInput): Promise<Product> {
-    const { images, ...updateData } = data as any;
+    const { images, variants, ...updateData } = data as any;
     
     return prisma.$transaction(async (tx) => {
+      // 1. Update main images
       if (images && Array.isArray(images)) {
         await tx.productImage.deleteMany({ where: { productId: id } });
         if (images.length > 0) {
@@ -160,6 +165,29 @@ export class ProductRepository {
               url,
               isPrimary: index === 0,
             })),
+          });
+        }
+      }
+
+      // 2. Update variants
+      if (variants && Array.isArray(variants)) {
+        // Delete existing variants
+        await tx.productVariant.deleteMany({ where: { productId: id } });
+        
+        // Re-create variants with their images
+        for (const v of variants) {
+          await tx.productVariant.create({
+            data: {
+              productId: id,
+              name: v.name,
+              price: v.price,
+              stock: v.stock,
+              images: {
+                create: (v.images || []).map((url: string) => ({
+                  url,
+                })),
+              },
+            },
           });
         }
       }

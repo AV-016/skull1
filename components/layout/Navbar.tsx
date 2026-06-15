@@ -36,11 +36,7 @@ export const Navbar = () => {
       try {
         const res = await api.get('/inquiries/my')
         if (res.data?.success && res.data?.data) {
-          const unread = res.data.data.filter((inq: any) => {
-            if (inq.status === 'RESOLVED') return false
-            const lastMsg = inq.messages?.[0]
-            return lastMsg && lastMsg.senderRole === 'ADMIN'
-          })
+          const unread = res.data.data.filter((inq: any) => !inq.isReadByCustomer)
           setNotifications(unread)
         }
       } catch (err) {
@@ -50,7 +46,12 @@ export const Navbar = () => {
 
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 10000)
-    return () => clearInterval(interval)
+
+    window.addEventListener('notifications-updated', fetchNotifications)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('notifications-updated', fetchNotifications)
+    }
   }, [user])
 
   useEffect(() => {

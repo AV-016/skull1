@@ -58,6 +58,18 @@ export class CategoryService {
 
   async deleteCategory(id: string): Promise<void> {
     await this.getCategoryById(id);
+
+    const productsCount = await prisma.product.count({
+      where: { categoryId: id },
+    });
+
+    if (productsCount > 0) {
+      throw new AppError(
+        400,
+        'Cannot delete category because it has associated products. Please delete or reassign the products first.'
+      );
+    }
+
     await prisma.category.delete({
       where: { id },
     });

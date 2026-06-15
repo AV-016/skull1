@@ -1,4 +1,4 @@
-import { Product, ProductImage, Tag, Category, Review } from '@prisma/client';
+import { Product, ProductImage, Tag, Category, Review, ProductVariant, ProductVariantImage } from '@prisma/client';
 
 export interface ProductResponseDTO {
   id: string;
@@ -20,6 +20,13 @@ export interface ProductResponseDTO {
     url: string;
     isPrimary: boolean;
   }[];
+  variants: {
+    id: string;
+    name: string;
+    price: number | null;
+    stock: number;
+    images: string[];
+  }[];
   tags: {
     id: string;
     name: string;
@@ -34,6 +41,9 @@ export interface ProductResponseDTO {
 export type ProductWithDetails = Product & {
   category: Category;
   images: ProductImage[];
+  variants: (ProductVariant & {
+    images: ProductVariantImage[];
+  })[];
   tags: Tag[];
   reviews: Review[];
 };
@@ -59,16 +69,23 @@ export const formatProductResponse = (product: ProductWithDetails): ProductRespo
       name: product.category.name,
       slug: product.category.slug,
     },
-    images: product.images.map((img) => ({
+    images: product.images ? product.images.map((img) => ({
       id: img.id,
       url: img.url,
       isPrimary: img.isPrimary,
-    })),
-    tags: product.tags.map((tag) => ({
+    })) : [],
+    variants: product.variants ? product.variants.map((v) => ({
+      id: v.id,
+      name: v.name,
+      price: v.price,
+      stock: v.stock,
+      images: v.images ? v.images.map((vi) => vi.url) : [],
+    })) : [],
+    tags: product.tags ? product.tags.map((tag) => ({
       id: tag.id,
       name: tag.name,
       slug: tag.slug,
-    })),
+    })) : [],
     rating,
     reviewsCount,
     createdAt: product.createdAt,

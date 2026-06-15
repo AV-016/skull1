@@ -22,8 +22,8 @@ export class CartController {
   async addItem(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const { productId, quantity } = req.body;
-      const cart = await cartService.addToCart(userId, productId, quantity);
+      const { productId, quantity, variantId } = req.body;
+      const cart = await cartService.addToCart(userId, productId, quantity, variantId);
       res.status(200).json({
         success: true,
         message: MESSAGES.CART.ITEM_ADDED,

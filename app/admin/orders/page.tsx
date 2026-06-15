@@ -1,20 +1,42 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useAdminOrders, useUpdateOrderStatus } from '@/hooks/useAdmin'
-import { Eye, Loader2, AlertTriangle } from 'lucide-react'
+import { Eye, Loader2, AlertTriangle, Search } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 export default function AdminOrders() {
   const { data: orders, isLoading, error, refetch } = useAdminOrders()
   const updateStatusMutation = useUpdateOrderStatus()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
 
   // Compute metrics dynamically from the fetched orders
   const totalOrders = orders?.length || 0
   const pendingCount = orders?.filter((o: any) => o.status === 'PENDING').length || 0
   const processingCount = orders?.filter((o: any) => o.status === 'PROCESSING').length || 0
   const deliveredCount = orders?.filter((o: any) => o.status === 'DELIVERED').length || 0
+
+  const filteredOrders = orders?.filter((order: any) => {
+    const orderNo = (order.orderNumber || '').toLowerCase()
+    const shortId = (order.id || '').slice(-6).toLowerCase()
+    const email = (order.user?.email || '').toLowerCase()
+    
+    // Normalize query (remove leading '#' if present)
+    const query = searchQuery.toLowerCase().trim().replace(/^#/, '')
+    
+    const matchesSearch = !query || 
+      orderNo.includes(query) || 
+      shortId.includes(query) || 
+      email.includes(query) || 
+      order.id.toLowerCase().includes(query)
+      
+    const matchesStatus = statusFilter === 'ALL' || order.status.toUpperCase() === statusFilter.toUpperCase()
+    
+    return matchesSearch && matchesStatus
+  }) || []
 
   const handleStatusChange = (id: string, status: string) => {
     updateStatusMutation.mutate(
@@ -70,6 +92,35 @@ export default function AdminOrders() {
           ))}
         </div>
 
+        {/* Search & Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-secondary/20 border border-border p-4 rounded-xl">
+          <div className="relative w-full sm:max-w-xs flex items-center bg-secondary border border-border focus-within:border-primary/50 rounded-lg overflow-hidden transition-all duration-300">
+            <Search className="w-4 h-4 text-muted-text ml-3 flex-shrink-0" />
+            <input
+              type="text"
+              placeholder="Search by Order ID or Email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full py-2 px-3 bg-transparent text-primary-text placeholder:text-muted-text text-xs focus:outline-none tracking-wide"
+            />
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <span className="text-[10px] font-bold text-muted-text uppercase tracking-widest whitespace-nowrap">Filter:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 bg-secondary border border-border rounded-lg text-[10px] text-primary-text focus:outline-none focus:border-primary/50 cursor-pointer uppercase font-bold tracking-wider"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="SHIPPED">Shipped</option>
+              <option value="DELIVERED">Delivered</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
         {/* Orders List */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
@@ -98,7 +149,7 @@ export default function AdminOrders() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 text-xs">
-                {orders?.map((order: any) => (
+                {filteredOrders.map((order: any) => (
                   <tr key={order.id} className="hover:bg-secondary/25 smooth-transition">
                     <td className="px-6 py-4 font-bold text-primary-text">
                       #{order.orderNumber || order.id.slice(-6).toUpperCase()}
@@ -136,10 +187,10 @@ export default function AdminOrders() {
                     </td>
                   </tr>
                 ))}
-                {orders?.length === 0 && (
+                {filteredOrders.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
-                      No orders found in database.
+                      No orders matching your filters.
                     </td>
                   </tr>
                 )}

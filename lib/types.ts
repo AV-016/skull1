@@ -11,6 +11,14 @@ export interface User {
 }
 
 
+export interface ProductVariant {
+  id: string
+  name: string
+  price: number | null
+  stock: number
+  images: string[]
+}
+
 // Product Types
 export interface Product {
   id: string
@@ -25,6 +33,7 @@ export interface Product {
   specifications: Record<string, string>
   featured: boolean
   createdAt: string
+  variants?: ProductVariant[]
 }
 
 // Category Types
@@ -39,8 +48,10 @@ export interface Category {
 // Cart Types
 export interface CartItem {
   productId: string
+  variantId?: string | null
   quantity: number
   product?: Product
+  variant?: ProductVariant | null
 }
 
 // Order Types

@@ -89,6 +89,7 @@ export default function DashboardPage() {
       const res = await api.get(`/inquiries/${id}`)
       if (res.data?.success && res.data?.data) {
         setSelectedInquiry(res.data.data)
+        window.dispatchEvent(new Event('notifications-updated'))
       }
     } catch (err) {
       console.error('Error fetching inquiry details:', err)

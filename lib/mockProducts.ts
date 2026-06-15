@@ -218,12 +218,30 @@ export const sanitizeProducts = (products: Product[]): ExtendedProduct[] => {
       prod.images?.[0]?.url ||
       '/placeholder.jpg';
 
+    const imageUrls = prod.images && Array.isArray(prod.images)
+      ? prod.images.map((img: any) => typeof img === 'string' ? img : img.url)
+      : [];
+
+    const variants = (prod as any).variants && Array.isArray((prod as any).variants)
+      ? (prod as any).variants.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          price: v.price,
+          stock: v.stock,
+          images: v.images && Array.isArray(v.images)
+            ? v.images.map((vi: any) => typeof vi === 'string' ? vi : vi.url)
+            : []
+        }))
+      : [];
+
     const mockProduct = mockProducts.find((mp) => mp.slug === prod.slug)
     if (mockProduct) {
       return {
         ...mockProduct,
         ...prod,
         image: primaryImg,
+        images: imageUrls.length > 0 ? imageUrls : mockProduct.images,
+        variants: variants.length > 0 ? variants : (mockProduct.variants || []),
         featured: (prod as any).isFeatured ?? mockProduct.featured,
         rating: (prod as any).rating !== undefined ? (prod as any).rating : 0,
         reviewsCount: (prod as any).reviewsCount !== undefined ? (prod as any).reviewsCount : 0,
@@ -243,6 +261,8 @@ export const sanitizeProducts = (products: Product[]): ExtendedProduct[] => {
     return {
       ...prod,
       image: primaryImg,
+      images: imageUrls.length > 0 ? imageUrls : [primaryImg],
+      variants,
       featured: (prod as any).isFeatured ?? (prod as any).featured ?? false,
       category: catName,
       rating: (prod as any).rating !== undefined ? (prod as any).rating : 0,

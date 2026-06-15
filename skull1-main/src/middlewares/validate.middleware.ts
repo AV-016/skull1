@@ -14,6 +14,7 @@ export const validate = (schema: AnyZodObject) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error('Validation error for request:', req.originalUrl, JSON.stringify(error.errors, null, 2));
         const errors: Record<string, string[]> = {};
         error.errors.forEach((err) => {
           const path = err.path.join('.');

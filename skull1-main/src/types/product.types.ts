@@ -12,6 +12,14 @@ export interface ProductQueryFilters {
   tagId?: string;
 }
 
+export interface CreateProductVariantInput {
+  id?: string;
+  name: string;
+  price?: number | null;
+  stock: number;
+  images?: string[];
+}
+
 export interface CreateProductInput {
   name: string;
   description: string;
@@ -21,4 +29,5 @@ export interface CreateProductInput {
   categoryId: string;
   tags?: string[]; // Tag slugs or ids
   images?: string[]; // Image URLs
+  variants?: CreateProductVariantInput[];
 }

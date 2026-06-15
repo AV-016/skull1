@@ -35,11 +35,13 @@ export default function AdminProducts() {
     compareAtPrice: '',
     stock: '',
     categoryId: '',
-    imageUrl: '', // Primary image
+    images: [] as string[],
+    variants: [] as any[],
     isActive: true,
     isFeatured: false
   })
 
+  const [manualUrl, setManualUrl] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [isDragActive, setIsDragActive] = useState(false)
 
@@ -53,26 +55,43 @@ export default function AdminProducts() {
     }
   }
 
-  const uploadFile = async (file: File) => {
-    try {
-      setIsUploading(true)
-      const uploadFormData = new FormData()
-      uploadFormData.append('file', file)
-      
-      const res = await api.post('/upload/product-image', uploadFormData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-      if (res.data?.success && res.data?.data?.url) {
-        setFormData(prev => ({ ...prev, imageUrl: res.data.data.url }))
-      } else {
-        alert('Upload failed')
+  const uploadFiles = async (files: FileList) => {
+    const remaining = 6 - formData.images.length
+    if (remaining <= 0) {
+      alert('Maximum 6 images allowed')
+      return
+    }
+    
+    const filesToUpload = Array.from(files).slice(0, remaining)
+    
+    for (const file of filesToUpload) {
+      if (!file.type.startsWith('image/')) {
+        alert(`File ${file.name} is not an image`)
+        continue
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Error uploading file')
-    } finally {
-      setIsUploading(false)
+      try {
+        setIsUploading(true)
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', file)
+        
+        const res = await api.post('/upload/product-image', uploadFormData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        if (res.data?.success && res.data?.data?.url) {
+          setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, res.data.data.url]
+          }))
+        } else {
+          alert(`Upload failed for ${file.name}`)
+        }
+      } catch (err: any) {
+        alert(err.response?.data?.message || `Error uploading ${file.name}`)
+      } finally {
+        setIsUploading(false)
+      }
     }
   }
 
@@ -81,19 +100,35 @@ export default function AdminProducts() {
     e.stopPropagation()
     setIsDragActive(false)
     
-    const file = e.dataTransfer.files?.[0]
-    if (!file) return
+    const files = e.dataTransfer.files
+    if (!files || files.length === 0) return
     
-    if (!file.type.startsWith('image/')) {
-      alert('Only image files are allowed for product images')
+    await uploadFiles(files)
+  }
+
+  const handleAddManualUrl = (e: React.MouseEvent | React.KeyboardEvent) => {
+    if (e.type === 'keydown' && (e as React.KeyboardEvent).key !== 'Enter') {
+      return
+    }
+    e.preventDefault()
+    
+    if (!manualUrl.trim()) return
+    
+    if (formData.images.length >= 6) {
+      alert('Maximum 6 images allowed')
       return
     }
     
-    await uploadFile(file)
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, manualUrl.trim()]
+    }))
+    setManualUrl('')
   }
 
   const openAddModal = () => {
     setSelectedProduct(null)
+    setManualUrl('')
     setFormData({
       name: '',
       description: '',
@@ -101,7 +136,8 @@ export default function AdminProducts() {
       compareAtPrice: '',
       stock: '',
       categoryId: categories?.[0]?.id || '',
-      imageUrl: '',
+      images: [],
+      variants: [],
       isActive: true,
       isFeatured: false
     })
@@ -110,9 +146,25 @@ export default function AdminProducts() {
 
   const openEditModal = (product: any) => {
     setSelectedProduct(product)
+    setManualUrl('')
     
-    // Find primary image url if available
-    const primaryImg = product.images?.find((img: any) => img.isPrimary)?.url || product.image || ''
+    // Find all image URLs and sort so the primary one is first (or default to product.image)
+    const imagesList = product.images 
+      ? [...product.images]
+          .sort((a: any, b: any) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
+          .map((img: any) => img.url)
+      : (product.image ? [product.image] : [])
+
+    // Map backend variants to frontend format
+    const variantsList = product.variants
+      ? product.variants.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          price: v.price ? String(v.price) : '',
+          stock: String(v.stock ?? 0),
+          images: v.images ? v.images.map((img: any) => img.url || img) : []
+        }))
+      : []
     
     setFormData({
       name: product.name,
@@ -121,7 +173,8 @@ export default function AdminProducts() {
       compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : '',
       stock: String(product.stock ?? 0),
       categoryId: product.categoryId || '',
-      imageUrl: primaryImg,
+      images: imagesList,
+      variants: variantsList,
       isActive: product.isActive ?? true,
       isFeatured: product.isFeatured ?? false
     })
@@ -144,8 +197,13 @@ export default function AdminProducts() {
       categoryId: formData.categoryId,
       isActive: formData.isActive,
       isFeatured: formData.isFeatured,
-      // Pass images structure matching backend validation
-      images: formData.imageUrl ? [formData.imageUrl] : []
+      images: formData.images,
+      variants: formData.variants.map((v: any) => ({
+        name: v.name,
+        price: v.price ? parseFloat(v.price) : null,
+        stock: parseInt(v.stock, 10) || 0,
+        images: v.images || []
+      }))
     }
 
     if (selectedProduct) {
@@ -326,7 +384,7 @@ export default function AdminProducts() {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-lg bg-popover border border-border p-6 shadow-2xl z-10 space-y-6"
+              className="relative w-full max-w-lg bg-popover border border-border p-6 shadow-2xl z-10 space-y-6 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center pb-3 border-b border-border">
                 <h3 className="font-bold text-sm uppercase tracking-widest text-primary-text">
@@ -408,70 +466,351 @@ export default function AdminProducts() {
                   </div>
                 </div>
 
-                {/* Product Image - Premium Drag & Drop Dropzone */}
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Product Image</label>
-                  <input
-                    type="url"
-                    placeholder="Or paste an image URL here (https://...)"
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    className="w-full px-4 py-2 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 text-xs mb-2"
-                  />
-                  <div
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    className={`relative border border-dashed rounded-lg p-5 flex flex-col items-center justify-center text-center smooth-transition min-h-[120px] ${
-                      isDragActive 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border bg-secondary/40 hover:border-primary/30'
-                    }`}
-                  >
-                    {isUploading ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                        <span className="text-secondary-text font-medium text-[10px]">Uploading image...</span>
+                {/* Product Images - Premium Multiple Image Upload Manager */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                      Product Images ({formData.images.length}/6)
+                    </label>
+                    <span className="text-[9px] text-muted-text uppercase tracking-wider">
+                      First image is primary
+                    </span>
+                  </div>
+
+                  {/* Manual input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      placeholder="Paste an image URL (https://...) and press Enter"
+                      value={manualUrl}
+                      onChange={(e) => setManualUrl(e.target.value)}
+                      onKeyDown={handleAddManualUrl}
+                      className="flex-1 px-4 py-2 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddManualUrl}
+                      className="px-4 py-2 bg-secondary border border-border text-primary-text hover:bg-primary hover:text-white smooth-transition text-xs font-bold"
+                    >
+                      Add
+                    </button>
+                  </div>
+
+                  {/* Image grid & drag area */}
+                  <div className="space-y-2">
+                    {/* Existing Images Grid */}
+                    {formData.images.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {formData.images.map((url, idx) => (
+                          <div key={idx} className="relative group aspect-square bg-secondary border border-border rounded overflow-hidden flex items-center justify-center">
+                            <img 
+                              src={url} 
+                              alt={`Preview ${idx + 1}`} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder.jpg'
+                              }}
+                            />
+                            
+                            {/* Badges */}
+                            <div className="absolute top-1 left-1 flex flex-col gap-1">
+                              {idx === 0 ? (
+                                <span className="px-1.5 py-0.5 bg-primary text-white text-[8px] font-bold rounded uppercase tracking-wider shadow-sm">
+                                  Primary
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData(prev => {
+                                      const newImages = [...prev.images]
+                                      const [moved] = newImages.splice(idx, 1)
+                                      newImages.unshift(moved)
+                                      return { ...prev, images: newImages }
+                                    })
+                                  }}
+                                  className="px-1.5 py-0.5 bg-black/60 hover:bg-primary text-white text-[8px] font-bold rounded uppercase tracking-wider shadow-sm opacity-0 group-hover:opacity-100 smooth-transition cursor-pointer"
+                                >
+                                  Make Primary
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Remove button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  images: prev.images.filter((_, i) => i !== idx)
+                                }))
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full opacity-0 group-hover:opacity-100 smooth-transition shadow-md cursor-pointer"
+                              title="Remove Image"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ) : formData.imageUrl ? (
-                      <div className="relative group w-full flex items-center justify-center">
-                        <img 
-                          src={formData.imageUrl} 
-                          alt="Product Preview" 
-                          className="max-h-24 object-contain rounded border border-border"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/placeholder.jpg'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, imageUrl: '' })}
-                          className="absolute -top-2 right-2 p-1 bg-destructive text-white rounded-full opacity-0 group-hover:opacity-100 hover:bg-red-600 smooth-transition shadow-md cursor-pointer"
-                          title="Remove Image"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                    )}
+
+                    {/* Upload Dropzone (if less than 6 images) */}
+                    {formData.images.length < 6 && (
+                      <div
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                        className={`relative border border-dashed rounded-lg p-4 flex flex-col items-center justify-center text-center smooth-transition min-h-[100px] ${
+                          isDragActive 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border bg-secondary/40 hover:border-primary/30'
+                        }`}
+                      >
+                        {isUploading ? (
+                          <div className="flex flex-col items-center gap-1.5">
+                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                            <span className="text-secondary-text font-medium text-[9px]">Uploading image...</span>
+                          </div>
+                        ) : (
+                          <label className="cursor-pointer flex flex-col items-center gap-1.5 w-full h-full py-1">
+                            <Upload className="w-5 h-5 text-muted-text" />
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-primary-text text-[10px]">Drag & drop images here</p>
+                              <p className="text-muted-text text-[8px]">or click to browse (supports multiple)</p>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={async (e) => {
+                                const files = e.target.files
+                                if (files && files.length > 0) {
+                                  await uploadFiles(files)
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
                       </div>
-                    ) : (
-                      <label className="cursor-pointer flex flex-col items-center gap-2 w-full h-full py-2">
-                        <Upload className="w-6 h-6 text-muted-text" />
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-primary-text text-[11px]">Drag & drop your image here</p>
-                          <p className="text-muted-text text-[9px]">or click to browse from device</p>
-                        </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0]
-                            if (file) await uploadFile(file)
-                          }}
-                        />
-                      </label>
                     )}
                   </div>
+                </div>
+
+                {/* Product Variants Section */}
+                <div className="border-t border-border/60 pt-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Product Variants</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          variants: [
+                            ...prev.variants,
+                            { name: '', price: '', stock: '', images: [], tempUrl: '', isUploading: false }
+                          ]
+                        }))
+                      }}
+                      className="px-2 py-1 bg-secondary hover:bg-primary hover:text-white smooth-transition text-[10px] font-bold border border-border rounded"
+                    >
+                      + Add Variant
+                    </button>
+                  </div>
+
+                  {formData.variants.length > 0 ? (
+                    <div className="space-y-4">
+                      {formData.variants.map((variant, vIdx) => (
+                        <div key={vIdx} className="p-3 bg-secondary/25 border border-border/80 rounded space-y-3 relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                variants: prev.variants.filter((_, i) => i !== vIdx)
+                              }))
+                            }}
+                            className="absolute top-2 right-2 text-muted-text hover:text-destructive smooth-transition cursor-pointer"
+                            title="Remove Variant"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Inputs */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[8px] font-bold text-muted-text uppercase tracking-wider mb-1">Variant Name</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Gold"
+                                value={variant.name}
+                                onChange={(e) => {
+                                  const newVariants = [...formData.variants]
+                                  newVariants[vIdx].name = e.target.value
+                                  setFormData({ ...formData, variants: newVariants })
+                                }}
+                                className="w-full px-2 py-1 bg-secondary border border-border text-primary-text text-[11px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold text-muted-text uppercase tracking-wider mb-1">Stock</label>
+                              <input
+                                type="number"
+                                required
+                                placeholder="0"
+                                value={variant.stock}
+                                onChange={(e) => {
+                                  const newVariants = [...formData.variants]
+                                  newVariants[vIdx].stock = e.target.value
+                                  setFormData({ ...formData, variants: newVariants })
+                                }}
+                                className="w-full px-2 py-1 bg-secondary border border-border text-primary-text text-[11px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold text-muted-text uppercase tracking-wider mb-1">Price Override (₹)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Optional"
+                                value={variant.price}
+                                onChange={(e) => {
+                                  const newVariants = [...formData.variants]
+                                  newVariants[vIdx].price = e.target.value
+                                  setFormData({ ...formData, variants: newVariants })
+                                }}
+                                className="w-full px-2 py-1 bg-secondary border border-border text-primary-text text-[11px]"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Variant Images */}
+                          <div className="space-y-1.5">
+                            <label className="block text-[8px] font-bold text-muted-text uppercase tracking-wider">
+                              Variant Images ({variant.images?.length || 0}/6)
+                            </label>
+
+                            {/* Paste URL */}
+                            <div className="flex gap-1.5">
+                              <input
+                                type="url"
+                                placeholder="Paste image URL..."
+                                value={variant.tempUrl || ''}
+                                onChange={(e) => {
+                                  const newVariants = [...formData.variants]
+                                  newVariants[vIdx].tempUrl = e.target.value
+                                  setFormData({ ...formData, variants: newVariants })
+                                }}
+                                className="flex-1 px-2 py-1 bg-secondary border border-border text-primary-text text-[10px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!variant.tempUrl?.trim()) return
+                                  if ((variant.images?.length || 0) >= 6) {
+                                    alert('Max 6 images allowed per variant')
+                                    return
+                                  }
+                                  const newVariants = [...formData.variants]
+                                  newVariants[vIdx].images = [...(variant.images || []), variant.tempUrl.trim()]
+                                  newVariants[vIdx].tempUrl = ''
+                                  setFormData({ ...formData, variants: newVariants })
+                                }}
+                                className="px-2 py-1 bg-secondary border border-border text-primary-text hover:bg-primary hover:text-white smooth-transition text-[10px] font-bold"
+                              >
+                                Add
+                              </button>
+                            </div>
+
+                            {/* Upload Files */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                id={`variant-upload-${vIdx}`}
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const files = e.target.files
+                                  if (!files || files.length === 0) return
+                                  const remaining = 6 - (variant.images?.length || 0)
+                                  if (remaining <= 0) {
+                                    alert('Max 6 images allowed per variant')
+                                    return
+                                  }
+                                  
+                                  const filesToUpload = Array.from(files).slice(0, remaining)
+                                  const newVariants = [...formData.variants]
+                                  newVariants[vIdx].isUploading = true
+                                  setFormData({ ...formData, variants: newVariants })
+
+                                  for (const file of filesToUpload) {
+                                    if (!file.type.startsWith('image/')) continue
+                                    try {
+                                      const uploadFormData = new FormData()
+                                      uploadFormData.append('file', file)
+                                      const res = await api.post('/upload/product-image', uploadFormData, {
+                                        headers: { 'Content-Type': 'multipart/form-data' }
+                                      })
+                                      if (res.data?.success && res.data?.data?.url) {
+                                        setFormData(prev => {
+                                          const updated = [...prev.variants]
+                                          updated[vIdx].images = [...(updated[vIdx].images || []), res.data.data.url]
+                                          return { ...prev, variants: updated }
+                                        })
+                                      }
+                                    } catch (err: any) {
+                                      alert('Error uploading variant image')
+                                    }
+                                  }
+                                  
+                                  setFormData(prev => {
+                                    const updated = [...prev.variants]
+                                    updated[vIdx].isUploading = false
+                                    return { ...prev, variants: updated }
+                                  })
+                                }}
+                              />
+                              <label
+                                htmlFor={`variant-upload-${vIdx}`}
+                                className="cursor-pointer px-2 py-1 bg-secondary border border-dashed border-border hover:border-primary/50 text-[10px] text-muted-text font-bold rounded flex items-center gap-1"
+                              >
+                                <Upload className="w-3 h-3" />
+                                {variant.isUploading ? 'Uploading...' : 'Upload Images'}
+                              </label>
+                            </div>
+
+                            {/* Images Grid */}
+                            {variant.images && variant.images.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {variant.images.map((url: string, imgIdx: number) => (
+                                  <div key={imgIdx} className="relative w-10 h-10 border border-border rounded overflow-hidden group">
+                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newVariants = [...formData.variants]
+                                        newVariants[vIdx].images = variant.images.filter((_: any, i: number) => i !== imgIdx)
+                                        setFormData({ ...formData, variants: newVariants })
+                                      }}
+                                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 smooth-transition text-white"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-text italic">No variants added yet. Adding variants lets you manage different stock/price overrides and variant-specific image sets.</p>
+                  )}
                 </div>
 
                 {/* Toggles */}
