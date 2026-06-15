@@ -11,7 +11,7 @@ export const Footer = () => {
       {/* Main Footer */}
       <div className="py-16">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
             {/* Shop Column */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -23,9 +23,9 @@ export const Footer = () => {
               <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Shop</h4>
               <ul className="space-y-2.5">
                 <li><Link href="/products" className="text-secondary-text hover:text-primary text-sm smooth-transition">Shop Products</Link></li>
-                <li><Link href="#best-sellers" className="text-secondary-text hover:text-primary text-sm smooth-transition">Best Sellers</Link></li>
-                <li><Link href="#new-arrivals" className="text-secondary-text hover:text-primary text-sm smooth-transition">New Arrivals</Link></li>
-                <li><Link href="#trending" className="text-secondary-text hover:text-primary text-sm smooth-transition">Featured Collections</Link></li>
+                <li><Link href="/#best-sellers" className="text-secondary-text hover:text-primary text-sm smooth-transition">Best Sellers</Link></li>
+                <li><Link href="/#new-arrivals" className="text-secondary-text hover:text-primary text-sm smooth-transition">New Arrivals</Link></li>
+                <li><Link href="/#trending" className="text-secondary-text hover:text-primary text-sm smooth-transition">Featured Collections</Link></li>
               </ul>
             </motion.div>
 
@@ -56,29 +56,11 @@ export const Footer = () => {
               transition={{ duration: 0.4, delay: 0.2 }}
               className="flex flex-col space-y-4"
             >
-              <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Custom Orders</h4>
+              <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Custom Projects</h4>
               <ul className="space-y-2.5">
                 <li><Link href="/custom-request" className="text-secondary-text hover:text-primary text-sm smooth-transition">Start Custom Order</Link></li>
                 <li><Link href="/custom-request" className="text-secondary-text hover:text-primary text-sm smooth-transition">Upload STL Files</Link></li>
-                <li><Link href="/custom-request" className="text-secondary-text hover:text-primary text-sm smooth-transition">Custom Quotations</Link></li>
-                <li><Link href="/custom-request" className="text-secondary-text hover:text-primary text-sm smooth-transition">Turnaround Calculator</Link></li>
-              </ul>
-            </motion.div>
-
-            {/* Company Column */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              className="flex flex-col space-y-4"
-            >
-              <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Company</h4>
-              <ul className="space-y-2.5">
-                <li><Link href="#about" className="text-secondary-text hover:text-primary text-sm smooth-transition">Our Story</Link></li>
-                <li><Link href="#materials" className="text-secondary-text hover:text-primary text-sm smooth-transition">Materials Guide</Link></li>
-                <li><Link href="#sustainability" className="text-secondary-text hover:text-primary text-sm smooth-transition">Sustainability</Link></li>
-                <li><Link href="#blog" className="text-secondary-text hover:text-primary text-sm smooth-transition">Blog</Link></li>
+                <li><Link href="/custom-requests" className="text-secondary-text hover:text-primary text-sm smooth-transition">My Custom Projects</Link></li>
               </ul>
             </motion.div>
 
@@ -87,15 +69,14 @@ export const Footer = () => {
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-              className="flex flex-col space-y-4 col-span-2 md:col-span-1"
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="flex flex-col space-y-4"
             >
-              <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Support</h4>
+              <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Support & Account</h4>
               <ul className="space-y-2.5">
-                <li><Link href="#shipping" className="text-secondary-text hover:text-primary text-sm smooth-transition">Shipping & Returns</Link></li>
-                <li><Link href="#quality" className="text-secondary-text hover:text-primary text-sm smooth-transition">Quality Guarantee</Link></li>
                 <li><Link href="/contact" className="text-secondary-text hover:text-primary text-sm smooth-transition">Contact Us</Link></li>
-                <li><Link href="#faq" className="text-secondary-text hover:text-primary text-sm smooth-transition">FAQ</Link></li>
+                <li><Link href="/dashboard" className="text-secondary-text hover:text-primary text-sm smooth-transition">Member Dashboard</Link></li>
+                <li><Link href="/account" className="text-secondary-text hover:text-primary text-sm smooth-transition">My Account</Link></li>
               </ul>
             </motion.div>
           </div>
