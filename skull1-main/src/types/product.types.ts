@@ -30,4 +30,5 @@ export interface CreateProductInput {
   tags?: string[]; // Tag slugs or ids
   images?: string[]; // Image URLs
   variants?: CreateProductVariantInput[];
+  specifications?: Record<string, string> | null;
 }

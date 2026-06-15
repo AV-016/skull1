@@ -17,6 +17,7 @@ export const createProductSchema = z.object({
       stock: z.number().int().nonnegative('Variant stock cannot be negative').default(0),
       images: z.array(z.string()).optional(),
     })).optional(),
+    specifications: z.record(z.string()).optional().nullable(),
   }),
 });
 
@@ -39,5 +40,6 @@ export const updateProductSchema = z.object({
       stock: z.number().int().nonnegative('Variant stock cannot be negative').default(0),
       images: z.array(z.string()).optional(),
     })).optional(),
+    specifications: z.record(z.string()).optional().nullable(),
   }),
 });

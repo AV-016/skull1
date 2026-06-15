@@ -24,7 +24,7 @@ export default function OrderDetailPage() {
   const cancelMutation = useCancelOrder()
   const { user } = useAuth()
   
-  const [reviewsState, setReviewsState] = useState<Record<string, { rating: number, comment: string, submitted: boolean, error: string | null, submitting: boolean }>>({})
+  const [reviewsState, setReviewsState] = useState<Record<string, { rating: number, comment: string, images?: string[], isUploading?: boolean, submitted: boolean, error: string | null, submitting: boolean }>>({})
 
   // Support Modal States
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false)
@@ -84,7 +84,7 @@ export default function OrderDetailPage() {
   }
 
   const handleReviewSubmit = async (productId: string) => {
-    const state = reviewsState[productId] || { rating: 5, comment: '', submitted: false, error: null, submitting: false }
+    const state = reviewsState[productId] || { rating: 5, comment: '', images: [], submitted: false, error: null, submitting: false }
     
     setReviewsState(prev => ({
       ...prev,
@@ -94,7 +94,8 @@ export default function OrderDetailPage() {
     try {
       await api.post(`/products/${productId}/reviews`, {
         rating: state.rating,
-        comment: state.comment
+        comment: state.comment,
+        images: state.images || []
       })
       setReviewsState(prev => ({
         ...prev,
@@ -177,7 +178,7 @@ export default function OrderDetailPage() {
             <h2 className="text-xl font-bold text-primary-text mb-6">Order Items</h2>
             <div className="space-y-4">
               {order.items?.map((item: any, idx: number) => {
-                const review = reviewsState[item.productId] || { rating: 5, comment: '', submitted: false, error: null, submitting: false }
+                const review = reviewsState[item.productId] || { rating: 5, comment: '', images: [] as string[], isUploading: false, submitted: false, error: null, submitting: false }
                 
                 return (
                   <div key={idx} className="py-6 border-b border-border last:border-0">
@@ -227,13 +228,97 @@ export default function OrderDetailPage() {
                               className="w-full min-h-[60px] p-2 bg-background border border-border rounded-lg text-primary-text text-xs focus:outline-none focus:border-primary"
                             />
 
+                            {/* Attach Images */}
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                                Attach Images ({review.images?.length || 0}/4)
+                              </label>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  id={`review-upload-${item.productId}`}
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const files = e.target.files
+                                    if (!files || files.length === 0) return
+                                    const remaining = 4 - (review.images?.length || 0)
+                                    if (remaining <= 0) {
+                                      alert('Max 4 images allowed per review')
+                                      return
+                                    }
+                                    
+                                    const filesToUpload = Array.from(files).slice(0, remaining)
+                                    
+                                    setReviewsState(prev => ({
+                                      ...prev,
+                                      [item.productId]: { ...review, isUploading: true }
+                                    }))
+
+                                    const uploadedUrls = [...(review.images || [])]
+                                    for (const file of filesToUpload) {
+                                      if (!file.type.startsWith('image/')) continue
+                                      try {
+                                        const uploadFormData = new FormData()
+                                        uploadFormData.append('file', file)
+                                        const res = await api.post('/upload/review-image', uploadFormData, {
+                                          headers: { 'Content-Type': 'multipart/form-data' }
+                                        })
+                                        if (res.data?.success && res.data?.data?.url) {
+                                          uploadedUrls.push(res.data.data.url)
+                                        }
+                                      } catch (err) {
+                                        console.error('Error uploading review image:', err)
+                                      }
+                                    }
+                                    
+                                    setReviewsState(prev => ({
+                                      ...prev,
+                                      [item.productId]: { ...review, images: uploadedUrls, isUploading: false }
+                                    }))
+                                  }}
+                                />
+                                <label
+                                  htmlFor={`review-upload-${item.productId}`}
+                                  className="cursor-pointer px-3 py-1.5 bg-secondary hover:bg-secondary/80 border border-dashed border-border hover:border-primary/50 text-[10px] text-primary-text font-bold rounded smooth-transition flex items-center gap-1.5"
+                                >
+                                  {review.isUploading ? 'Uploading...' : 'Upload Images'}
+                                </label>
+                              </div>
+
+                              {/* Uploaded review images preview */}
+                              {review.images && review.images.length > 0 && (
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                  {review.images.map((url: string, imgIdx: number) => (
+                                    <div key={imgIdx} className="relative w-12 h-12 border border-border rounded overflow-hidden group">
+                                      <img src={url} alt="" className="w-full h-full object-cover" />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updatedUrls = (review.images || []).filter((_: string, i: number) => i !== imgIdx)
+                                          setReviewsState(prev => ({
+                                            ...prev,
+                                            [item.productId]: { ...review, images: updatedUrls }
+                                          }))
+                                        }}
+                                        className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 smooth-transition text-white cursor-pointer"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
                             {review.error && (
                               <p className="text-[10px] text-red-500">{review.error}</p>
                             )}
 
                             <button
                               type="button"
-                              disabled={review.submitting}
+                              disabled={review.submitting || review.isUploading}
                               onClick={() => handleReviewSubmit(item.productId)}
                               className="px-3 py-1.5 bg-primary hover:bg-primary/95 text-white text-xs font-bold rounded smooth-transition cursor-pointer disabled:opacity-50"
                             >

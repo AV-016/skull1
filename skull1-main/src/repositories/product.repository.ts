@@ -13,6 +13,7 @@ const productInclude = {
   },
   tags: true,
   reviews: true,
+  orderItems: true,
 };
 
 export class ProductRepository {
@@ -112,7 +113,7 @@ export class ProductRepository {
   }
 
   async create(data: CreateProductInput): Promise<Product> {
-    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [], variants = [] } = data;
+    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [], variants = [], specifications = null } = data;
     
     // Generate slug from name
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -126,6 +127,7 @@ export class ProductRepository {
         compareAtPrice,
         stock,
         categoryId,
+        specifications: specifications || undefined,
         tags: {
           connect: tags.map((id) => ({ id })),
         },

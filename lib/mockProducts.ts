@@ -13,6 +13,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Shogun Cyber-Oni Figure',
     description: 'A premium, hand-detailed 3D printed mechanical demon figure. Featuring intricate armor panels, modular display weapons, and a custom futuristic display base.',
     price: 4999,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80',
     images: [
       'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80',
@@ -37,6 +38,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Fractal Kinetic Sculpture',
     description: 'An elegant desk companion that moves in mesmerizing patterns. Mathematical geometry brought to life using ultra-low-friction pivot bearings.',
     price: 1899,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80'],
     category: 'Desk Accessories',
@@ -57,6 +59,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Cyberpunk Artisan Keycaps',
     description: 'Custom 3D printed resin keycaps for mechanical keyboards. Translucent glowing visor details allow LED backlighting to shine through beautifully.',
     price: 1299,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1622560480654-d96214fdc887?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1622560480654-d96214fdc887?w=800&auto=format&fit=crop&q=80'],
     category: 'Custom Designs',
@@ -76,6 +79,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Articulated Crystal Dragon',
     description: 'Fully jointed, highly flexible crystal dragon printed as a single piece. Features color-shifting silk filament that sparkles under changing light.',
     price: 1499,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1594787318286-3d835c1d207f?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1594787318286-3d835c1d207f?w=800&auto=format&fit=crop&q=80'],
     category: 'Miniatures',
@@ -96,6 +100,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Parametric Origami Vase',
     description: 'Stunning mathematical flower vase. Its complex folded structure creates subtle ambient shadows that accent modern minimalist interiors.',
     price: 2299,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?w=800&auto=format&fit=crop&q=80'],
     category: 'Home Decor',
@@ -115,6 +120,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'V8 Engine Assembly Model',
     description: 'A working educational piston assembly model. See pistons fire and gears engage with high-precision components printed to exact tolerances.',
     price: 5999,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80'],
     category: 'Engineering Models',
@@ -134,6 +140,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Magnetic Helix Organizer',
     description: 'A double-helix pen and tool dock with integrated high-strength neodymium magnets to snap paperclips and metal tools in place.',
     price: 999,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80'],
     category: 'Desk Accessories',
@@ -153,6 +160,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Steampunk Gear Keychain',
     description: 'Real working planetary gears on your key ring. A pocket-sized mechanical fidget toy that operates with smooth micro-mesh design.',
     price: 499,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1582139329536-e7284fece509?w=800&auto=format&fit=crop&q=80'],
     category: 'Keychains',
@@ -173,6 +181,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Gothic Gargoyle Miniature',
     description: 'Intricately sculpted gargoyle figure for tabletop gaming or painting enthusiasts, featuring sharp texture detail and slate stone base.',
     price: 799,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=800&auto=format&fit=crop&q=80'],
     category: 'Miniatures',
@@ -192,6 +201,7 @@ export const mockProducts: ExtendedProduct[] = [
     name: 'Low-Poly Wolf Sculpture',
     description: 'Abstract geometric wolf sculpture. Perfect clean facets and sharp lines make a bold modern statement piece for any sideboard or shelf.',
     price: 1599,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1535262412277-26ec02b49985?w=800&auto=format&fit=crop&q=80',
     images: ['https://images.unsplash.com/photo-1535262412277-26ec02b49985?w=800&auto=format&fit=crop&q=80'],
     category: 'Home Decor',
@@ -214,8 +224,8 @@ export const sanitizeProducts = (products: Product[]): ExtendedProduct[] => {
 
   return products.map((prod) => {
     const primaryImg = (prod as any).image ||
-      prod.images?.find((img: any) => img.isPrimary)?.url ||
-      prod.images?.[0]?.url ||
+      (prod.images as any)?.find((img: any) => img.isPrimary)?.url ||
+      (prod.images as any)?.[0]?.url ||
       '/placeholder.jpg';
 
     const imageUrls = prod.images && Array.isArray(prod.images)

@@ -674,6 +674,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                   <p className="text-secondary-text text-sm leading-relaxed whitespace-pre-wrap pl-1">
                     {review.comment || 'No comment provided.'}
                   </p>
+                  
+                  {review.images && review.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2.5 pt-3 pl-1">
+                      {review.images.map((img: any) => (
+                        <a 
+                          key={img.id} 
+                          href={img.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="relative w-16 h-16 border border-border/80 hover:border-primary rounded-lg overflow-hidden bg-secondary smooth-transition block cursor-zoom-in"
+                        >
+                          <img src={img.url} alt="Review attachment" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

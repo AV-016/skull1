@@ -14,6 +14,8 @@ import { Plus, Edit2, Trash2, Search, Loader2, X, AlertTriangle, Upload } from '
 import { formatCurrency } from '@/lib/utils'
 import api from '@/lib/api'
 
+const PREDEFINED_KEYS = ['Material', 'Dimensions', 'Height', 'Weight', 'Finish', 'Layer Height', 'Scale', 'Color']
+
 export default function AdminProducts() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -38,7 +40,8 @@ export default function AdminProducts() {
     images: [] as string[],
     variants: [] as any[],
     isActive: true,
-    isFeatured: false
+    isFeatured: false,
+    specifications: [] as { key: string; value: string }[]
   })
 
   const [manualUrl, setManualUrl] = useState('')
@@ -139,7 +142,13 @@ export default function AdminProducts() {
       images: [],
       variants: [],
       isActive: true,
-      isFeatured: false
+      isFeatured: false,
+      specifications: [
+        { key: 'Material', value: '' },
+        { key: 'Dimensions', value: '' },
+        { key: 'Weight', value: '' },
+        { key: 'Finish', value: '' }
+      ]
     })
     setIsModalOpen(true)
   }
@@ -165,6 +174,11 @@ export default function AdminProducts() {
           images: v.images ? v.images.map((img: any) => img.url || img) : []
         }))
       : []
+
+    // Convert specifications JSON object to array of { key, value }
+    const specsList = product.specifications && typeof product.specifications === 'object'
+      ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: String(value) }))
+      : []
     
     setFormData({
       name: product.name,
@@ -176,7 +190,8 @@ export default function AdminProducts() {
       images: imagesList,
       variants: variantsList,
       isActive: product.isActive ?? true,
-      isFeatured: product.isFeatured ?? false
+      isFeatured: product.isFeatured ?? false,
+      specifications: specsList
     })
     setIsModalOpen(true)
   }
@@ -186,6 +201,14 @@ export default function AdminProducts() {
     
     // Auto-generate slug from name
     const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+
+    // Convert specs array back to JSON object
+    const specsObj = formData.specifications.reduce((acc: any, curr) => {
+      if (curr.key.trim()) {
+        acc[curr.key.trim()] = curr.value.trim()
+      }
+      return acc
+    }, {})
 
     const productPayload = {
       name: formData.name,
@@ -198,6 +221,7 @@ export default function AdminProducts() {
       isActive: formData.isActive,
       isFeatured: formData.isFeatured,
       images: formData.images,
+      specifications: Object.keys(specsObj).length > 0 ? specsObj : null,
       variants: formData.variants.map((v: any) => ({
         name: v.name,
         price: v.price ? parseFloat(v.price) : null,
@@ -299,6 +323,7 @@ export default function AdminProducts() {
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Stock</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Saled</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -334,6 +359,9 @@ export default function AdminProducts() {
                           {product.isActive ? 'Active' : 'Draft'}
                         </span>
                       </td>
+                      <td className="px-6 py-4 font-bold text-primary-text">
+                        {product.salesCount ?? 0} units
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
                           <button 
@@ -357,7 +385,7 @@ export default function AdminProducts() {
                 })}
                 {filteredProducts.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
+                    <td colSpan={8} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
                       No products found.
                     </td>
                   </tr>
@@ -464,6 +492,104 @@ export default function AdminProducts() {
                       ))}
                     </select>
                   </div>
+                </div>
+
+                {/* Product Specifications Section */}
+                <div className="border-t border-border/60 pt-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Product Specifications</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          specifications: [
+                            ...prev.specifications,
+                            { key: '', value: '' }
+                          ]
+                        }))
+                      }}
+                      className="px-2 py-1 bg-secondary hover:bg-primary hover:text-white smooth-transition text-[10px] font-bold border border-border rounded"
+                    >
+                      + Add Specification
+                    </button>
+                  </div>
+
+                  {formData.specifications.length > 0 ? (
+                    <div className="space-y-2">
+                      {formData.specifications.map((spec, sIdx) => {
+                        const isPredefined = PREDEFINED_KEYS.includes(spec.key) || spec.key === '';
+                        return (
+                          <div key={sIdx} className="flex gap-2 items-center">
+                            <div className="flex-1 flex gap-2">
+                              <select
+                                value={PREDEFINED_KEYS.includes(spec.key) ? spec.key : (spec.key ? 'Custom' : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  const newSpecs = [...formData.specifications]
+                                  if (val === 'Custom') {
+                                    newSpecs[sIdx].key = ''
+                                  } else {
+                                    newSpecs[sIdx].key = val
+                                  }
+                                  setFormData({ ...formData, specifications: newSpecs })
+                                }}
+                                className="w-1/2 px-2 py-1.5 bg-secondary border border-border text-primary-text text-[11px] focus:outline-none focus:border-primary/50 cursor-pointer"
+                              >
+                                <option value="" disabled>Select Property</option>
+                                {PREDEFINED_KEYS.map((k) => (
+                                  <option key={k} value={k}>{k}</option>
+                                ))}
+                                <option value="Custom">Custom...</option>
+                              </select>
+                              
+                              {(!isPredefined || !PREDEFINED_KEYS.includes(spec.key)) && (
+                                <input
+                                  type="text"
+                                  placeholder="Property Name"
+                                  required
+                                  value={spec.key}
+                                  onChange={(e) => {
+                                    const newSpecs = [...formData.specifications]
+                                    newSpecs[sIdx].key = e.target.value
+                                    setFormData({ ...formData, specifications: newSpecs })
+                                  }}
+                                  className="w-1/2 px-2 py-1.5 bg-secondary border border-border text-primary-text text-[11px] focus:outline-none focus:border-primary/50"
+                                />
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Value (e.g. Tough Resin)"
+                              required
+                              value={spec.value}
+                              onChange={(e) => {
+                                const newSpecs = [...formData.specifications]
+                                newSpecs[sIdx].value = e.target.value
+                                setFormData({ ...formData, specifications: newSpecs })
+                              }}
+                              className="flex-1 px-3 py-1.5 bg-secondary border border-border text-primary-text text-[11px] focus:outline-none focus:border-primary/50"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  specifications: prev.specifications.filter((_, i) => i !== sIdx)
+                                }))
+                              }}
+                              className="p-1.5 border border-border hover:border-red-500/50 text-muted-text hover:text-red-500 rounded smooth-transition cursor-pointer"
+                              title="Remove Specification"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-text italic">No specifications added yet. Adding specs (e.g. Material, Dimensions, Finish) helps customers understand the product details better.</p>
+                  )}
                 </div>
 
                 {/* Product Images - Premium Multiple Image Upload Manager */}

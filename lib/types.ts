@@ -32,6 +32,7 @@ export interface Product {
   category: string
   specifications: Record<string, string>
   featured: boolean
+  salesCount?: number
   createdAt: string
   variants?: ProductVariant[]
 }

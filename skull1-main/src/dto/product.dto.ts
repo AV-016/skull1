@@ -1,4 +1,4 @@
-import { Product, ProductImage, Tag, Category, Review, ProductVariant, ProductVariantImage } from '@prisma/client';
+import { Product, ProductImage, Tag, Category, Review, ProductVariant, ProductVariantImage, OrderItem } from '@prisma/client';
 
 export interface ProductResponseDTO {
   id: string;
@@ -34,6 +34,8 @@ export interface ProductResponseDTO {
   }[];
   rating: number;
   reviewsCount: number;
+  specifications: any;
+  salesCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +48,7 @@ export type ProductWithDetails = Product & {
   })[];
   tags: Tag[];
   reviews: Review[];
+  orderItems?: OrderItem[];
 };
 
 export const formatProductResponse = (product: ProductWithDetails): ProductResponseDTO => {
@@ -88,6 +91,8 @@ export const formatProductResponse = (product: ProductWithDetails): ProductRespo
     })) : [],
     rating,
     reviewsCount,
+    specifications: product.specifications,
+    salesCount: product.orderItems ? product.orderItems.reduce((sum, item) => sum + item.quantity, 0) : 0,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
   };
