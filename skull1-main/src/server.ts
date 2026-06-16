@@ -1,5 +1,6 @@
 import app from './app';
 import { env } from './config/env';
+// Reload trigger
 import { prisma } from './config/database';
 import logger from './utils/logger';
 
