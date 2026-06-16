@@ -25,6 +25,7 @@ import uploadRoutes from './routes/upload.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import adminRoutes from './routes/admin.routes';
 import { prisma } from './config/database';
+import { env } from './config/env';
 
 const app = express();
 
@@ -56,6 +57,55 @@ app.get('/api/version', (req, res) => {
     version: '1.0.0',
     description: 'Skulture Backend Service',
   });
+});
+
+app.get('/api/test-email', async (req, res) => {
+  const { Resend } = require('resend');
+  const targetEmail = String(req.query.to || 'vajpayee016@gmail.com');
+  const fromAddress = String(req.query.from || env.EMAIL_FROM_AUTH);
+
+  try {
+    if (!env.RESEND_API_KEY) {
+      return res.status(400).json({
+        success: false,
+        message: 'RESEND_API_KEY is not configured in the environment variables.',
+      });
+    }
+
+    const resendClient = new Resend(env.RESEND_API_KEY);
+    const { data, error } = await resendClient.emails.send({
+      from: fromAddress,
+      to: [targetEmail],
+      subject: 'Skulture Email Test',
+      html: '<p>Email delivery is working successfully! 🎉</p>',
+    });
+
+    if (error) {
+      console.error('Email test failed:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    console.log('Test email success:', {
+      to: targetEmail,
+      from: fromAddress,
+      emailId: data?.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Test email sent successfully to ${targetEmail}`,
+      data,
+    });
+  } catch (err: any) {
+    console.error('Test email route exception:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
 });
 
 app.get('/api/settings', async (req, res, next) => {

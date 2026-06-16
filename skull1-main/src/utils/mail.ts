@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env';
 import logger from './logger';
 
-const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY as string) : null;
 
 // Initialize NodeMailer transporter if SMTP variables are set
 const transporter = env.SMTP_HOST
@@ -39,44 +39,54 @@ export async function sendOtpEmail(to: string, name: string, otp: string): Promi
   `;
 
   try {
+    const fromAddress = env.EMAIL_FROM_AUTH;
     // 1. Try sending via SMTP if configured
     if (transporter) {
-      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || 'no-reply@skulture.com';
+      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || fromAddress;
       await transporter.sendMail({
         from,
         to,
         subject,
         html: htmlContent,
       });
-      logger.info(`Verification OTP email successfully sent via SMTP to ${to}.`);
+      logger.info(`Verification OTP email successfully sent via SMTP to ${to} from ${from}.`);
       return;
     }
 
     // 2. Try sending via Resend if configured
     if (resend) {
       const { data, error } = await resend.emails.send({
-        from: env.RESEND_FROM_EMAIL || 'Acme <onboarding@resend.dev>',
+        from: fromAddress,
         to: [to],
         subject,
         html: htmlContent,
       });
 
       if (error) {
+        logger.error(`Resend API returned error for verification email to ${to}:`, error);
         throw new Error(error.message);
       }
 
-      logger.info(`Verification OTP email successfully sent via Resend to ${to}. Message ID: ${data?.id}`);
+      logger.info(`Verification OTP email successfully sent via Resend.`, {
+        to,
+        from: fromAddress,
+        emailId: data?.id,
+      });
       return;
     }
 
     // 3. Mock Fallback (if neither is configured)
-    logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Here is the OTP code for ${to} (${name}): ${otp}`);
-    console.log(`\n==================================================`);
-    console.log(`[EMAIL OTP CODE] for ${to}:`);
-    console.log(`Code: ${otp}`);
-    console.log(`==================================================\n`);
+    if (env.NODE_ENV === 'development') {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Here is the OTP code for ${to} (${name}): ${otp}`);
+      console.log(`\n==================================================`);
+      console.log(`[EMAIL OTP CODE] for ${to}:`);
+      console.log(`Code: ${otp}`);
+      console.log(`==================================================\n`);
+    } else {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. OTP code hidden in production.`);
+    }
   } catch (err: any) {
-    logger.error(`Failed to send verification email to ${to}:`, err);
+    logger.error(`Failed to send verification email to ${to} (from: ${env.EMAIL_FROM_AUTH}):`, err);
     // In dev, let's fallback to console log so development is not blocked
     if (env.NODE_ENV === 'development') {
       console.log(`\n==================================================`);
@@ -115,45 +125,56 @@ export async function sendOrderConfirmationEmail(
   `;
 
   try {
+    const fromAddress = env.EMAIL_FROM_NOREPLY;
     // 1. Try sending via SMTP if configured
     if (transporter) {
-      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || 'no-reply@skulture.com';
+      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || fromAddress;
       await transporter.sendMail({
         from,
         to,
         subject,
         html: htmlContent,
       });
-      logger.info(`Order confirmation email successfully sent via SMTP to ${to} for Order #${orderNumber}.`);
+      logger.info(`Order confirmation email successfully sent via SMTP to ${to} from ${from} for Order #${orderNumber}.`);
       return;
     }
 
     // 2. Try sending via Resend if configured
     if (resend) {
       const { data, error } = await resend.emails.send({
-        from: env.RESEND_FROM_EMAIL || 'Acme <onboarding@resend.dev>',
+        from: fromAddress,
         to: [to],
         subject,
         html: htmlContent,
       });
 
       if (error) {
+        logger.error(`Resend API returned error for order confirmation email to ${to}:`, error);
         throw new Error(error.message);
       }
 
-      logger.info(`Order confirmation email successfully sent via Resend to ${to} for Order #${orderNumber}. Message ID: ${data?.id}`);
+      logger.info(`Order confirmation email successfully sent via Resend.`, {
+        to,
+        from: fromAddress,
+        emailId: data?.id,
+        orderNumber,
+      });
       return;
     }
 
     // 3. Mock Fallback (if neither is configured)
-    logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Order confirmation code for ${to} (${name}): #${orderNumber}, total: ₹${totalAmount}`);
-    console.log(`\n==================================================`);
-    console.log(`[ORDER CONFIRMATION EMAIL] for ${to}:`);
-    console.log(`Order: #${orderNumber}`);
-    console.log(`Total: ₹${totalAmount}`);
-    console.log(`==================================================\n`);
+    if (env.NODE_ENV === 'development') {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Order confirmation code for ${to} (${name}): #${orderNumber}, total: ₹${totalAmount}`);
+      console.log(`\n==================================================`);
+      console.log(`[ORDER CONFIRMATION EMAIL] for ${to}:`);
+      console.log(`Order: #${orderNumber}`);
+      console.log(`Total: ₹${totalAmount}`);
+      console.log(`==================================================\n`);
+    } else {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Order confirmation suppressed in production logs.`);
+    }
   } catch (err: any) {
-    logger.error(`Failed to send order confirmation email to ${to} for Order #${orderNumber}:`, err);
+    logger.error(`Failed to send order confirmation email to ${to} for Order #${orderNumber} (from: ${env.EMAIL_FROM_NOREPLY}):`, err);
     if (env.NODE_ENV === 'development') {
       console.log(`\n==================================================`);
       console.log(`[ORDER CONFIRMATION FALLBACK] for ${to} (due to error: ${err.message}):`);
@@ -187,42 +208,52 @@ export async function sendPasswordResetOtpEmail(to: string, name: string, otp: s
   `;
 
   try {
+    const fromAddress = env.EMAIL_FROM_AUTH;
     if (transporter) {
-      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || 'no-reply@skulture.com';
+      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || fromAddress;
       await transporter.sendMail({
         from,
         to,
         subject,
         html: htmlContent,
       });
-      logger.info(`Password reset OTP email successfully sent via SMTP to ${to}.`);
+      logger.info(`Password reset OTP email successfully sent via SMTP to ${to} from ${from}.`);
       return;
     }
 
     if (resend) {
       const { data, error } = await resend.emails.send({
-        from: env.RESEND_FROM_EMAIL || 'Acme <onboarding@resend.dev>',
+        from: fromAddress,
         to: [to],
         subject,
         html: htmlContent,
       });
 
       if (error) {
+        logger.error(`Resend API returned error for password reset email to ${to}:`, error);
         throw new Error(error.message);
       }
 
-      logger.info(`Password reset OTP email successfully sent via Resend to ${to}. Message ID: ${data?.id}`);
+      logger.info(`Password reset OTP email successfully sent via Resend.`, {
+        to,
+        from: fromAddress,
+        emailId: data?.id,
+      });
       return;
     }
 
     // Fallback
-    logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Password reset OTP code for ${to} (${name}): ${otp}`);
-    console.log(`\n==================================================`);
-    console.log(`[PASSWORD RESET OTP CODE] for ${to}:`);
-    console.log(`Code: ${otp}`);
-    console.log(`==================================================\n`);
+    if (env.NODE_ENV === 'development') {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Password reset OTP code for ${to} (${name}): ${otp}`);
+      console.log(`\n==================================================`);
+      console.log(`[PASSWORD RESET OTP CODE] for ${to}:`);
+      console.log(`Code: ${otp}`);
+      console.log(`==================================================\n`);
+    } else {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Password reset OTP code hidden in production.`);
+    }
   } catch (err: any) {
-    logger.error(`Failed to send password reset email to ${to}:`, err);
+    logger.error(`Failed to send password reset email to ${to} (from: ${env.EMAIL_FROM_AUTH}):`, err);
     if (env.NODE_ENV === 'development') {
       console.log(`\n==================================================`);
       console.log(`[PASSWORD RESET OTP CODE FALLBACK] for ${to} (due to error: ${err.message}):`);

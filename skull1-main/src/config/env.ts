@@ -26,6 +26,8 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default('Acme <onboarding@resend.dev>'),
+  EMAIL_FROM_AUTH: z.string().default('Skulture <auth@skulture.in>'),
+  EMAIL_FROM_NOREPLY: z.string().default('Skulture <noreply@skulture.in>'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().transform((val) => val ? parseInt(val, 10) : undefined).optional(),
   SMTP_USER: z.string().optional(),
