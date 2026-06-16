@@ -5,6 +5,8 @@ import { OrderResponseDTO, formatOrderResponse } from '../dto/order.dto';
 import { AppError } from '../middlewares/error.middleware';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { prisma } from '../config/database';
+import { sendOrderConfirmationEmail } from '../utils/mail';
+import logger from '../utils/logger';
 
 const orderRepository = new OrderRepository();
 const cartRepository = new CartRepository();
@@ -95,7 +97,7 @@ export class OrderService {
     // 2.5 Fetch and apply loyalty discount if any
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { loyaltyDiscountSet: true, loyaltyDiscountValue: true },
+      select: { loyaltyDiscountSet: true, loyaltyDiscountValue: true, email: true, name: true },
     });
 
     let discountApplied = 0;
@@ -159,6 +161,12 @@ export class OrderService {
           });
         }
       }
+    }
+
+    // 5. Send order confirmation email for COD orders
+    if (paymentMethod === 'COD' && user && user.email) {
+      sendOrderConfirmationEmail(user.email, user.name || 'Customer', order.orderNumber, order.totalAmount)
+        .catch((err) => logger.error(`Error sending COD order confirmation email to ${user.email}:`, err));
     }
 
     return order;

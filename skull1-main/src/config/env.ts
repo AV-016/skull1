@@ -24,9 +24,13 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
-  RESEND_API_KEY: z.string({
-    required_error: 'RESEND_API_KEY environment variable is required',
-  }),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().default('Acme <onboarding@resend.dev>'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().transform((val) => val ? parseInt(val, 10) : undefined).optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM_EMAIL: z.string().optional(),
   FAST2SMS_API_KEY: z.string().optional(),
 });
 

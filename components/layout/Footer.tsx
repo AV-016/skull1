@@ -77,6 +77,8 @@ export const Footer = () => {
                 <li><Link href="/contact" className="text-secondary-text hover:text-primary text-sm smooth-transition">Contact Us</Link></li>
                 <li><Link href="/dashboard" className="text-secondary-text hover:text-primary text-sm smooth-transition">Member Dashboard</Link></li>
                 <li><Link href="/account" className="text-secondary-text hover:text-primary text-sm smooth-transition">My Account</Link></li>
+                <li><Link href="/terms" className="text-secondary-text hover:text-primary text-sm smooth-transition">Terms & Conditions</Link></li>
+                <li><Link href="/privacy" className="text-secondary-text hover:text-primary text-sm smooth-transition">Privacy Policy</Link></li>
               </ul>
             </motion.div>
           </div>

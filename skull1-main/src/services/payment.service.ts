@@ -6,6 +6,8 @@ import { verifyRazorpaySignature, verifyWebhookSignature } from '../utils/razorp
 import { AppError } from '../middlewares/error.middleware';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import logger from '../utils/logger';
+import { sendOrderConfirmationEmail } from '../utils/mail';
+import { prisma } from '../config/database';
 
 const paymentRepository = new PaymentRepository();
 const orderRepository = new OrderRepository();
@@ -62,6 +64,15 @@ export class PaymentService {
     razorpayPaymentId: string,
     razorpaySignature: string
   ): Promise<boolean> {
+    const order = await orderRepository.findById(orderId);
+    if (!order) {
+      throw new AppError(404, 'Order not found');
+    }
+
+    if (order.userId !== userId) {
+      throw new AppError(403, 'Forbidden order access');
+    }
+
     const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
     if (!isValid) {
       // Mark payment as failed
@@ -70,16 +81,30 @@ export class PaymentService {
       throw new AppError(400, 'Payment signature verification failed');
     }
 
-    // Mark payment as successful, update order payment status
-    await paymentRepository.updateStatus(
-      razorpayOrderId,
-      'success',
-      razorpayPaymentId,
-      razorpaySignature
-    );
+    if (order.paymentStatus !== PaymentStatus.PAID) {
+      // Mark payment as successful, update order payment status
+      await paymentRepository.updateStatus(
+        razorpayOrderId,
+        'success',
+        razorpayPaymentId,
+        razorpaySignature
+      );
 
-    await orderRepository.updatePaymentStatus(orderId, PaymentStatus.PAID, razorpayPaymentId);
-    await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED, 'Payment received, order confirmed.');
+      await orderRepository.updatePaymentStatus(orderId, PaymentStatus.PAID, razorpayPaymentId);
+      await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED, 'Payment received, order confirmed.');
+
+      // Send order confirmation email
+      const email = order.user?.email;
+      const name = order.user?.name;
+      if (email) {
+        sendOrderConfirmationEmail(
+          email,
+          name || 'Customer',
+          order.orderNumber,
+          order.totalAmount
+        ).catch((err) => logger.error(`Error sending online order confirmation email to ${email}:`, err));
+      }
+    }
 
     return true;
   }
@@ -101,14 +126,29 @@ export class PaymentService {
 
       const payment = await paymentRepository.findByRazorpayOrderId(razorpayOrderId);
       if (payment) {
-        await paymentRepository.updateStatus(
-          razorpayOrderId,
-          'success',
-          razorpayPaymentId,
-          signature
-        );
-        await orderRepository.updatePaymentStatus(payment.orderId, PaymentStatus.PAID, razorpayPaymentId);
-        await orderRepository.updateStatus(payment.orderId, OrderStatus.CONFIRMED, 'Payment confirmed via webhook.');
+        const order = await orderRepository.findById(payment.orderId);
+        if (order && order.paymentStatus !== PaymentStatus.PAID) {
+          await paymentRepository.updateStatus(
+            razorpayOrderId,
+            'success',
+            razorpayPaymentId,
+            signature
+          );
+          await orderRepository.updatePaymentStatus(payment.orderId, PaymentStatus.PAID, razorpayPaymentId);
+          await orderRepository.updateStatus(payment.orderId, OrderStatus.CONFIRMED, 'Payment confirmed via webhook.');
+
+          // Send order confirmation email
+          const email = order.user?.email;
+          const name = order.user?.name;
+          if (email) {
+            sendOrderConfirmationEmail(
+              email,
+              name || 'Customer',
+              order.orderNumber,
+              order.totalAmount
+            ).catch((err) => logger.error(`Error sending online order confirmation email to ${email}:`, err));
+          }
+        }
       }
     } else if (event === 'payment.failed') {
       const paymentDetails = payload.payload.payment.entity;

@@ -10,7 +10,7 @@ import { authConfig } from '../config/auth';
 import logger from '../utils/logger';
 import crypto from 'crypto';
 import { prisma } from '../config/database';
-import { sendOtpEmail } from '../utils/mail';
+import { sendOtpEmail, sendPasswordResetOtpEmail } from '../utils/mail';
 import { sendOtpSms } from '../utils/sms';
 import bcrypt from 'bcrypt';
 
@@ -86,6 +86,20 @@ export class AuthService {
     }
 
     if (!user.isVerified) {
+      // Auto-send fresh verification OTP email when unverified user tries to log in
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      await prisma.emailOTP.deleteMany({
+        where: { email: user.email },
+      });
+      await prisma.emailOTP.create({
+        data: {
+          email: user.email,
+          otp,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        },
+      });
+      await sendOtpEmail(user.email, user.name || 'User', otp);
+
       throw new AppError(403, 'Please verify your email address using the OTP sent to your email.');
     }
 
@@ -171,19 +185,78 @@ export class AuthService {
     throw new AppError(400, 'This endpoint is deprecated. Please use the OTP verification flow.');
   }
 
-  async forgotPassword(email: string): Promise<void> {
+  async forgotPassword(emailInput: string): Promise<void> {
+    const email = String(emailInput || '').trim().toLowerCase();
+    if (!email) {
+      throw new AppError(400, 'Email address is required.');
+    }
+
     const user = await userRepository.findByEmail(email);
     if (!user) {
       // Proactively succeed or fail silently to avoid email enumeration
       return;
     }
-    // In production, send email with a token. We will mock it here.
-    return;
+
+    // Generate a 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Delete old OTPs for this email
+    await prisma.emailOTP.deleteMany({
+      where: { email },
+    });
+
+    // Save OTP to DB
+    await prisma.emailOTP.create({
+      data: {
+        email,
+        otp,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      },
+    });
+
+    // Send email
+    await sendPasswordResetOtpEmail(email, user.name || 'User', otp);
   }
 
   async resetPassword(data: any): Promise<void> {
-    // Mocked password reset verify token and reset
-    return;
+    const email = String(data.email || '').trim().toLowerCase();
+    const otp = String(data.token || '').trim();
+    const password = String(data.password || '');
+
+    if (!email || !otp || !password) {
+      throw new AppError(400, 'Email, OTP code, and new password are required.');
+    }
+
+    if (password.length < 6) {
+      throw new AppError(400, 'Password must be at least 6 characters long.');
+    }
+
+    const record = await prisma.emailOTP.findFirst({
+      where: { email, otp },
+    });
+
+    if (!record) {
+      throw new AppError(400, 'Invalid OTP code.');
+    }
+
+    if (record.expiresAt < new Date()) {
+      throw new AppError(400, 'OTP code has expired. Please request a new one.');
+    }
+
+    const user = await userRepository.findByEmail(email);
+    if (!user) {
+      throw new AppError(404, 'User not found.');
+    }
+
+    const hashedPassword = await hashPassword(password);
+    await userRepository.update(user.id, {
+      password: hashedPassword,
+    });
+
+    // Delete OTP record after use
+    await prisma.emailOTP.delete({
+      where: { id: record.id },
+    });
   }
 
   async handleGoogleCallback(code: string): Promise<AuthResponseDTO> {
@@ -252,6 +325,7 @@ export class AuthService {
           googleId: googleUser.id,
           picture: googleUser.picture || null,
           role: Role.CUSTOMER,
+          isVerified: true, // Google accounts are pre-verified
         });
       }
 

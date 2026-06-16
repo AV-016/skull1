@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import Link from 'next/link'
+import Script from 'next/script'
 import { useSettings } from '@/context/SettingsContext'
 import { CreditCard, ShoppingBag, CheckCircle, ArrowRight, Loader2, MapPin, Phone } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -70,6 +71,20 @@ export default function CheckoutPage() {
   
   const { formatPrice } = useSettings()
   const { user, setUser } = useAuth()
+
+  const getErrorMessage = (err: any, fallbackMessage: string = 'An error occurred. Please try again.') => {
+    if (err.response?.data) {
+      const data = err.response.data
+      if (data.errors) {
+        const fieldErrors = Object.entries(data.errors)
+          .map(([field, msgs]: any) => `${field.replace('body.', '')}: ${msgs.join(', ')}`)
+          .join(' | ')
+        return `${data.message} (${fieldErrors})`
+      }
+      return data.message || fallbackMessage
+    }
+    return err.message || fallbackMessage
+  }
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -233,34 +248,113 @@ export default function CheckoutPage() {
       }
 
       // 3. Create the order
-      await api.post('/orders', {
+      const orderRes = await api.post('/orders', {
         addressId,
         paymentMethod
       })
+      const order = orderRes.data.data
 
-      // 3.5 Refresh profile data to clear stamps/discount in context
-      try {
-        const userRes = await api.get('/auth/me')
-        if (userRes.data?.success && userRes.data?.data) {
-          setUser(userRes.data.data)
+      // If online card payment, trigger Razorpay checkout
+      if (paymentMethod === 'CARD') {
+        if (typeof window === 'undefined' || !(window as any).Razorpay) {
+          throw new Error('Razorpay SDK failed to load. Please refresh the page and try again.')
         }
-      } catch (e) {
-        console.error('Error refreshing profile:', e)
-      }
 
-      // 4. Clear local storage cart
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('cart')
-        window.dispatchEvent(new Event('cart-updated'))
+        // Call backend to create Razorpay order
+        const paymentRes = await api.post('/payments/create-order', {
+          orderId: order.id
+        })
+        const rzpOrder = paymentRes.data.data
+
+        const options = {
+          key: rzpOrder.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+          amount: rzpOrder.amount,
+          currency: rzpOrder.currency,
+          name: 'Skulture',
+          description: `Order #${rzpOrder.orderNumber}`,
+          order_id: rzpOrder.razorpayOrderId,
+          handler: async function (response: any) {
+            try {
+              setIsSubmitting(true)
+              setSubmitError(null)
+              
+              // Verify payment signature on backend
+              await api.post('/payments/verify', {
+                orderId: order.id,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              })
+
+              // 3.5 Refresh profile data to clear stamps/discount in context
+              try {
+                const userRes = await api.get('/auth/me')
+                if (userRes.data?.success && userRes.data?.data) {
+                  setUser(userRes.data.data)
+                }
+              } catch (e) {
+                console.error('Error refreshing profile:', e)
+              }
+
+              // 4. Clear local storage cart
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('cart')
+                window.dispatchEvent(new Event('cart-updated'))
+              }
+              setIsOrdered(true)
+            } catch (verifyErr: any) {
+              console.error('Payment verification error:', verifyErr)
+              setSubmitError(getErrorMessage(verifyErr, 'Payment signature verification failed. Please contact support.'))
+            } finally {
+              setIsSubmitting(false)
+            }
+          },
+          prefill: {
+            name: formData.fullName,
+            email: formData.email,
+            contact: formData.phone,
+          },
+          theme: {
+            color: '#000000',
+          },
+          modal: {
+            ondismiss: function () {
+              setSubmitError('Payment cancelled by user.')
+              setIsSubmitting(false)
+            }
+          }
+        }
+
+        const rzp = new (window as any).Razorpay(options)
+        rzp.on('payment.failed', function (response: any) {
+          console.error('Razorpay payment failed:', response.error)
+          setSubmitError(response.error.description || 'Payment transaction failed.')
+        })
+        rzp.open()
+      } else {
+        // Cash on delivery: complete order directly
+        
+        // 3.5 Refresh profile data to clear stamps/discount in context
+        try {
+          const userRes = await api.get('/auth/me')
+          if (userRes.data?.success && userRes.data?.data) {
+            setUser(userRes.data.data)
+          }
+        } catch (e) {
+          console.error('Error refreshing profile:', e)
+        }
+
+        // 4. Clear local storage cart
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('cart')
+          window.dispatchEvent(new Event('cart-updated'))
+        }
+        setIsOrdered(true)
+        setIsSubmitting(false)
       }
-      setIsOrdered(true)
     } catch (err: any) {
       console.error('Checkout error:', err)
-      setSubmitError(
-        err.response?.data?.message || 
-        'An error occurred while placing your order. Please try again.'
-      )
-    } finally {
+      setSubmitError(getErrorMessage(err, 'An error occurred while placing your order. Please try again.'))
       setIsSubmitting(false)
     }
   }
@@ -468,6 +562,7 @@ export default function CheckoutPage() {
                               type="text"
                               name="address"
                               required
+                              minLength={5}
                               value={formData.address}
                               onChange={handleInputChange}
                               className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
@@ -480,6 +575,7 @@ export default function CheckoutPage() {
                               type="tel"
                               name="phone"
                               required
+                              minLength={10}
                               value={formData.phone}
                               onChange={handleInputChange}
                               className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
@@ -492,6 +588,7 @@ export default function CheckoutPage() {
                               type="text"
                               name="city"
                               required
+                              minLength={2}
                               value={formData.city}
                               onChange={handleInputChange}
                               className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
@@ -504,6 +601,7 @@ export default function CheckoutPage() {
                               type="text"
                               name="postalCode"
                               required
+                              minLength={4}
                               value={formData.postalCode}
                               onChange={handleInputChange}
                               className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
@@ -653,6 +751,7 @@ export default function CheckoutPage() {
       </div>
 
       <Footer />
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
     </main>
   )
 }
