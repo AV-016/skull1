@@ -28,7 +28,9 @@ import {
   Lock,
   LogOut
 } from 'lucide-react'
-import { useSendPhoneOtp, useVerifyPhoneOtp, useDeleteAccount } from '@/hooks/useAuth'
+import { useVerifyPhoneOtp, useDeleteAccount } from '@/hooks/useAuth'
+import { auth } from '@/lib/firebase'
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
 
 interface Address {
   id: string
@@ -69,8 +71,10 @@ export default function AccountPage() {
   const [cooldown, setCooldown] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
 
-  const sendOtpMutation = useSendPhoneOtp()
   const verifyOtpMutation = useVerifyPhoneOtp()
   const deleteAccountMutation = useDeleteAccount()
 
@@ -268,13 +272,31 @@ export default function AccountPage() {
     e.preventDefault()
     setErrorMsg(null)
     setSuccessMsg(null)
+    setIsSendingOtp(true)
     try {
-      await sendOtpMutation.mutateAsync(phoneInput)
+      if (typeof window !== 'undefined') {
+        const wrapper = document.getElementById('recaptcha-container-wrapper')
+        if (wrapper) {
+          wrapper.innerHTML = '<div id="recaptcha-container"></div>'
+        }
+      }
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {},
+        'expired-callback': () => {
+          setErrorMsg('reCAPTCHA expired. Please try again.')
+        }
+      })
+      const confirmation = await signInWithPhoneNumber(auth, phoneInput, verifier)
+      setConfirmationResult(confirmation)
       setOtpSent(true)
       setCooldown(60)
       setSuccessMsg('Verification OTP has been sent via SMS.')
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Failed to send OTP. Please try again.')
+      console.error('Firebase send phone OTP error:', err)
+      setErrorMsg(err.message || 'Failed to send OTP. Please check your phone number and try again.')
+    } finally {
+      setIsSendingOtp(false)
     }
   }
 
@@ -282,8 +304,16 @@ export default function AccountPage() {
     e.preventDefault()
     setErrorMsg(null)
     setSuccessMsg(null)
+    if (!confirmationResult) {
+      setErrorMsg('No active verification session. Please request a new OTP.')
+      return
+    }
+    setIsVerifyingOtp(true)
     try {
-      await verifyOtpMutation.mutateAsync({ phone: phoneInput, otp: otpInput })
+      const credential = await confirmationResult.confirm(otpInput)
+      const token = await credential.user.getIdToken()
+
+      await verifyOtpMutation.mutateAsync({ token })
       setSuccessMsg('Phone number verified successfully!')
       
       const res = await api.get('/auth/me')
@@ -297,9 +327,13 @@ export default function AccountPage() {
         setOtpInput('')
         setSuccessMsg(null)
         setEditMobile(false)
+        setConfirmationResult(null)
       }, 1500)
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Invalid or expired OTP. Please try again.')
+      console.error('Firebase verify phone OTP error:', err)
+      setErrorMsg(err.response?.data?.message || err.message || 'Invalid or expired OTP. Please try again.')
+    } finally {
+      setIsVerifyingOtp(false)
     }
   }
 
@@ -1186,12 +1220,16 @@ export default function AccountPage() {
                     />
                   </div>
 
+                  <div id="recaptcha-container-wrapper">
+                    <div id="recaptcha-container"></div>
+                  </div>
+
                   <button
                     type="submit"
-                    disabled={sendOtpMutation.isPending}
+                    disabled={isSendingOtp}
                     className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded font-bold uppercase tracking-wider transition shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
-                    {sendOtpMutation.isPending ? (
+                    {isSendingOtp ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : 'Send Verification OTP'}
                   </button>
@@ -1216,10 +1254,10 @@ export default function AccountPage() {
 
                   <button
                     type="submit"
-                    disabled={verifyOtpMutation.isPending}
+                    disabled={isVerifyingOtp}
                     className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded font-bold uppercase tracking-wider transition shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
-                    {verifyOtpMutation.isPending ? (
+                    {isVerifyingOtp ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : 'Verify OTP'}
                   </button>
@@ -1235,7 +1273,7 @@ export default function AccountPage() {
 
                     <button
                       type="button"
-                      disabled={cooldown > 0 || sendOtpMutation.isPending}
+                      disabled={cooldown > 0 || isSendingOtp}
                       onClick={handleSendOtp}
                       className={`font-semibold cursor-pointer ${
                         cooldown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-red-500 hover:text-red-600'

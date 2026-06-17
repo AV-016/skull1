@@ -86,7 +86,7 @@ export const useSendPhoneOtp = () => {
 
 export const useVerifyPhoneOtp = () => {
   return useMutation({
-    mutationFn: async (data: { phone: string; otp: string }) => {
+    mutationFn: async (data: { token: string }) => {
       const response = await api.post('/auth/verify-phone-otp', data)
       return response.data
     },

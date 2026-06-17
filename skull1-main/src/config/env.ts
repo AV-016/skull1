@@ -34,6 +34,9 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM_EMAIL: z.string().optional(),
   FAST2SMS_API_KEY: z.string().optional(),
+  FIREBASE_PROJECT_ID: z.string().optional(),
+  FIREBASE_CLIENT_EMAIL: z.string().optional(),
+  FIREBASE_PRIVATE_KEY: z.string().optional(),
 });
 
 const parseEnv = () => {

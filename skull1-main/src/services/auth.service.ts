@@ -11,8 +11,9 @@ import logger from '../utils/logger';
 import crypto from 'crypto';
 import { prisma } from '../config/database';
 import { sendOtpEmail, sendPasswordResetOtpEmail } from '../utils/mail';
-import { sendOtpSms } from '../utils/sms';
 import bcrypt from 'bcrypt';
+import { getFirebaseAdmin } from '../config/firebase';
+import { getAuth } from 'firebase-admin/auth';
 
 const userRepository = new UserRepository();
 
@@ -351,84 +352,29 @@ export class AuthService {
   }
 
   async sendPhoneOtp(userId: string, phoneInput: string): Promise<void> {
-    const phone = String(phoneInput || '').trim().replace(/\s+/g, '');
-    if (!phone) {
-      throw new AppError(400, 'Phone number is required.');
+    throw new AppError(410, 'This endpoint is deprecated. Phone verification is now handled client-side.');
+  }
+
+  async verifyPhoneOtp(userId: string, token: string): Promise<void> {
+    if (!token) {
+      throw new AppError(400, 'Firebase verification token is required.');
     }
 
-    if (!/^\+[1-9]\d{1,14}$/.test(phone)) {
-      throw new AppError(400, 'Invalid phone number format. Must be in E.164 format (e.g. +919876543210).');
+    let decodedToken;
+    try {
+      const firebaseAdmin = getFirebaseAdmin();
+      decodedToken = await getAuth(firebaseAdmin).verifyIdToken(token);
+    } catch (error: any) {
+      logger.error('Error verifying Firebase ID token:', error);
+      throw new AppError(401, `Invalid or expired Firebase verification token: ${error.message}`);
+    }
+
+    const phone = decodedToken.phone_number;
+    if (!phone) {
+      throw new AppError(400, 'Verification token does not contain a verified phone number.');
     }
 
     // Check if phone number is already verified by another user
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        phone,
-        isPhoneVerified: true,
-        NOT: { id: userId },
-      },
-    });
-    if (existingUser) {
-      throw new AppError(400, 'This phone number is already verified on another account.');
-    }
-
-    // Check rate limit: 1 OTP per 60 seconds
-    const lastOtp = await prisma.phoneOTP.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (lastOtp && (Date.now() - lastOtp.createdAt.getTime()) < 60000) {
-      const waitSec = Math.ceil((60000 - (Date.now() - lastOtp.createdAt.getTime())) / 1000);
-      throw new AppError(429, `Please wait ${waitSec} seconds before requesting a new OTP.`);
-    }
-
-    // Generate 6-digit OTP code
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Hash OTP
-    const hashedOtp = await bcrypt.hash(otpCode, 10);
-
-    // Save/Overwrite OTP
-    await prisma.phoneOTP.deleteMany({
-      where: { userId },
-    });
-    await prisma.phoneOTP.create({
-      data: {
-        userId,
-        phone,
-        otp: hashedOtp,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiry
-      },
-    });
-
-    // Send SMS
-    await sendOtpSms(phone, otpCode);
-  }
-
-  async verifyPhoneOtp(userId: string, phoneInput: string, otp: string): Promise<void> {
-    const phone = String(phoneInput || '').trim().replace(/\s+/g, '');
-    if (!phone || !otp) {
-      throw new AppError(400, 'Phone number and OTP code are required.');
-    }
-
-    const record = await prisma.phoneOTP.findFirst({
-      where: { userId, phone },
-    });
-    if (!record) {
-      throw new AppError(400, 'No verification session found for this phone number.');
-    }
-
-    if (record.expiresAt < new Date()) {
-      throw new AppError(400, 'OTP code has expired. Please request a new one.');
-    }
-
-    // Verify OTP hash
-    const isMatch = await bcrypt.compare(otp, record.otp);
-    if (!isMatch) {
-      throw new AppError(400, 'Invalid OTP code.');
-    }
-
-    // Double check uniqueness before final write
     const existingUser = await prisma.user.findFirst({
       where: {
         phone,
@@ -444,11 +390,6 @@ export class AuthService {
     await userRepository.update(userId, {
       phone,
       isPhoneVerified: true,
-    });
-
-    // Delete OTP record
-    await prisma.phoneOTP.delete({
-      where: { id: record.id },
     });
   }
 

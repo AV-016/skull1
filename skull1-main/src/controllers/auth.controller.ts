@@ -180,8 +180,8 @@ export class AuthController {
   async verifyPhoneOtp(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const { phone, otp } = req.body;
-      await authService.verifyPhoneOtp(userId, phone, otp);
+      const { token } = req.body;
+      await authService.verifyPhoneOtp(userId, token);
       res.status(200).json({
         success: true,
         message: 'Phone number verified successfully.',
