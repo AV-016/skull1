@@ -8,6 +8,10 @@ export interface User {
   phone?: string | null
   isPhoneVerified?: boolean
   createdAt: string
+  loyaltyStamps?: number
+  loyaltyDiscountPending?: boolean
+  loyaltyDiscountValue?: number
+  loyaltyDiscountSet?: boolean
 }
 
 
@@ -58,7 +62,7 @@ export interface CartItem {
 // Order Types
 export enum OrderStatus {
   PENDING = 'PENDING',
-  PAID = 'PAID',
+  CONFIRMED = 'CONFIRMED',
   PROCESSING = 'PROCESSING',
   SHIPPED = 'SHIPPED',
   DELIVERED = 'DELIVERED',
@@ -67,12 +71,21 @@ export enum OrderStatus {
 
 export interface Order {
   id: string
+  orderNumber?: string
   userId: string
-  items: CartItem[]
+  items: any[]
+  totalAmount?: number
   total: number
-  status: OrderStatus
-  shippingAddress: Address
-  billingAddress: Address
+  status: OrderStatus | string
+  address?: any
+  shippingAddress?: Address
+  billingAddress?: Address
+  trackingId?: string | null
+  carrier?: string | null
+  trackingUrl?: string | null
+  statusHistory?: any[]
+  returnReason?: string | null
+  returnImage?: string | null
   createdAt: string
   updatedAt: string
 }

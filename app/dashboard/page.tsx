@@ -216,7 +216,13 @@ export default function DashboardPage() {
       }, 1500)
     } catch (err: any) {
       console.error('Firebase verify phone OTP error:', err)
-      setErrorMsg(err.response?.data?.message || err.message || 'Invalid or expired OTP. Please try again.')
+      let msg = err.response?.data?.message || err.message || 'Invalid or expired OTP. Please try again.'
+      if (err.code === 'auth/invalid-verification-code') {
+        msg = 'The verification code you entered is invalid. Please check the code and try again.'
+      } else if (err.code === 'auth/code-expired') {
+        msg = 'The verification code has expired. Please send a new OTP and try again.'
+      }
+      setErrorMsg(msg)
     } finally {
       setIsVerifyingOtp(false)
     }
@@ -420,7 +426,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] md:text-xs text-[#4f5d75] dark:text-[#9da8b6] leading-relaxed">
                   Earn 1 stamp for every order placed. Complete all <strong>8 stamps</strong> to unlock a special, custom discount from the Admin applied directly to your next checkout!
                 </p>
-                {user?.loyaltyDiscountSet && user?.loyaltyDiscountValue > 0 ? (
+                {user?.loyaltyDiscountSet && user?.loyaltyDiscountValue && user.loyaltyDiscountValue > 0 ? (
                   <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg text-xs font-bold text-green-600 dark:text-green-400 flex items-center gap-1.5 animate-pulse">
                     🎉 Special Offer: You have a {user.loyaltyDiscountValue}% discount waiting at checkout!
                   </div>

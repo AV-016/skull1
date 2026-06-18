@@ -331,7 +331,13 @@ export default function AccountPage() {
       }, 1500)
     } catch (err: any) {
       console.error('Firebase verify phone OTP error:', err)
-      setErrorMsg(err.response?.data?.message || err.message || 'Invalid or expired OTP. Please try again.')
+      let msg = err.response?.data?.message || err.message || 'Invalid or expired OTP. Please try again.'
+      if (err.code === 'auth/invalid-verification-code') {
+        msg = 'The verification code you entered is invalid. Please check the code and try again.'
+      } else if (err.code === 'auth/code-expired') {
+        msg = 'The verification code has expired. Please send a new OTP and try again.'
+      }
+      setErrorMsg(msg)
     } finally {
       setIsVerifyingOtp(false)
     }

@@ -259,6 +259,47 @@ export class OrderRepository {
     });
   }
 
+  async updateShippingDetails(
+    id: string,
+    data: { trackingId: string | null; carrier: string | null; trackingUrl: string | null }
+  ): Promise<Order> {
+    return prisma.order.update({
+      where: { id },
+      data: {
+        trackingId: data.trackingId,
+        carrier: data.carrier,
+        trackingUrl: data.trackingUrl,
+      },
+    });
+  }
+
+  async saveReturnRequest(
+    id: string,
+    reason: string,
+    image: string
+  ): Promise<Order> {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id },
+        data: {
+          status: OrderStatus.RETURN_REQUESTED,
+          returnReason: reason,
+          returnImage: image,
+        },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          status: OrderStatus.RETURN_REQUESTED,
+          notes: `Customer requested return. Reason: ${reason}`,
+        },
+      });
+
+      return order;
+    });
+  }
+
   async countPending(): Promise<number> {
     return prisma.order.count({
       where: { status: OrderStatus.PENDING },

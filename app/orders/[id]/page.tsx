@@ -1,6 +1,6 @@
 'use client'
 
-import { useOrderDetail, useCancelOrder } from '@/hooks/useOrders'
+import { useOrderDetail, useCancelOrder, useReturnOrder } from '@/hooks/useOrders'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -22,9 +22,22 @@ export default function OrderDetailPage() {
   const orderId = params.id as string
   const { data: order, isLoading, error, refetch } = useOrderDetail(orderId)
   const cancelMutation = useCancelOrder()
-  const { user } = useAuth()
+  const returnMutation = useReturnOrder()
+  const { user, isAdmin } = useAuth()
   
   const [reviewsState, setReviewsState] = useState<Record<string, { rating: number, comment: string, images?: string[], isUploading?: boolean, submitted: boolean, error: string | null, submitting: boolean }>>({})
+
+  // Shipping States for Admin
+  const [adminCarrier, setAdminCarrier] = useState('')
+  const [adminTrackingId, setAdminTrackingId] = useState('')
+  const [adminTrackingUrl, setAdminTrackingUrl] = useState('')
+  const [isUpdatingShipping, setIsUpdatingShipping] = useState(false)
+
+  // Return Modal States
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
+  const [userReturnReason, setUserReturnReason] = useState('')
+  const [userReturnImage, setUserReturnImage] = useState('')
+  const [isReturnUploading, setIsReturnUploading] = useState(false)
 
   // Support Modal States
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false)
@@ -44,6 +57,9 @@ export default function OrderDetailPage() {
         ...prev,
         subject: `Order Support: #${order.orderNumber || order.id}`
       }))
+      setAdminCarrier(order.carrier || '')
+      setAdminTrackingId(order.trackingId || '')
+      setAdminTrackingUrl(order.trackingUrl || '')
     }
   }, [order])
 
@@ -57,6 +73,23 @@ export default function OrderDetailPage() {
       }))
     }
   }, [user])
+
+  const handleUpdateShipping = async () => {
+    try {
+      setIsUpdatingShipping(true)
+      await api.patch(`/admin/orders/${orderId}/shipping`, {
+        carrier: adminCarrier || null,
+        trackingId: adminTrackingId || null,
+        trackingUrl: adminTrackingUrl || null
+      })
+      alert('Shipping details updated successfully')
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update shipping details')
+    } finally {
+      setIsUpdatingShipping(false)
+    }
+  }
 
   const handleSupportSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -140,6 +173,14 @@ export default function OrderDetailPage() {
 
   const currentStatusIndex = ORDER_STATUSES.indexOf((order.status || 'pending').toLowerCase())
 
+  const deliveredHistory = order.statusHistory?.find(
+    (h: any) => h.status.toUpperCase() === 'DELIVERED'
+  )
+  const deliveryDate = deliveredHistory ? new Date(deliveredHistory.createdAt) : null
+  const isPastReturnWindow = deliveryDate 
+    ? (new Date().getTime() - deliveryDate.getTime()) > (3 * 24 * 60 * 60 * 1000) 
+    : false
+
   const subtotal = order.totalAmount || 0
   const shipping = 0
   const total = subtotal + shipping
@@ -165,6 +206,18 @@ export default function OrderDetailPage() {
             order id: #{order.orderNumber || order.id}
           </p>
           <p className="text-xs text-secondary-text">Placed on {formatDate(order.createdAt)}</p>
+        </motion.div>
+
+        {/* Policy Notification Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-8 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 text-xs text-secondary-text space-y-1"
+        >
+          <p className="font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider text-[10px]">Cancellation & Return Policy:</p>
+          <p>• Orders **cannot be canceled** after they have been shipped (Status: Shipped or Delivered).</p>
+          <p>• Returns are only permitted within **3 days** of order delivery.</p>
         </motion.div>
 
         <div className="grid gap-8 md:grid-cols-3 mb-12">
@@ -376,7 +429,9 @@ export default function OrderDetailPage() {
               <span>Get Support</span>
             </Button>
 
-            {order.status !== 'delivered' && order.status !== 'CANCELLED' && (
+            {order.status?.toUpperCase() !== 'DELIVERED' && order.status?.toUpperCase() !== 'SHIPPED' && order.status?.toUpperCase() !== 'CANCELLED' && 
+            order.status?.toUpperCase() !== 'RETURN_REQUESTED' && order.status?.toUpperCase() !== 'RETURNED' && 
+            order.status?.toUpperCase() !== 'RETURN_REJECTED' && (
               <Button
                 variant="outline"
                 className="w-full mt-3 border-border text-primary-text hover:bg-secondary cursor-pointer font-bold"
@@ -386,8 +441,172 @@ export default function OrderDetailPage() {
                 {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
               </Button>
             )}
+
+            {order.status?.toUpperCase() === 'DELIVERED' && (
+              <div className="mt-3 space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full border-red-500/20 hover:border-red-500 text-red-500 hover:bg-red-500/5 cursor-pointer font-bold"
+                  disabled={isPastReturnWindow}
+                  onClick={() => setIsReturnModalOpen(true)}
+                >
+                  Request Return
+                </Button>
+                {isPastReturnWindow && (
+                  <p className="text-[10px] text-red-400 text-center font-medium mt-1">
+                    Return window closed (3 days elapsed since delivery)
+                  </p>
+                )}
+              </div>
+            )}
+
+            {order.status?.toUpperCase() === 'RETURN_REQUESTED' && (
+              <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg text-xs font-bold text-center">
+                Return Requested (Pending Review)
+              </div>
+            )}
+
+            {order.status?.toUpperCase() === 'RETURNED' && (
+              <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-lg text-xs font-bold text-center">
+                Order Returned & Refunded
+              </div>
+            )}
+
+            {order.status?.toUpperCase() === 'RETURN_REJECTED' && (
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold text-center">
+                Return Request Rejected
+              </div>
+            )}
           </motion.div>
         </div>
+
+        {/* Tracking Details */}
+        {(order.trackingId || order.carrier || order.trackingUrl) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="glass-card p-8 bg-card border border-primary/20 mb-8"
+          >
+            <h3 className="text-lg font-bold text-primary-text mb-4">Tracking Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+              <div>
+                <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px]">Carrier</p>
+                <p className="text-primary-text font-bold mt-1 text-sm">{order.carrier || 'Standard Shipping'}</p>
+              </div>
+              <div>
+                <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px]">Tracking Number</p>
+                <p className="text-primary-text font-bold mt-1 text-sm select-all">{order.trackingId || 'N/A'}</p>
+              </div>
+            </div>
+            {(order.trackingUrl || order.trackingId) && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <a
+                  href={
+                    order.trackingUrl ||
+                    (order.carrier?.toLowerCase().includes('fedex')
+                      ? `https://www.fedex.com/apps/fedextrack/?tracknumbers=${order.trackingId}`
+                      : order.carrier?.toLowerCase().includes('dhl')
+                      ? `https://www.dhl.com/en/express/tracking.html?AWB=${order.trackingId}`
+                      : order.carrier?.toLowerCase().includes('ups')
+                      ? `https://www.ups.com/track?tracknum=${order.trackingId}`
+                      : `https://track.delhivery.com/track/shipping-packages?filter_id=${order.trackingId}`)
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline uppercase tracking-wider"
+                >
+                  Track Order External Link →
+                </a>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Return Details View (Visible to Admin & Customer if status is return-related) */}
+        {(order.status?.toUpperCase() === 'RETURN_REQUESTED' || order.status?.toUpperCase() === 'RETURNED' || order.status?.toUpperCase() === 'RETURN_REJECTED') && (order.returnReason || order.returnImage) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="glass-card p-8 bg-card border border-red-500/20 mb-8 space-y-4"
+          >
+            <h3 className="text-lg font-bold text-red-500 uppercase tracking-wider">Return Request Details</h3>
+            <div className="space-y-4 text-xs">
+              <div>
+                <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px]">Return Reason</p>
+                <p className="text-primary-text mt-1 text-sm bg-secondary/50 p-4 border border-border/40 rounded-lg whitespace-pre-wrap">
+                  {order.returnReason || 'No reason provided.'}
+                </p>
+              </div>
+              {order.returnImage && (
+                <div>
+                  <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px] mb-2">Product Image Proof</p>
+                  <a href={order.returnImage} target="_blank" rel="noopener noreferrer" className="inline-block border border-border hover:border-primary/50 rounded-lg overflow-hidden group smooth-transition">
+                    <img 
+                      src={order.returnImage} 
+                      alt="Return Proof" 
+                      className="max-w-xs max-h-64 object-contain group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </a>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Admin Shipping Controls */}
+        {isAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="glass-card p-8 bg-card border border-amber-500/20 mb-8 space-y-4"
+          >
+            <h3 className="text-lg font-bold text-amber-500 uppercase tracking-wider">Admin: Update Shipping Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Carrier Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. FedEx, DHL, Delivery"
+                  value={adminCarrier}
+                  onChange={(e) => setAdminCarrier(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 text-xs rounded"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Tracking Number</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1234567890"
+                  value={adminTrackingId}
+                  onChange={(e) => setAdminTrackingId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 text-xs rounded"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">External Tracking URL</label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://track.example.com"
+                  value={adminTrackingUrl}
+                  onChange={(e) => setAdminTrackingUrl(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 text-xs rounded"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                onClick={handleUpdateShipping}
+                disabled={isUpdatingShipping}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-6 py-2.5 border-amber-600 cursor-pointer"
+              >
+                {isUpdatingShipping ? 'Saving...' : 'Save Shipping Info'}
+              </Button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Shipping Info */}
         <motion.div
@@ -529,6 +748,163 @@ export default function OrderDetailPage() {
                   </div>
                 </form>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Return Request Modal */}
+      <AnimatePresence>
+        {isReturnModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsReturnModalOpen(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-popover border border-border p-6 shadow-2xl z-10 space-y-6 max-h-[95vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center pb-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm uppercase tracking-widest text-primary-text">
+                    Request Product Return
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReturnModalOpen(false)}
+                  className="text-muted-text hover:text-primary-text smooth-transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (!userReturnReason.trim()) {
+                    alert('Please enter a return reason')
+                    return
+                  }
+                  if (!userReturnImage) {
+                    alert('Please upload a proof image of the product')
+                    return
+                  }
+                  try {
+                    await returnMutation.mutateAsync({
+                      orderId,
+                      reason: userReturnReason,
+                      image: userReturnImage
+                    })
+                    alert('Return request submitted successfully')
+                    setIsReturnModalOpen(false)
+                    setUserReturnReason('')
+                    setUserReturnImage('')
+                  } catch (err: any) {
+                    alert(err.response?.data?.message || 'Failed to submit return request')
+                  }
+                }}
+                className="space-y-4 text-xs"
+              >
+                <div className="p-3 bg-secondary/40 border border-border/50 rounded-lg">
+                  <p className="font-bold text-xs text-primary-text">Order Number: #{order.orderNumber || order.id}</p>
+                </div>
+
+                {/* Return Reason */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Reason for Return (Mandatory)</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={userReturnReason}
+                    onChange={(e) => setUserReturnReason(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 resize-none rounded-lg"
+                    placeholder="Describe the issue, defect, or reason for return in detail..."
+                  />
+                </div>
+
+                {/* Return Proof Image Upload */}
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                    Upload Product Image Proof (Mandatory)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="return-image-upload"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        try {
+                          setIsReturnUploading(true)
+                          const uploadFormData = new FormData()
+                          uploadFormData.append('file', file)
+                          const res = await api.post('/upload/image', uploadFormData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                          })
+                          if (res.data?.success && res.data?.data?.url) {
+                            setUserReturnImage(res.data.data.url)
+                          } else {
+                            alert('Failed to extract uploaded image URL')
+                          }
+                        } catch (err) {
+                          console.error('Error uploading return image:', err)
+                          alert('Error uploading image to server')
+                        } finally {
+                          setIsReturnUploading(false)
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="return-image-upload"
+                      className="cursor-pointer px-4 py-2 bg-secondary hover:bg-secondary/80 border border-dashed border-border hover:border-primary/50 text-[10px] text-primary-text font-bold rounded smooth-transition flex items-center gap-1.5"
+                    >
+                      {isReturnUploading ? 'Uploading...' : 'Upload Image'}
+                    </label>
+                  </div>
+
+                  {userReturnImage && (
+                    <div className="relative w-24 h-24 border border-border rounded overflow-hidden mt-2">
+                      <img src={userReturnImage} alt="Return Proof" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setUserReturnImage('')}
+                        className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 rounded-full p-1 text-white cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit / Cancel */}
+                <div className="pt-3 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsReturnModalOpen(false)}
+                    className="px-5 py-2.5 border border-border text-primary-text hover:bg-secondary smooth-transition uppercase tracking-widest text-[10px] font-bold cursor-pointer"
+                    disabled={returnMutation.isPending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={returnMutation.isPending || isReturnUploading}
+                    className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white smooth-transition uppercase tracking-widest text-[10px] font-bold flex items-center gap-2 cursor-pointer rounded"
+                  >
+                    {returnMutation.isPending ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

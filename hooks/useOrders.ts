@@ -38,3 +38,17 @@ export function useCancelOrder() {
     },
   })
 }
+
+export function useReturnOrder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ orderId, reason, image }: { orderId: string; reason: string; image: string }) => {
+      const response = await api.post(`/orders/${orderId}/return`, { reason, image })
+      return response.data.data
+    },
+    onSuccess: (_, { orderId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orderDetail(orderId) })
+    },
+  })
+}

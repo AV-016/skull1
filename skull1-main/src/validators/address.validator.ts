@@ -7,7 +7,7 @@ export const createAddressSchema = z.object({
     state: z.string().min(2, 'State must be at least 2 characters'),
     postalCode: z.string().min(4, 'Postal code must be at least 4 characters'),
     country: z.string().min(2, 'Country must be at least 2 characters'),
-    phone: z.string().min(10, 'Phone number must be at least 10 characters').optional(),
+    phone: z.string().min(10, 'Phone number must be at least 10 characters').optional().or(z.literal('')),
     isDefault: z.boolean().optional(),
   }),
 });
@@ -19,7 +19,7 @@ export const updateAddressSchema = z.object({
     state: z.string().min(2).optional(),
     postalCode: z.string().min(4).optional(),
     country: z.string().min(2).optional(),
-    phone: z.string().min(10).optional(),
+    phone: z.string().min(10).optional().or(z.literal('')),
     isDefault: z.boolean().optional(),
   }),
 });

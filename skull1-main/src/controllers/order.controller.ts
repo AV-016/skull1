@@ -67,6 +67,22 @@ export class OrderController {
     }
   }
 
+  async requestReturn(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id;
+      const orderId = req.params.id;
+      const { reason, image } = req.body;
+      const order = await orderService.requestReturn(userId, orderId, { reason, image });
+      res.status(200).json({
+        success: true,
+        message: 'Return requested successfully',
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getAllOrders(req: Request, res: Response, next: NextFunction) {
     try {
       const filters = {
@@ -95,6 +111,21 @@ export class OrderController {
       res.status(200).json({
         success: true,
         message: MESSAGES.ORDER.STATUS_UPDATED,
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateOrderShipping(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orderId = req.params.id;
+      const { trackingId, carrier, trackingUrl } = req.body;
+      const order = await orderService.updateOrderShipping(orderId, { trackingId, carrier, trackingUrl });
+      res.status(200).json({
+        success: true,
+        message: 'Order shipping details updated successfully',
         data: order,
       });
     } catch (error) {

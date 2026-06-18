@@ -240,6 +240,57 @@ export class OrderService {
     return formatOrderResponse(refreshed!);
   }
 
+  async updateOrderShipping(
+    orderId: string,
+    data: { trackingId: string | null; carrier: string | null; trackingUrl: string | null }
+  ): Promise<OrderResponseDTO> {
+    const order = await orderRepository.findById(orderId);
+    if (!order) {
+      throw new AppError(404, 'Order not found');
+    }
+
+    await orderRepository.updateShippingDetails(orderId, data);
+    const refreshed = await orderRepository.findById(orderId);
+    return formatOrderResponse(refreshed!);
+  }
+
+  async requestReturn(userId: string, orderId: string, data: { reason: string; image: string }): Promise<OrderResponseDTO> {
+    const { reason, image } = data;
+    if (!reason || reason.trim() === '') {
+      throw new AppError(400, 'Return reason is required');
+    }
+    if (!image || image.trim() === '') {
+      throw new AppError(400, 'Return proof image is required');
+    }
+
+    const order = await orderRepository.findById(orderId);
+    if (!order) {
+      throw new AppError(404, 'Order not found');
+    }
+
+    if (order.userId !== userId) {
+      throw new AppError(403, 'Forbidden access to this order');
+    }
+
+    if (order.status !== OrderStatus.DELIVERED) {
+      throw new AppError(400, 'Only delivered orders can be returned');
+    }
+
+    // Check 3 days window
+    const deliveredHistory = order.statusHistory.find((h) => h.status === OrderStatus.DELIVERED);
+    if (deliveredHistory) {
+      const deliveryTime = new Date(deliveredHistory.createdAt).getTime();
+      const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
+      if (Date.now() - deliveryTime > threeDaysInMs) {
+        throw new AppError(400, 'Return window (3 days after delivery) has expired');
+      }
+    }
+
+    await orderRepository.saveReturnRequest(orderId, reason, image);
+    const refreshed = await orderRepository.findById(orderId);
+    return formatOrderResponse(refreshed!);
+  }
+
   async getOrderStatusHistory(userId: string, orderId: string, isAdmin: boolean = false): Promise<any> {
     const order = await this.getOrderById(userId, orderId, isAdmin);
     return order.statusHistory;

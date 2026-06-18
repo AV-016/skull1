@@ -15,3 +15,11 @@ export const updateOrderStatusSchema = z.object({
     notes: z.string().optional(),
   }),
 });
+
+export const updateOrderShippingSchema = z.object({
+  body: z.object({
+    trackingId: z.string().nullable().optional(),
+    carrier: z.string().nullable().optional(),
+    trackingUrl: z.string().nullable().optional(),
+  }),
+});

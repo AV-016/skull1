@@ -31,6 +31,11 @@ export interface OrderResponseDTO {
     notes: string | null;
     createdAt: Date;
   }[];
+  trackingId?: string | null;
+  carrier?: string | null;
+  trackingUrl?: string | null;
+  returnReason?: string | null;
+  returnImage?: string | null;
   user?: {
     id: string;
     name: string | null;
@@ -54,6 +59,11 @@ export const formatOrderResponse = (order: OrderWithDetails): OrderResponseDTO =
     paymentStatus: order.paymentStatus,
     paymentId: order.paymentId,
     createdAt: order.createdAt,
+    trackingId: order.trackingId,
+    carrier: order.carrier,
+    trackingUrl: order.trackingUrl,
+    returnReason: order.returnReason,
+    returnImage: order.returnImage,
     address: {
       id: order.address.id,
       street: order.address.street,

@@ -59,6 +59,12 @@ export default function AdminOrders() {
         return 'bg-orange-500/5 text-orange-400 border-orange-500/20'
       case 'CANCELLED':
         return 'bg-red-500/5 text-red-400 border-red-500/20'
+      case 'RETURN_REQUESTED':
+        return 'bg-blue-500/5 text-blue-300 border-blue-500/20'
+      case 'RETURNED':
+        return 'bg-green-500/10 text-green-300 border-green-500/20'
+      case 'RETURN_REJECTED':
+        return 'bg-red-500/5 text-red-300 border-red-500/20'
       default:
         return 'bg-secondary text-secondary-text border-border'
     }
@@ -173,6 +179,9 @@ export default function AdminOrders() {
                         <option value="SHIPPED">Shipped</option>
                         <option value="DELIVERED">Delivered</option>
                         <option value="CANCELLED">Cancelled</option>
+                        <option value="RETURN_REQUESTED">Return Requested</option>
+                        <option value="RETURNED">Returned</option>
+                        <option value="RETURN_REJECTED">Return Rejected</option>
                       </select>
                     </td>
                     <td className="px-6 py-4 text-right">

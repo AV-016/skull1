@@ -169,6 +169,11 @@ model Order {
   loyaltyStampAwarded Boolean        @default(false)
   paymentMethod       String         @default("CARD")
   codCharge           Float          @default(0.0)
+  trackingId          String?
+  carrier             String?
+  trackingUrl         String?
+  returnReason        String?
+  returnImage         String?
   statusHistory OrderStatusHistory[]
   payments      Payment[]
   inquiries     Inquiry[]
@@ -331,6 +336,9 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+  RETURN_REJECTED
 }
 
 enum PaymentStatus {

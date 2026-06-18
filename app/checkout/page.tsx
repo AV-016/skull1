@@ -360,8 +360,8 @@ export default function CheckoutPage() {
   }
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const hasDiscount = user?.loyaltyDiscountSet && user?.loyaltyDiscountValue > 0
-  const discountRate = hasDiscount ? user.loyaltyDiscountValue : 0
+  const hasDiscount = !!(user?.loyaltyDiscountSet && user?.loyaltyDiscountValue && user.loyaltyDiscountValue > 0)
+  const discountRate = hasDiscount ? (user?.loyaltyDiscountValue || 0) : 0
   const discountAmount = hasDiscount ? (subtotal * (discountRate / 100)) : 0
   const discountedSubtotal = subtotal - discountAmount
   const tax = discountedSubtotal * 0.1
@@ -665,6 +665,12 @@ export default function CheckoutPage() {
                         You will pay for your order in cash upon delivery. A standard COD handling charge of <span className="font-bold text-primary-text">{formatPrice(codChargeVal)}</span> will be added to your total.
                       </div>
                     )}
+                  </div>
+
+                  <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl text-xs text-secondary-text space-y-1.5">
+                    <p className="font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider text-[10px]">Important Shipping & Return Notice:</p>
+                    <p className="leading-relaxed">• Orders **cannot be canceled** once they have been shipped.</p>
+                    <p className="leading-relaxed">• Returns are only accepted within **3 days** of order delivery. Returns requested after 3 days of delivery will not be approved.</p>
                   </div>
 
                   {submitError && (
