@@ -14,44 +14,87 @@ const orderRepository = new OrderRepository();
 
 export class PaymentService {
   async createRazorpayOrder(userId: string, orderId: string): Promise<any> {
-    const order = await orderRepository.findById(orderId);
-    if (!order) {
-      throw new AppError(404, 'Order not found');
-    }
-
-    if (order.userId !== userId) {
-      throw new AppError(403, 'Forbidden checkout order access');
-    }
-
-    if (order.paymentStatus === PaymentStatus.PAID) {
-      throw new AppError(400, 'Order is already paid');
-    }
-
-    const options = {
-      amount: Math.round(order.totalAmount * 100), // Razorpay expects amount in paise (cents)
-      currency: 'INR',
-      receipt: order.orderNumber,
-    };
-
     try {
-      const rzpOrder = await razorpay.orders.create(options);
-      
-      // Store payment record
-      await paymentRepository.create({
-        order: { connect: { id: order.id } },
-        razorpayOrderId: rzpOrder.id,
-        amount: order.totalAmount,
-        status: 'created',
-      });
+      // Use an interactive transaction with a row lock on the Order to serialize concurrent payment session creations for the same order
+      return await prisma.$transaction(async (tx) => {
+        // 1. Lock the order row using SELECT FOR UPDATE
+        const orders = await tx.$queryRaw`
+          SELECT "id", "userId", "totalAmount", "orderNumber", "paymentStatus"
+          FROM "Order"
+          WHERE "id" = ${orderId}
+          LIMIT 1
+          FOR UPDATE
+        `;
 
-      return {
-        keyId: env.RAZORPAY_KEY_ID,
-        amount: rzpOrder.amount,
-        currency: rzpOrder.currency,
-        razorpayOrderId: rzpOrder.id,
-        orderNumber: order.orderNumber,
-      };
-    } catch (error) {
+        if (!orders || !Array.isArray(orders) || orders.length === 0) {
+          throw new AppError(404, 'Order not found');
+        }
+
+        const order = orders[0];
+
+        if (order.userId !== userId) {
+          throw new AppError(403, 'Forbidden checkout order access');
+        }
+
+        if (order.paymentStatus === 'PAID') {
+          throw new AppError(400, 'Order is already paid');
+        }
+
+        // 2. Check for an existing payment record
+        const existingPayment = await tx.payment.findFirst({
+          where: {
+            orderId: order.id,
+            status: { in: ['created', 'success'] },
+          },
+        });
+
+        if (existingPayment) {
+          if (existingPayment.status === 'success') {
+            throw new AppError(400, 'Order is already paid');
+          }
+          // Reuse the existing Razorpay order
+          return {
+            keyId: env.RAZORPAY_KEY_ID,
+            amount: Math.round(existingPayment.amount * 100),
+            currency: 'INR',
+            razorpayOrderId: existingPayment.razorpayOrderId,
+            orderNumber: order.orderNumber,
+          };
+        }
+
+        // 3. Create a new Razorpay order
+        const options = {
+          amount: Math.round(order.totalAmount * 100), // Razorpay expects amount in paise (cents)
+          currency: 'INR',
+          receipt: order.orderNumber,
+        };
+
+        const rzpOrder = await razorpay.orders.create(options);
+
+        // 4. Store payment record
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            razorpayOrderId: rzpOrder.id,
+            amount: order.totalAmount,
+            status: 'created',
+          },
+        });
+
+        return {
+          keyId: env.RAZORPAY_KEY_ID,
+          amount: rzpOrder.amount,
+          currency: rzpOrder.currency,
+          razorpayOrderId: rzpOrder.id,
+          orderNumber: order.orderNumber,
+        };
+      }, {
+        timeout: 10000 // 10 seconds timeout for interactive transaction
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Error creating Razorpay order:', error);
       throw new AppError(500, 'Failed to initialize payment gateway order');
     }
@@ -75,6 +118,7 @@ export class PaymentService {
 
     const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
     if (!isValid) {
+      logger.error(`Payment verification failed - signature invalid for Razorpay Order ID: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
       // Mark payment as failed
       await paymentRepository.updateStatus(razorpayOrderId, 'failed');
       await orderRepository.updatePaymentStatus(orderId, PaymentStatus.FAILED);
@@ -92,6 +136,7 @@ export class PaymentService {
 
       await orderRepository.updatePaymentStatus(orderId, PaymentStatus.PAID, razorpayPaymentId);
       await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED, 'Payment received, order confirmed.');
+      logger.info(`Payment successful (user checkout verified) - Order ID: ${orderId}, Number: ${order.orderNumber}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
 
       // Send order confirmation email
       const email = order.user?.email;
@@ -112,6 +157,7 @@ export class PaymentService {
   async handleWebhook(rawBody: string, signature: string): Promise<void> {
     const isValid = verifyWebhookSignature(rawBody, signature);
     if (!isValid) {
+      logger.error(`Webhook signature verification failed!`);
       throw new AppError(400, 'Invalid webhook signature');
     }
 
@@ -136,6 +182,7 @@ export class PaymentService {
           );
           await orderRepository.updatePaymentStatus(payment.orderId, PaymentStatus.PAID, razorpayPaymentId);
           await orderRepository.updateStatus(payment.orderId, OrderStatus.CONFIRMED, 'Payment confirmed via webhook.');
+          logger.info(`Webhook payment success - Order ID: ${payment.orderId}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
 
           // Send order confirmation email
           const email = order.user?.email;
@@ -156,6 +203,7 @@ export class PaymentService {
       
       const payment = await paymentRepository.findByRazorpayOrderId(razorpayOrderId);
       if (payment) {
+        logger.warn(`Webhook payment failed event received - Razorpay Order: ${razorpayOrderId}`);
         await paymentRepository.updateStatus(razorpayOrderId, 'failed');
         await orderRepository.updatePaymentStatus(payment.orderId, PaymentStatus.FAILED);
       }

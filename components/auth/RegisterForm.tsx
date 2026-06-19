@@ -48,8 +48,9 @@ export const RegisterForm = () => {
         password: data.password,
       },
       {
-        onSuccess: () => {
-          router.push(`/auth/verify-otp?email=${encodeURIComponent(data.email)}`)
+        onSuccess: (resData) => {
+          const emailSent = resData?.emailSent !== false
+          router.push(`/auth/verify-otp?email=${encodeURIComponent(data.email)}&emailSent=${emailSent}`)
         },
       }
     )

@@ -36,6 +36,8 @@ export class AuthService {
       isVerified: false,
     });
 
+    logger.info(`User registered successfully: ${user.email} (ID: ${user.id})`);
+
     // Generate a 6-digit verification code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -54,15 +56,22 @@ export class AuthService {
     });
 
     // Send OTP via Resend email utility
-    await sendOtpEmail(user.email, user.name || 'User', otp);
+    let emailSent = true;
+    try {
+      await sendOtpEmail(user.email, user.name || 'User', otp);
+    } catch (emailErr: any) {
+      logger.error(`Failed to send verification email during registration to ${user.email}:`, emailErr);
+      emailSent = false;
+    }
 
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
 
-    return formatAuthResponse(user, token);
+    return formatAuthResponse(user, token, emailSent);
   }
 
   async login(data: any): Promise<AuthResponseDTO> {
@@ -74,6 +83,7 @@ export class AuthService {
     const user = await userRepository.findByEmail(email);
     if (!user) {
       console.log(`[LOGIN DEBUG] User not found for email: "${email}"`);
+      logger.warn(`User login failed - email not found: "${email}"`);
       throw new AppError(401, MESSAGES.AUTH.INVALID_CREDENTIALS);
     }
 
@@ -83,6 +93,7 @@ export class AuthService {
     console.log(`[LOGIN DEBUG] Password validation result: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
+      logger.warn(`User login failed - incorrect password for: "${email}"`);
       throw new AppError(401, MESSAGES.AUTH.INVALID_CREDENTIALS);
     }
 
@@ -99,7 +110,15 @@ export class AuthService {
           expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
         },
       });
-      await sendOtpEmail(user.email, user.name || 'User', otp);
+      try {
+        await sendOtpEmail(user.email, user.name || 'User', otp);
+      } catch (emailErr: any) {
+        logger.error(`Failed to send verification email during login to ${user.email}:`, emailErr);
+        throw new AppError(
+          403,
+          'Please verify your email address. We generated a verification code, but failed to deliver the email. Please try logging in again to retry or click resend.'
+        );
+      }
 
       throw new AppError(403, 'Please verify your email address using the OTP sent to your email.');
     }
@@ -108,7 +127,10 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
+
+    logger.info(`User login successful: ${user.email} (ID: ${user.id})`);
 
     return formatAuthResponse(user, token);
   }
@@ -178,7 +200,12 @@ export class AuthService {
     });
 
     // Send OTP via Resend
-    await sendOtpEmail(email, user.name || 'User', otp);
+    try {
+      await sendOtpEmail(email, user.name || 'User', otp);
+    } catch (emailErr: any) {
+      logger.error(`Failed to resend verification email to ${email}:`, emailErr);
+      throw new AppError(500, 'We generated a new verification code, but failed to deliver the email. Please try again later.');
+    }
   }
 
   // Keep verifyEmail legacy function for safety (no-op or simple fallback)
@@ -216,7 +243,12 @@ export class AuthService {
     });
 
     // Send email
-    await sendPasswordResetOtpEmail(email, user.name || 'User', otp);
+    try {
+      await sendPasswordResetOtpEmail(email, user.name || 'User', otp);
+    } catch (emailErr: any) {
+      logger.error(`Failed to send password reset email to ${email}:`, emailErr);
+      throw new AppError(500, 'We generated a password reset code, but failed to deliver the email. Please try again later.');
+    }
   }
 
   async resetPassword(data: any): Promise<void> {
@@ -252,7 +284,10 @@ export class AuthService {
     const hashedPassword = await hashPassword(password);
     await userRepository.update(user.id, {
       password: hashedPassword,
+      tokenVersion: user.tokenVersion + 1,
     });
+
+    logger.info(`User password reset successful: ${email} (ID: ${user.id})`);
 
     // Delete OTP record after use
     await prisma.emailOTP.delete({
@@ -334,6 +369,7 @@ export class AuthService {
         userId: user.id,
         email: user.email,
         role: user.role,
+        tokenVersion: user.tokenVersion,
       });
 
       return formatAuthResponse(user, token);

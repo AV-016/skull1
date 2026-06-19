@@ -12,6 +12,7 @@ function VerifyOtpContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const email = searchParams.get('email') || ''
+  const emailSent = searchParams.get('emailSent') !== 'false'
 
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''))
   const [activeInput, setActiveInput] = useState(0)
@@ -196,6 +197,17 @@ function VerifyOtpContent() {
           <strong className="text-primary-text">{email}</strong>
         </p>
       </div>
+
+      {/* Email Outage Warning Alert */}
+      {!emailSent && (
+        <div className="p-4 bg-yellow-500/10 border border-yellow-500/35 rounded-xl flex items-start gap-3 text-yellow-600 dark:text-yellow-400">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div className="text-xs leading-relaxed font-medium space-y-1">
+            <p className="font-bold uppercase tracking-wider text-[10px]">⚠️ Delivery Failure Alert</p>
+            <p>Your account was successfully created, but we could not deliver the verification code due to a temporary mail service outage. You can request another verification code by clicking the "Resend Code" link below, or attempt logging in again later.</p>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {errorMessage && (

@@ -11,9 +11,10 @@ export interface AuthResponseDTO {
     isVerified: boolean;
   };
   token: string;
+  emailSent?: boolean;
 }
 
-export const formatAuthResponse = (user: User, token: string): AuthResponseDTO => {
+export const formatAuthResponse = (user: User, token: string, emailSent?: boolean): AuthResponseDTO => {
   return {
     user: {
       id: user.id,
@@ -25,5 +26,6 @@ export const formatAuthResponse = (user: User, token: string): AuthResponseDTO =
       isVerified: user.isVerified,
     },
     token,
+    emailSent,
   };
 };

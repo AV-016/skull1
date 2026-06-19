@@ -12,7 +12,13 @@ export const verifyRazorpaySignature = (
     .createHmac('sha256', secret)
     .update(body)
     .digest('hex');
-  return expectedSignature === signature;
+  
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+  const signatureBuffer = Buffer.from(signature, 'hex');
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 };
 
 export const verifyWebhookSignature = (
@@ -24,5 +30,11 @@ export const verifyWebhookSignature = (
     .createHmac('sha256', secret)
     .update(payload)
     .digest('hex');
-  return expectedSignature === signature;
+  
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+  const signatureBuffer = Buffer.from(signature, 'hex');
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 };

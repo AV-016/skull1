@@ -42,13 +42,25 @@ export const startPaymentCleanupJob = () => {
             },
           });
 
-          // 2. Return products to stock
+          // 2. Return products or variants to stock atomically
           for (const item of order.items) {
-            const product = await tx.product.findUnique({ where: { id: item.productId } });
-            if (product) {
+            if (item.variantId) {
+              await tx.productVariant.update({
+                where: { id: item.variantId },
+                data: {
+                  stock: {
+                    increment: item.quantity,
+                  },
+                },
+              });
+            } else {
               await tx.product.update({
                 where: { id: item.productId },
-                data: { stock: product.stock + item.quantity },
+                data: {
+                  stock: {
+                    increment: item.quantity,
+                  },
+                },
               });
             }
           }

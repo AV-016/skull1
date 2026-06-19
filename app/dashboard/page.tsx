@@ -211,6 +211,11 @@ export default function DashboardPage() {
     setErrorMsg(null)
     setSuccessMsg(null)
     setIsSendingOtp(true)
+    if (!auth) {
+      setErrorMsg('Firebase is not configured on this website. Please add Firebase credentials to your environment variables.')
+      setIsSendingOtp(false)
+      return
+    }
     try {
       if (typeof window !== 'undefined') {
         const wrapper = document.getElementById('recaptcha-container-wrapper')

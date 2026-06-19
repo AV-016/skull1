@@ -34,7 +34,10 @@ const app = express();
 app.use(helmet({
   contentSecurityPolicy: false // Disable CSP for local testing page resource loads
 }));
-app.use(cors());
+app.use(cors({
+  origin: env.FRONTEND_URL,
+  credentials: true
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -20,13 +20,20 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || MESSAGES.COMMON.INTERNAL_SERVER_ERROR;
+  let statusCode = err.statusCode || 500;
+  let message = err.message || MESSAGES.COMMON.INTERNAL_SERVER_ERROR;
 
+  // Log the full detailed error trace for operators
   logger.error(`[${req.method}] ${req.path} - Status: ${statusCode} - Error: ${message}`, {
     stack: err.stack,
     errors: err.errors,
   });
+
+  // Security: In production, do not leak raw ORM or database stack trace error messages to clients unless it is a safe custom AppError
+  if (process.env.NODE_ENV === 'production' && !(err instanceof AppError)) {
+    statusCode = 500;
+    message = MESSAGES.COMMON.INTERNAL_SERVER_ERROR;
+  }
 
   res.status(statusCode).json({
     success: false,

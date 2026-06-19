@@ -9,22 +9,118 @@ import { ErrorState } from '@/components/states/ErrorState'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
-import { Check, MessageSquare, X } from 'lucide-react'
+import { Check, MessageSquare, X, Loader2 } from 'lucide-react'
+import Script from 'next/script'
 
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered']
 
 export default function OrderDetailPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const orderId = params.id as string
   const { data: order, isLoading, error, refetch } = useOrderDetail(orderId)
   const cancelMutation = useCancelOrder()
   const returnMutation = useReturnOrder()
   const { user, isAdmin } = useAuth()
   
+  // Payment States
+  const [isResumingPayment, setIsResumingPayment] = useState(false)
+  const [paymentAlert, setPaymentAlert] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+
+  const paymentSuccess = searchParams.get('payment_success') === 'true'
+  const paymentError = searchParams.get('payment_error')
+  const errorDesc = searchParams.get('description')
+
+  const handlePayNow = async () => {
+    try {
+      setIsResumingPayment(true)
+      setPaymentAlert(null)
+
+      if (typeof window === 'undefined' || !(window as any).Razorpay) {
+        throw new Error('Razorpay SDK is still loading. Please try again in a moment.')
+      }
+
+      const paymentRes = await api.post('/payments/create-order', {
+        orderId: order.id
+      })
+      const rzpOrder = paymentRes.data.data
+
+      const options = {
+        key: rzpOrder.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        name: 'Skulture',
+        description: `Order #${rzpOrder.orderNumber}`,
+        order_id: rzpOrder.razorpayOrderId,
+        handler: async function (response: any) {
+          try {
+            setIsResumingPayment(true)
+            // Verify payment signature on backend
+            await api.post('/payments/verify', {
+              orderId: order.id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            })
+
+            setPaymentAlert({
+              type: 'success',
+              message: 'Payment completed successfully! Your order is now confirmed.'
+            })
+            refetch()
+          } catch (verifyErr: any) {
+            console.error('Payment verification error:', verifyErr)
+            setPaymentAlert({
+              type: 'error',
+              message: 'Payment verification failed. Please contact support.'
+            })
+          } finally {
+            setIsResumingPayment(false)
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: order.address?.phone || '',
+        },
+        theme: {
+          color: '#000000',
+        },
+        modal: {
+          ondismiss: function () {
+            setIsResumingPayment(false)
+            setPaymentAlert({
+              type: 'error',
+              message: 'Payment was cancelled.'
+            })
+          }
+        }
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.on('payment.failed', function (response: any) {
+        console.error('Razorpay payment failed:', response.error)
+        setPaymentAlert({
+          type: 'error',
+          message: response.error.description || 'Payment transaction failed.'
+        })
+        setIsResumingPayment(false)
+      })
+      rzp.open()
+    } catch (err: any) {
+      console.error('Pay Now error:', err)
+      setPaymentAlert({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Failed to initiate payment. Please try again.'
+      })
+      setIsResumingPayment(false)
+    }
+  }
+
   const [reviewsState, setReviewsState] = useState<Record<string, { rating: number, comment: string, images?: string[], isUploading?: boolean, submitted: boolean, error: string | null, submitting: boolean }>>({})
 
   // Shipping States for Admin
@@ -207,6 +303,34 @@ export default function OrderDetailPage() {
           </p>
           <p className="text-xs text-secondary-text">Placed on {formatDate(order.createdAt)}</p>
         </motion.div>
+
+        {/* Payment Query Param / Resume Alerts */}
+        {(paymentSuccess || paymentAlert?.type === 'success') && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 rounded-xl border border-green-500/20 bg-green-500/5 text-xs text-green-400 font-semibold flex items-center gap-2"
+          >
+            <span>✓</span>
+            <p>{paymentAlert?.message || 'Payment completed successfully! Your order is now confirmed.'}</p>
+          </motion.div>
+        )}
+
+        {(paymentError || paymentAlert?.type === 'error') && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-xs text-red-400 font-semibold flex items-center gap-2"
+          >
+            <span>🚨</span>
+            <p>
+              {paymentAlert?.message || 
+               (paymentError === 'cancelled' 
+                 ? 'Payment was cancelled. Please complete payment now to process your order.' 
+                 : `Payment failed: ${decodeURIComponent(errorDesc || 'Please try again.')}`)}
+            </p>
+          </motion.div>
+        )}
 
         {/* Policy Notification Banner */}
         <motion.div
@@ -428,6 +552,23 @@ export default function OrderDetailPage() {
               <MessageSquare className="w-4 h-4" />
               <span>Get Support</span>
             </Button>
+
+            {order.paymentStatus === 'PENDING' && order.paymentMethod === 'CARD' && order.status === 'PENDING' && (
+              <Button
+                disabled={isResumingPayment}
+                onClick={handlePayNow}
+                className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white cursor-pointer font-bold flex items-center justify-center gap-2 border-green-600"
+              >
+                {isResumingPayment ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <span>Pay Now (Online)</span>
+                )}
+              </Button>
+            )}
 
             {order.status?.toUpperCase() !== 'DELIVERED' && order.status?.toUpperCase() !== 'SHIPPED' && order.status?.toUpperCase() !== 'CANCELLED' && 
             order.status?.toUpperCase() !== 'RETURN_REQUESTED' && order.status?.toUpperCase() !== 'RETURNED' && 
@@ -911,6 +1052,7 @@ export default function OrderDetailPage() {
       </AnimatePresence>
 
       <Footer />
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
     </main>
   )
 }

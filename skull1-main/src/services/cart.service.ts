@@ -11,6 +11,13 @@ export class CartService {
   }
 
   async addToCart(userId: string, productId: string, quantity: number = 1, variantId?: string | null): Promise<any> {
+    if (quantity <= 0) {
+      throw new AppError(400, 'Quantity must be at least 1');
+    }
+    if (quantity > 100) {
+      throw new AppError(400, 'Quantity cannot exceed 100 per item');
+    }
+
     const product = await productRepository.findById(productId);
     if (!product) {
       throw new AppError(404, 'Product not found');
@@ -37,6 +44,9 @@ export class CartService {
   async updateCartItem(userId: string, itemId: string, quantity: number): Promise<any> {
     if (quantity <= 0) {
       return this.removeFromCart(userId, itemId);
+    }
+    if (quantity > 100) {
+      throw new AppError(400, 'Quantity cannot exceed 100 per item');
     }
     
     // Verify item belongs to user's cart

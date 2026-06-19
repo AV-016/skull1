@@ -12,7 +12,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useProducts } from '@/hooks/useProducts'
 import { ProductCard } from '@/components/products/ProductCard'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface CartItem {
   id: string
@@ -27,9 +27,9 @@ interface CartItem {
 }
 
 function CheckoutContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const isBuyNow = searchParams.get('buyNow') === 'true'
-
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [orderedItems, setOrderedItems] = useState<CartItem[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
@@ -307,6 +307,12 @@ function CheckoutContent() {
       })
       const order = orderRes.data.data
 
+      // 4. Immediately clear local storage cart to prevent duplicate orders or stuck carts on page refresh
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cart')
+        window.dispatchEvent(new Event('cart-updated'))
+      }
+
       // If online card payment, trigger Razorpay checkout
       if (paymentMethod === 'CARD') {
         if (typeof window === 'undefined' || !(window as any).Razorpay) {
@@ -339,7 +345,7 @@ function CheckoutContent() {
                 razorpaySignature: response.razorpay_signature,
               })
 
-              // 3.5 Refresh profile data to clear stamps/discount in context
+              // Refresh profile data to clear stamps/discount in context
               try {
                 const userRes = await api.get('/auth/me')
                 if (userRes.data?.success && userRes.data?.data) {
@@ -358,10 +364,10 @@ function CheckoutContent() {
                   window.dispatchEvent(new Event('cart-updated'))
                 }
               }
-              setIsOrdered(true)
+              router.push(`/orders/${order.id}?payment_success=true`)
             } catch (verifyErr: any) {
               console.error('Payment verification error:', verifyErr)
-              setSubmitError(getErrorMessage(verifyErr, 'Payment signature verification failed. Please contact support.'))
+              router.push(`/orders/${order.id}?payment_error=verification_failed`)
             } finally {
               setIsSubmitting(false)
             }
@@ -376,8 +382,8 @@ function CheckoutContent() {
           },
           modal: {
             ondismiss: function () {
-              setSubmitError('Payment cancelled by user.')
               setIsSubmitting(false)
+              router.push(`/orders/${order.id}?payment_error=cancelled`)
             }
           }
         }
@@ -385,13 +391,13 @@ function CheckoutContent() {
         const rzp = new (window as any).Razorpay(options)
         rzp.on('payment.failed', function (response: any) {
           console.error('Razorpay payment failed:', response.error)
-          setSubmitError(response.error.description || 'Payment transaction failed.')
+          router.push(`/orders/${order.id}?payment_error=failed&description=${encodeURIComponent(response.error.description || '')}`)
         })
         rzp.open()
       } else {
         // Cash on delivery: complete order directly
         
-        // 3.5 Refresh profile data to clear stamps/discount in context
+        // Refresh profile data to clear stamps/discount in context
         try {
           const userRes = await api.get('/auth/me')
           if (userRes.data?.success && userRes.data?.data) {
@@ -410,8 +416,7 @@ function CheckoutContent() {
             window.dispatchEvent(new Event('cart-updated'))
           }
         }
-        setIsOrdered(true)
-        setIsSubmitting(false)
+        router.push(`/orders/${order.id}?payment_success=true`)
       }
     } catch (err: any) {
       console.error('Checkout error:', err)

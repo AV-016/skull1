@@ -11,6 +11,19 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase for SSR compatibility
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+let app: any = null;
+let auth: any = null;
+
+const isFirebaseConfigured = !!firebaseConfig.apiKey;
+
+if (isFirebaseConfigured) {
+  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  auth = getAuth(app);
+} else {
+  if (typeof window !== "undefined") {
+    console.warn("Firebase API key is missing. Phone verification will be disabled.");
+  }
+}
+
+export { app, auth, isFirebaseConfigured };
+

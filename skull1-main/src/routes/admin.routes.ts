@@ -14,6 +14,7 @@ import { adminQuotationRouter } from './quotation.routes';
 import { adminInquiryRouter } from './inquiry.routes';
 import { adminDashboardRouter } from './dashboard.routes';
 import { adminEventRouter } from './event.routes';
+import adminMonitoringRouter from './monitoring.routes';
 
 const router = Router();
 const controller = new AdminController();
@@ -45,5 +46,6 @@ router.use('/quotations', adminQuotationRouter);
 router.use('/inquiries', adminInquiryRouter);
 router.use('/dashboard', adminDashboardRouter);
 router.use('/events', adminEventRouter);
+router.use('/monitoring', adminMonitoringRouter);
 
 export default router;

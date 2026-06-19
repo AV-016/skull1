@@ -6,9 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  // Clean up existing data to allow repeated seeding
-  await prisma.cart.deleteMany({});
-  await prisma.address.deleteMany({});
+  // Clean up is handled by idempotent upserts below
 
   // 1. Settings
   await prisma.settings.upsert({
@@ -29,40 +27,57 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@skulture.com' },
-    update: {},
+    update: {
+      password: adminPasswordHash,
+      name: 'Skulture Admin',
+      role: Role.ADMIN,
+      isVerified: true,
+    },
     create: {
       email: 'admin@skulture.com',
       password: adminPasswordHash,
       name: 'Skulture Admin',
       role: Role.ADMIN,
+      isVerified: true,
     },
   });
 
   const customer = await prisma.user.upsert({
     where: { email: 'customer@skulture.com' },
-    update: {},
+    update: {
+      password: customerPasswordHash,
+      name: 'John Doe',
+      role: Role.CUSTOMER,
+      isVerified: true,
+    },
     create: {
       email: 'customer@skulture.com',
       password: customerPasswordHash,
       name: 'John Doe',
       role: Role.CUSTOMER,
+      isVerified: true,
     },
   });
 
   console.log(`Seeded users: Admin: ${admin.email}, Customer: ${customer.email}`);
 
   // 3. Addresses
-  const address = await prisma.address.create({
-    data: {
-      userId: customer.id,
-      street: '123 Maker Street',
-      city: 'Print City',
-      state: 'Filament State',
-      postalCode: '12345',
-      country: 'MakerLand',
-      isDefault: true,
-    },
+  let address = await prisma.address.findFirst({
+    where: { userId: customer.id, street: '123 Maker Street' }
   });
+  if (!address) {
+    address = await prisma.address.create({
+      data: {
+        userId: customer.id,
+        street: '123 Maker Street',
+        city: 'Print City',
+        state: 'Filament State',
+        postalCode: '12345',
+        country: 'MakerLand',
+        isDefault: true,
+      },
+    });
+  }
 
   // 4. Categories
   const catMinis = await prisma.category.upsert({
@@ -194,17 +209,22 @@ async function main() {
   });
 
   // 7. Cart
-  await prisma.cart.create({
-    data: {
-      userId: customer.id,
-      items: {
-        create: [
-          { productId: p1.id, quantity: 2 },
-          { productId: p2.id, quantity: 1 },
-        ],
-      },
-    },
+  const existingCart = await prisma.cart.findUnique({
+    where: { userId: customer.id }
   });
+  if (!existingCart) {
+    await prisma.cart.create({
+      data: {
+        userId: customer.id,
+        items: {
+          create: [
+            { productId: p1.id, quantity: 2 },
+            { productId: p2.id, quantity: 1 },
+          ],
+        },
+      },
+    });
+  }
 
   console.log('Seeding complete successfully.');
 }

@@ -216,3 +216,14 @@ export const useApproveLoyaltyDiscount = () => {
     },
   })
 }
+
+export const useAdminMonitoringStats = () => {
+  return useQuery({
+    queryKey: ['admin', 'monitoring', 'stats'],
+    queryFn: async () => {
+      const response = await api.get<{ data: any }>('/admin/monitoring/stats')
+      return response.data.data
+    },
+    refetchInterval: 30 * 1000, // Poll every 30 seconds for real-time monitoring
+  })
+}
