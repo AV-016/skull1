@@ -38,6 +38,12 @@ export interface ProductResponseDTO {
   salesCount: number;
   createdAt: Date;
   updatedAt: Date;
+  eventPromo?: {
+    eventId: string;
+    eventTitle: string;
+    discountPercentage: number;
+    discountedPrice: number;
+  } | null;
 }
 
 export type ProductWithDetails = Product & {
@@ -49,6 +55,14 @@ export type ProductWithDetails = Product & {
   tags: Tag[];
   reviews: Review[];
   orderItems?: OrderItem[];
+  events?: {
+    id: string;
+    title: string;
+    discountPercentage: number;
+    startDate: Date;
+    endDate: Date;
+    isActive: boolean;
+  }[];
 };
 
 export const formatProductResponse = (product: ProductWithDetails): ProductResponseDTO => {
@@ -56,6 +70,18 @@ export const formatProductResponse = (product: ProductWithDetails): ProductRespo
   const reviewsCount = activeReviews.length;
   const ratingSum = activeReviews.reduce((sum, r) => sum + r.rating, 0);
   const rating = reviewsCount > 0 ? Number((ratingSum / reviewsCount).toFixed(1)) : 0.0;
+
+  const now = new Date();
+  const activeEvent = product.events?.find(
+    (e) => e.isActive && new Date(e.startDate) <= now && new Date(e.endDate) >= now && e.discountPercentage > 0
+  );
+
+  const eventPromo = activeEvent ? {
+    eventId: activeEvent.id,
+    eventTitle: activeEvent.title,
+    discountPercentage: activeEvent.discountPercentage,
+    discountedPrice: Number((product.price * (1 - activeEvent.discountPercentage / 100)).toFixed(2))
+  } : null;
 
   return {
     id: product.id,
@@ -95,6 +121,7 @@ export const formatProductResponse = (product: ProductWithDetails): ProductRespo
     salesCount: product.orderItems ? product.orderItems.reduce((sum, item) => sum + item.quantity, 0) : 0,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
+    eventPromo,
   };
 };
 

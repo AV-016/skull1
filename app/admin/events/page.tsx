@@ -20,6 +20,7 @@ export default function AdminEvents() {
     startDate: '',
     endDate: '',
     isActive: true,
+    discountPercentage: 0,
     productIds: [] as string[]
   })
 
@@ -105,6 +106,7 @@ export default function AdminEvents() {
       startDate: '',
       endDate: '',
       isActive: true,
+      discountPercentage: 0,
       productIds: []
     })
     setIsModalOpen(true)
@@ -127,6 +129,7 @@ export default function AdminEvents() {
       startDate: formatDateTime(event.startDate),
       endDate: formatDateTime(event.endDate),
       isActive: event.isActive ?? true,
+      discountPercentage: event.discountPercentage || 0,
       productIds: event.products?.map((p: any) => p.id) || []
     })
     setIsModalOpen(true)
@@ -274,6 +277,7 @@ export default function AdminEvents() {
                   </div>
 
                   <div className="pt-3 border-t border-border/40 flex justify-between items-center text-[10px] text-muted-text uppercase font-bold tracking-widest">
+                    <span>Discount: {event.discountPercentage || 0}% OFF</span>
                     <span>Products: {event.products?.length || 0}</span>
                   </div>
                 </div>
@@ -327,6 +331,20 @@ export default function AdminEvents() {
                     required
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+
+                {/* Discount Percentage */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Discount Percentage (% Off)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    required
+                    value={formData.discountPercentage}
+                    onChange={(e) => setFormData({ ...formData, discountPercentage: parseFloat(e.target.value) || 0 })}
                     className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
                   />
                 </div>

@@ -129,11 +129,27 @@ export function BestSellersSection() {
                       {heroProduct.name}
                     </h4>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-primary-text block">
-                      {formatPrice(heroProduct.price)}
-                    </span>
-                    <span className="text-[10px] text-muted-text font-semibold uppercase">Inclusive of Taxes</span>
+                  <div className="text-right flex flex-col items-end">
+                    {heroProduct.eventPromo ? (
+                      <>
+                        <span className="text-sm text-muted-text line-through font-semibold leading-none">
+                          {formatPrice(heroProduct.price)}
+                        </span>
+                        <span className="text-2xl font-black text-primary block mt-1 leading-none">
+                          {formatPrice(heroProduct.eventPromo.discountedPrice)}
+                        </span>
+                        <span className="text-[8px] text-green-500 font-bold uppercase tracking-wider block mt-1">
+                          {heroProduct.eventPromo.discountPercentage}% OFF — {heroProduct.eventPromo.eventTitle}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-2xl font-black text-primary-text block leading-none">
+                          {formatPrice(heroProduct.price)}
+                        </span>
+                        <span className="text-[9px] text-muted-text font-semibold uppercase block mt-1">Inclusive of Taxes</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -203,13 +219,33 @@ export function BestSellersSection() {
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                      <span className="text-primary-text font-extrabold text-base">
-                        {formatPrice(product.price)}
-                      </span>
-                      <span className="text-primary text-xs font-semibold group-hover:translate-x-1 transition-transform duration-300">
-                        View Details →
-                      </span>
+                    <div className="mt-4 pt-3 border-t border-border flex flex-col gap-1">
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex flex-col">
+                          {product.eventPromo ? (
+                            <>
+                              <span className="text-[10px] text-muted-text line-through font-medium leading-none">
+                                {formatPrice(product.price)}
+                              </span>
+                              <span className="text-primary font-extrabold text-base mt-0.5 leading-none">
+                                {formatPrice(product.eventPromo.discountedPrice)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-primary-text font-extrabold text-base leading-none">
+                              {formatPrice(product.price)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-primary text-xs font-semibold group-hover:translate-x-1 transition-transform duration-300">
+                          View Details →
+                        </span>
+                      </div>
+                      {product.eventPromo && (
+                        <div className="text-[9px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                          {product.eventPromo.discountPercentage}% OFF — {product.eventPromo.eventTitle}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>

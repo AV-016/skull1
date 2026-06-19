@@ -93,15 +93,35 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           <p className="text-muted-text text-sm mt-1 line-clamp-2">
             {product.description}
           </p>
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-lg font-bold text-primary-text">
-              {formatPrice(product.price)}
-            </span>
-            <span className="text-xs bg-secondary text-secondary-text px-3 py-1 rounded-full">
-              {typeof product.category === 'object' && product.category !== null
-                ? (product.category as any).name
-                : product.category}
-            </span>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                {product.eventPromo ? (
+                  <>
+                    <span className="text-xs text-muted-text line-through font-medium leading-none">
+                      {formatPrice(product.price)}
+                    </span>
+                    <span className="text-lg font-bold text-primary mt-1 leading-none">
+                      {formatPrice(product.eventPromo.discountedPrice)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-lg font-bold text-primary-text leading-none">
+                    {formatPrice(product.price)}
+                  </span>
+                )}
+              </div>
+              <span className="text-xs bg-secondary text-secondary-text px-3 py-1 rounded-full">
+                {typeof product.category === 'object' && product.category !== null
+                  ? (product.category as any).name
+                  : product.category}
+              </span>
+            </div>
+            {product.eventPromo && (
+              <div className="text-[9px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                {product.eventPromo.discountPercentage}% OFF — Under {product.eventPromo.eventTitle}
+              </div>
+            )}
           </div>
         </div>
       </Link>

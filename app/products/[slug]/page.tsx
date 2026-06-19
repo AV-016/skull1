@@ -21,10 +21,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const { data: product, isLoading, error } = useProductDetail(slug)
   const { formatPrice } = useSettings()
 
-  const sanitizedProduct = useMemo(() => {
-    return product ? sanitizeProducts([product])[0] : null
-  }, [product])
-
   const [quantity, setQuantity] = useState(1)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [reviews, setReviews] = useState<any[]>([])
@@ -35,6 +31,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
+
+  const sanitizedProduct = useMemo(() => {
+    return product ? sanitizeProducts([product])[0] : null
+  }, [product])
+
+  const currentOriginalPrice = useMemo(() => {
+    if (!sanitizedProduct) return 0
+    return selectedVariant && selectedVariant.price !== null
+      ? selectedVariant.price
+      : sanitizedProduct.price
+  }, [sanitizedProduct, selectedVariant])
+
+  const currentFinalPrice = useMemo(() => {
+    if (!sanitizedProduct) return 0
+    return sanitizedProduct.eventPromo
+      ? Number((currentOriginalPrice * (1 - sanitizedProduct.eventPromo.discountPercentage / 100)).toFixed(2))
+      : currentOriginalPrice
+  }, [sanitizedProduct, currentOriginalPrice])
+
+
 
   useEffect(() => {
     if (sanitizedProduct?.variants && sanitizedProduct.variants.length > 0) {
@@ -214,7 +230,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
               variantId: selectedVariant?.id || null,
               name: selectedVariant ? `${sanitizedProduct.name} (${selectedVariant.name})` : sanitizedProduct.name,
               slug: sanitizedProduct.slug,
-              price: selectedVariant && selectedVariant.price !== null ? selectedVariant.price : sanitizedProduct.price,
+              price: currentFinalPrice,
               image: (selectedVariant?.images?.[0]) || sanitizedProduct.image || '/placeholder.jpg',
               category: sanitizedProduct.category,
               quantity: stock
@@ -237,7 +253,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
           variantId: selectedVariant?.id || null,
           name: selectedVariant ? `${sanitizedProduct.name} (${selectedVariant.name})` : sanitizedProduct.name,
           slug: sanitizedProduct.slug,
-          price: selectedVariant && selectedVariant.price !== null ? selectedVariant.price : sanitizedProduct.price,
+          price: currentFinalPrice,
           image: (selectedVariant?.images?.[0]) || sanitizedProduct.image || '/placeholder.jpg',
           category: sanitizedProduct.category,
           quantity: quantity
@@ -264,32 +280,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
     }
 
     if (typeof window !== 'undefined') {
-      const currentCart = JSON.parse(localStorage.getItem('cart') || '[]')
       const cartItemId = selectedVariant ? `${sanitizedProduct.id}_${selectedVariant.id}` : sanitizedProduct.id
-      const existing = currentCart.find((item: any) => item.id === cartItemId)
-      
-      const targetQty = existing ? existing.quantity + quantity : quantity
-      const finalQty = Math.min(targetQty, stock)
-
-      if (existing) {
-        existing.quantity = finalQty
-      } else {
-        currentCart.push({
-          id: cartItemId,
-          productId: sanitizedProduct.id,
-          variantId: selectedVariant?.id || null,
-          name: selectedVariant ? `${sanitizedProduct.name} (${selectedVariant.name})` : sanitizedProduct.name,
-          slug: sanitizedProduct.slug,
-          price: selectedVariant && selectedVariant.price !== null ? selectedVariant.price : sanitizedProduct.price,
-          image: (selectedVariant?.images?.[0]) || sanitizedProduct.image || '/placeholder.jpg',
-          category: sanitizedProduct.category,
-          quantity: finalQty
-        })
+      const buyNowItem = {
+        id: cartItemId,
+        productId: sanitizedProduct.id,
+        variantId: selectedVariant?.id || null,
+        name: selectedVariant ? `${sanitizedProduct.name} (${selectedVariant.name})` : sanitizedProduct.name,
+        slug: sanitizedProduct.slug,
+        price: currentFinalPrice,
+        image: (selectedVariant?.images?.[0]) || sanitizedProduct.image || '/placeholder.jpg',
+        category: sanitizedProduct.category,
+        quantity: quantity
       }
-      localStorage.setItem('cart', JSON.stringify(currentCart))
-      window.dispatchEvent(new Event('cart-updated'))
-      
-      router.push('/checkout')
+      localStorage.setItem('buyNowItem', JSON.stringify(buyNowItem))
+      router.push('/checkout?buyNow=true')
     }
   }
 
@@ -541,17 +545,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">
                  {/* Left Side: Pricing & Quantity */}
                  <div className="space-y-4">
-                   {/* Price */}
-                   <div className="flex items-baseline gap-2">
-                     <span className="text-5xl font-bold text-primary-text">
-                       {formatPrice(
-                         selectedVariant && selectedVariant.price !== null
-                           ? selectedVariant.price
-                           : sanitizedProduct.price
-                       )}
-                     </span>
-                     <span className="text-secondary-text">per unit</span>
-                   </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-baseline gap-2">
+                        {sanitizedProduct.eventPromo ? (
+                          <>
+                            <span className="text-4xl font-bold text-primary">
+                              {formatPrice(currentFinalPrice)}
+                            </span>
+                            <span className="text-xl text-muted-text line-through font-semibold">
+                              {formatPrice(currentOriginalPrice)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-4xl font-bold text-primary-text">
+                            {formatPrice(currentOriginalPrice)}
+                          </span>
+                        )}
+                        <span className="text-secondary-text text-sm">per unit</span>
+                      </div>
+                      {sanitizedProduct.eventPromo && (
+                        <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
+                          {sanitizedProduct.eventPromo.discountPercentage}% OFF — Under {sanitizedProduct.eventPromo.eventTitle}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Stock Info */}
                     <div className="text-sm">

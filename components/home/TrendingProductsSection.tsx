@@ -50,6 +50,7 @@ export const TrendingProductsSection = () => {
     if (typeof window !== 'undefined') {
       const currentCart = JSON.parse(localStorage.getItem('cart') || '[]')
       const existing = currentCart.find((item: any) => item.id === product.id)
+      const finalPrice = product.eventPromo ? product.eventPromo.discountedPrice : product.price
       if (existing) {
         existing.quantity += 1
       } else {
@@ -57,7 +58,7 @@ export const TrendingProductsSection = () => {
           id: product.id,
           name: product.name,
           slug: product.slug,
-          price: product.price,
+          price: finalPrice,
           image: product.image || '/placeholder.jpg',
           category: product.category,
           quantity: 1
@@ -191,17 +192,37 @@ export const TrendingProductsSection = () => {
                 </Link>
 
                 {/* Footer price & cart row */}
-                <div className="px-6 pb-6 pt-2 flex items-center justify-between border-t border-border">
-                  <span className="text-primary-text font-extrabold text-xl">
-                    {formatPrice(product.price)}
-                  </span>
-                  <button
-                    onClick={(e) => handleAddToCart(product, e)}
-                    className="px-4 py-2 border border-border hover:border-primary hover:bg-primary hover:text-white text-primary-text rounded-lg text-xs font-semibold transition-all duration-300 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ShoppingCart className="w-3.5 h-3.5" />
-                    Add
-                  </button>
+                <div className="px-6 pb-6 pt-2 flex flex-col gap-1.5 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      {product.eventPromo ? (
+                        <>
+                          <span className="text-xs text-muted-text line-through font-medium leading-none">
+                            {formatPrice(product.price)}
+                          </span>
+                          <span className="text-primary font-extrabold text-xl mt-1 leading-none">
+                            {formatPrice(product.eventPromo.discountedPrice)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-primary-text font-extrabold text-xl leading-none">
+                          {formatPrice(product.price)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => handleAddToCart(product, e)}
+                      className="px-4 py-2 border border-border hover:border-primary hover:bg-primary hover:text-white text-primary-text rounded-lg text-xs font-semibold transition-all duration-300 cursor-pointer flex items-center gap-1.5 animate-none"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                      Add
+                    </button>
+                  </div>
+                  {product.eventPromo && (
+                    <div className="text-[10px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                      {product.eventPromo.discountPercentage}% OFF — Under {product.eventPromo.eventTitle}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -313,20 +334,40 @@ export const TrendingProductsSection = () => {
                 </div>
 
                 {/* Price & Action */}
-                <div className="flex items-center justify-between border-t border-border pt-4 mt-4">
-                  <span className="text-2xl font-extrabold text-primary-text">
-                    {formatPrice(selectedProduct.price)}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      handleAddToCart(selectedProduct, e)
-                      setSelectedProduct(null)
-                    }}
-                    className="px-6 py-3 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl transition-all duration-300 accent-glow flex items-center gap-2 cursor-pointer"
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    Add To Cart
-                  </button>
+                <div className="flex flex-col gap-2 border-t border-border pt-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      {selectedProduct.eventPromo ? (
+                        <>
+                          <span className="text-xs text-muted-text line-through font-medium leading-none">
+                            {formatPrice(selectedProduct.price)}
+                          </span>
+                          <span className="text-2xl font-extrabold text-primary mt-1 leading-none">
+                            {formatPrice(selectedProduct.eventPromo.discountedPrice)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-2xl font-extrabold text-primary-text leading-none">
+                          {formatPrice(selectedProduct.price)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        handleAddToCart(selectedProduct, e)
+                        setSelectedProduct(null)
+                      }}
+                      className="px-6 py-3 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl transition-all duration-300 accent-glow flex items-center gap-2 cursor-pointer"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      Add To Cart
+                    </button>
+                  </div>
+                  {selectedProduct.eventPromo && (
+                    <div className="text-[11px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                      {selectedProduct.eventPromo.discountPercentage}% OFF — Under {selectedProduct.eventPromo.eventTitle}
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

@@ -71,6 +71,16 @@ const productInclude = {
       updatedAt: true,
     },
   },
+  events: {
+    select: {
+      id: true,
+      title: true,
+      discountPercentage: true,
+      startDate: true,
+      endDate: true,
+      isActive: true,
+    },
+  },
 };
 
 export class ProductRepository {

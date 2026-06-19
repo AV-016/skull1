@@ -94,7 +94,7 @@ export class EventController {
 
   async createEvent(req: Request, res: Response, next: NextFunction) {
     try {
-      const { title, description, bannerUrl, startDate, endDate, isActive, productIds } = req.body;
+      const { title, description, bannerUrl, startDate, endDate, isActive, discountPercentage, productIds } = req.body;
 
       const event = await prisma.event.create({
         data: {
@@ -104,6 +104,7 @@ export class EventController {
           startDate: new Date(startDate),
           endDate: new Date(endDate),
           isActive: isActive !== undefined ? isActive : true,
+          discountPercentage: discountPercentage !== undefined ? parseFloat(discountPercentage) : 0,
           products: productIds && productIds.length > 0 
             ? { connect: productIds.map((id: string) => ({ id })) }
             : undefined
@@ -125,7 +126,7 @@ export class EventController {
 
   async updateEvent(req: Request, res: Response, next: NextFunction) {
     try {
-      const { title, description, bannerUrl, startDate, endDate, isActive, productIds } = req.body;
+      const { title, description, bannerUrl, startDate, endDate, isActive, discountPercentage, productIds } = req.body;
       const eventId = req.params.id;
 
       // First disconnect all existing products to perform a clean update
@@ -147,6 +148,7 @@ export class EventController {
           startDate: startDate ? new Date(startDate) : undefined,
           endDate: endDate ? new Date(endDate) : undefined,
           isActive: isActive !== undefined ? isActive : undefined,
+          discountPercentage: discountPercentage !== undefined ? parseFloat(discountPercentage) : undefined,
           products: productIds 
             ? { connect: productIds.map((id: string) => ({ id })) }
             : undefined

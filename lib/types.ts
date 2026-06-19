@@ -39,6 +39,12 @@ export interface Product {
   salesCount?: number
   createdAt: string
   variants?: ProductVariant[]
+  eventPromo?: {
+    eventId: string
+    eventTitle: string
+    discountPercentage: number
+    discountedPrice: number
+  } | null
 }
 
 // Category Types

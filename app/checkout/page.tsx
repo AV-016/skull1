@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import Link from 'next/link'
 import Script from 'next/script'
 import { useSettings } from '@/context/SettingsContext'
-import { CreditCard, ShoppingBag, CheckCircle, ArrowRight, Loader2, MapPin, Phone } from 'lucide-react'
+import { CreditCard, ShoppingBag, CheckCircle, ArrowRight, Loader2, MapPin, Phone, Plus, Minus, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
+import { useProducts } from '@/hooks/useProducts'
+import { ProductCard } from '@/components/products/ProductCard'
+import { useSearchParams } from 'next/navigation'
 
 interface CartItem {
   id: string
@@ -23,8 +26,12 @@ interface CartItem {
   quantity: number
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
+  const searchParams = useSearchParams()
+  const isBuyNow = searchParams.get('buyNow') === 'true'
+
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [orderedItems, setOrderedItems] = useState<CartItem[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [isOrdered, setIsOrdered] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -71,6 +78,7 @@ export default function CheckoutPage() {
   
   const { formatPrice } = useSettings()
   const { user, setUser } = useAuth()
+  const { data: allProducts = [] } = useProducts()
 
   const getErrorMessage = (err: any, fallbackMessage: string = 'An error occurred. Please try again.') => {
     if (err.response?.data) {
@@ -86,10 +94,52 @@ export default function CheckoutPage() {
     return err.message || fallbackMessage
   }
 
+  const saveCart = (newItems: CartItem[]) => {
+    setCartItems(newItems)
+    if (typeof window !== 'undefined') {
+      if (isBuyNow) {
+        if (newItems.length === 0) {
+          localStorage.removeItem('buyNowItem')
+        } else {
+          localStorage.setItem('buyNowItem', JSON.stringify(newItems[0]))
+        }
+      } else {
+        localStorage.setItem('cart', JSON.stringify(newItems))
+        window.dispatchEvent(new Event('cart-updated'))
+      }
+    }
+  }
+
+  const updateQuantity = (id: string, newQty: number) => {
+    if (newQty < 1) return
+    
+    const baseId = id.includes('_') ? id.split('_')[0] : id
+    const dbProd = allProducts?.find((p: any) => p.id === baseId)
+    if (dbProd && newQty > dbProd.stock) {
+      alert(`Sorry, only ${dbProd.stock} items of "${dbProd.name}" are currently in stock.`)
+      return
+    }
+
+    const newItems = cartItems.map(item => 
+      item.id === id ? { ...item, quantity: newQty } : item
+    )
+    saveCart(newItems)
+  }
+
+  const removeItem = (id: string) => {
+    const newItems = cartItems.filter(item => item.id !== id)
+    saveCart(newItems)
+  }
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const items = JSON.parse(localStorage.getItem('cart') || '[]')
-      setCartItems(items)
+      const buyNow = localStorage.getItem('buyNowItem')
+      if (isBuyNow && buyNow) {
+        setCartItems([JSON.parse(buyNow)])
+      } else {
+        const items = JSON.parse(localStorage.getItem('cart') || '[]')
+        setCartItems(items)
+      }
       setIsLoaded(true)
     }
 
@@ -101,7 +151,7 @@ export default function CheckoutPage() {
         }
       })
       .catch(err => console.error('Error fetching settings:', err))
-  }, [])
+  }, [isBuyNow])
 
   useEffect(() => {
     if (user) {
@@ -219,6 +269,7 @@ export default function CheckoutPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitError(null)
+    setOrderedItems([...cartItems])
 
     try {
       // 1. Sync local cart items to the database cart in parallel
@@ -300,8 +351,12 @@ export default function CheckoutPage() {
 
               // 4. Clear local storage cart
               if (typeof window !== 'undefined') {
-                localStorage.removeItem('cart')
-                window.dispatchEvent(new Event('cart-updated'))
+                if (isBuyNow) {
+                  localStorage.removeItem('buyNowItem')
+                } else {
+                  localStorage.removeItem('cart')
+                  window.dispatchEvent(new Event('cart-updated'))
+                }
               }
               setIsOrdered(true)
             } catch (verifyErr: any) {
@@ -348,8 +403,12 @@ export default function CheckoutPage() {
 
         // 4. Clear local storage cart
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('cart')
-          window.dispatchEvent(new Event('cart-updated'))
+          if (isBuyNow) {
+            localStorage.removeItem('buyNowItem')
+          } else {
+            localStorage.removeItem('cart')
+            window.dispatchEvent(new Event('cart-updated'))
+          }
         }
         setIsOrdered(true)
         setIsSubmitting(false)
@@ -386,32 +445,140 @@ export default function CheckoutPage() {
   }
 
   if (isOrdered) {
+    const orderedSubtotal = orderedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    const orderedDiscountAmount = hasDiscount ? (orderedSubtotal * (discountRate / 100)) : 0
+    const orderedDiscountedSubtotal = orderedSubtotal - orderedDiscountAmount
+    const orderedTax = orderedDiscountedSubtotal * 0.1
+    const orderedTotal = orderedDiscountedSubtotal + orderedTax + (paymentMethod === 'COD' ? codChargeVal : 0)
+    const recommendedProducts = allProducts.filter((p: any) => p.isActive && p.stock > 0).slice(0, 4)
+
     return (
       <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
         <Navbar />
-        <div className="pt-32 pb-12 md:pb-16 text-center">
-          <div className="container mx-auto px-4 md:px-6 max-w-md py-16">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-card border border-border rounded-xl p-8 flex flex-col items-center gap-6 shadow-2xl"
-            >
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
-                <CheckCircle className="w-10 h-10" />
+        <div className="pt-32 pb-12 md:pb-16">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Left Column: Success Message & Product Details & Recommendations */}
+              <div className="lg:col-span-2 space-y-8">
+                {/* Success Card */}
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-card border border-border rounded-2xl p-8 flex flex-col items-center text-center gap-6 shadow-xl"
+                >
+                  <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
+                    <CheckCircle className="w-10 h-10" />
+                  </div>
+                  <div>
+                    <h2 className="heading-3 text-primary-text font-bold">Order Confirmed!</h2>
+                    <p className="text-secondary-text text-sm mt-2">
+                      Thank you for your purchase. We have sent an email confirmation to <span className="text-primary font-medium">{formData.email}</span>.
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Ordered Product Details */}
+                <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+                  <h3 className="font-bold text-base text-primary-text uppercase tracking-wide pb-3 border-b border-border">Items Ordered</h3>
+                  <div className="divide-y divide-border/60">
+                    {orderedItems.map((item) => (
+                      <div key={item.id} className="py-4 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-4">
+                          <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-lg bg-secondary border border-border shrink-0" />
+                          <div>
+                            <h4 className="font-bold text-sm text-primary-text">{item.name}</h4>
+                            <p className="text-xs text-muted-text mt-0.5">{item.category}</p>
+                            <p className="text-xs text-secondary-text mt-1">Quantity: <span className="font-semibold text-primary-text">{item.quantity}</span></p>
+                          </div>
+                        </div>
+                        <span className="font-bold text-primary-text text-sm">{formatPrice(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Delivery Address Details */}
+                <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+                  <h3 className="font-bold text-base text-primary-text uppercase tracking-wide pb-3 border-b border-border">Shipping Address</h3>
+                  <div className="text-xs text-secondary-text space-y-1 leading-relaxed capitalize">
+                    <p className="font-bold text-primary-text">{formData.fullName}</p>
+                    <p>{formData.address}</p>
+                    <p>{formData.city} - {formData.postalCode}</p>
+                    <p className="normal-case">Phone: {formData.phone || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {/* Recommended Products */}
+                {recommendedProducts.length > 0 && (
+                  <div className="space-y-6">
+                    <h3 className="font-bold text-lg text-primary-text uppercase tracking-wider">Recommended for You</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {recommendedProducts.slice(0, 4).map((prod: any) => (
+                        <ProductCard key={prod.id} product={prod} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Right Column: Order Summary & Shop More Panel */}
               <div>
-                <h2 className="heading-3 text-primary-text font-bold">Order Confirmed!</h2>
-                <p className="text-secondary-text text-sm mt-2">
-                  Thank you for your purchase. We have sent an email confirmation to <span className="text-primary font-medium">{formData.email}</span>.
-                </p>
+                <div className="bg-card border border-border rounded-xl p-6 sticky top-28 space-y-6 shadow-xl text-center">
+                  <h3 className="font-bold text-lg text-primary-text border-b border-border pb-4 uppercase tracking-wide">
+                    Order Summary
+                  </h3>
+                  
+                  {/* Miniature list */}
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {orderedItems.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center text-xs">
+                        <span className="text-secondary-text truncate max-w-[180px] text-left">{item.name} x {item.quantity}</span>
+                        <span className="font-semibold text-primary-text">{formatPrice(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-border pt-4 space-y-2">
+                    <div className="flex justify-between text-xs text-secondary-text">
+                      <span>Subtotal</span>
+                      <span>{formatPrice(orderedSubtotal)}</span>
+                    </div>
+                    {hasDiscount && (
+                      <div className="flex justify-between text-xs text-green-500 font-bold">
+                        <span>Discount</span>
+                        <span>-{formatPrice(orderedDiscountAmount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs text-secondary-text">
+                      <span>Tax</span>
+                      <span>{formatPrice(orderedTax)}</span>
+                    </div>
+                    {paymentMethod === 'COD' && (
+                      <div className="flex justify-between text-xs text-secondary-text">
+                        <span>COD Charge</span>
+                        <span>{formatPrice(codChargeVal)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-border pt-3 flex justify-between font-bold text-sm text-primary-text">
+                      <span>Total Paid</span>
+                      <span className="text-primary">{formatPrice(orderedTotal)}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 space-y-3 border-t border-border/60">
+                    <p className="text-xs text-muted-text italic">Want to explore more unique designs?</p>
+                    <Link
+                      href="/products"
+                      className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary hover:bg-primary/95 text-white font-bold rounded-lg smooth-transition uppercase text-xs tracking-wider cursor-pointer shadow"
+                    >
+                      Shop More Products <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
               </div>
-              <Link
-                href="/products"
-                className="w-full py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 smooth-transition uppercase text-xs tracking-wider font-bold cursor-pointer text-center"
-              >
-                Continue Shopping
-              </Link>
-            </motion.div>
+
+            </div>
           </div>
         </div>
         <Footer />
@@ -708,15 +875,42 @@ export default function CheckoutPage() {
 
                   <div className="max-h-60 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
                     {cartItems.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3 justify-between">
-                        <div className="flex items-center gap-3">
-                          <img src={item.image} alt={item.name} className="w-10 h-10 object-cover rounded bg-secondary border border-border" />
-                          <div>
-                            <p className="text-xs font-bold text-primary-text line-clamp-1">{item.name}</p>
-                            <p className="text-[10px] text-muted-text">Qty: {item.quantity}</p>
+                      <div key={item.id} className="flex items-center gap-3 justify-between py-2 border-b border-border/40 last:border-b-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img src={item.image} alt={item.name} className="w-10 h-10 object-cover rounded bg-secondary border border-border shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-primary-text truncate">{item.name}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {/* Quantity selector */}
+                              <div className="flex items-center border border-border rounded bg-secondary text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  className="px-1.5 py-0.5 text-secondary-text hover:text-primary smooth-transition cursor-pointer"
+                                >
+                                  −
+                                </button>
+                                <span className="px-1.5 text-primary-text font-bold">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                  className="px-1.5 py-0.5 text-secondary-text hover:text-primary smooth-transition cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeItem(item.id)}
+                                className="text-muted-text hover:text-red-500 p-0.5 smooth-transition cursor-pointer"
+                                title="Remove item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <span className="text-xs font-semibold text-primary-text">{formatPrice(item.price * item.quantity)}</span>
+                        <span className="text-xs font-semibold text-primary-text shrink-0">{formatPrice(item.price * item.quantity)}</span>
                       </div>
                     ))}
                   </div>
@@ -761,6 +955,18 @@ export default function CheckoutPage() {
       <Footer />
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
     </main>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   )
 }
 

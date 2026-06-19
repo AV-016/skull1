@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import api from '@/lib/api'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const EventCountdown = ({ endDate }: { endDate: string }) => {
   const [timeLeft, setTimeLeft] = useState('')
@@ -43,6 +44,8 @@ const EventCountdown = ({ endDate }: { endDate: string }) => {
 export function EventBannerSection() {
   const [activeEvents, setActiveEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [direction, setDirection] = useState(0)
 
   useEffect(() => {
     const fetchActiveEvents = async () => {
@@ -58,26 +61,82 @@ export function EventBannerSection() {
     fetchActiveEvents()
   }, [])
 
+  useEffect(() => {
+    if (activeEvents.length <= 1) return
+    const timer = setInterval(() => {
+      setDirection(1)
+      setCurrentIndex((prev) => (prev + 1) % activeEvents.length)
+    }, 6000) // auto-scroll every 6 seconds
+    return () => clearInterval(timer)
+  }, [activeEvents.length])
+
   if (isLoading || activeEvents.length === 0) return null
 
+  const handleNext = () => {
+    if (activeEvents.length <= 1) return
+    setDirection(1)
+    setCurrentIndex((prev) => (prev + 1) % activeEvents.length)
+  }
+
+  const handlePrev = () => {
+    if (activeEvents.length <= 1) return
+    setDirection(-1)
+    setCurrentIndex((prev) => (prev - 1 + activeEvents.length) % activeEvents.length)
+  }
+
+  const handleDotClick = (index: number) => {
+    if (index === currentIndex) return
+    setDirection(index > currentIndex ? 1 : -1)
+    setCurrentIndex(index)
+  }
+
+  const currentEvent = activeEvents[currentIndex]
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 100 : -100,
+      opacity: 0
+    }),
+    center: {
+      x: 0,
+      opacity: 1
+    },
+    exit: (dir: number) => ({
+      x: dir < 0 ? 100 : -100,
+      opacity: 0
+    })
+  }
+
   return (
-    <section className="py-6 bg-background">
+    <section className="py-12 bg-background border-b border-border relative">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="space-y-6">
-          {activeEvents.map((event) => (
+        {/* Section Heading matching item sections */}
+        <div className="mb-8">
+          <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-2">Active Promotions</h2>
+          <h3 className="heading-2 text-primary-text">Special Events & Offers</h3>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card hover:border-primary/20 shadow-lg group transition-all duration-300">
+          <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
-              key={event.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="relative overflow-hidden rounded-2xl border border-primary/20 bg-secondary/20 p-6 md:p-8 shadow-xl flex flex-col gap-6"
+              key={currentIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                x: { type: "spring", stiffness: 300, damping: 30 },
+                opacity: { duration: 0.2 }
+              }}
+              className="relative p-6 md:p-8 flex flex-col gap-6 min-h-[280px] w-full"
             >
-              {/* Banner background with premium gradient overlay */}
-              {event.bannerUrl && (
+              {/* Banner background with gradient overlay constrained to the text area */}
+              {currentEvent.bannerUrl && (
                 <div 
                   className="absolute inset-0 bg-cover bg-center pointer-events-none transition-opacity duration-300 z-0"
                   style={{ 
-                    backgroundImage: `linear-gradient(to right, rgba(18, 19, 26, 0.95) 40%, rgba(18, 19, 26, 0.6) 70%, rgba(18, 19, 26, 0.25) 100%), url(${event.bannerUrl})` 
+                    backgroundImage: `linear-gradient(to right, rgba(18, 19, 26, 0.95) 35%, rgba(18, 19, 26, 0.8) 45%, rgba(18, 19, 26, 0) 65%), url(${currentEvent.bannerUrl})` 
                   }}
                 />
               )}
@@ -87,20 +146,20 @@ export function EventBannerSection() {
                 <div className="lg:col-span-7 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="bg-primary text-white text-[9px] font-black px-2.5 py-1 uppercase tracking-widest rounded">Active Promo</span>
-                    <EventCountdown endDate={event.endDate} />
+                    <EventCountdown endDate={currentEvent.endDate} />
                   </div>
                   
                   <h2 className="text-xl md:text-2xl font-black text-primary-text uppercase tracking-wide">
-                    {event.title}
+                    {currentEvent.title}
                   </h2>
                   
                   <p className="text-xs text-muted-text leading-relaxed max-w-xl">
-                    {event.description}
+                    {currentEvent.description}
                   </p>
                   
                   <div className="pt-2">
                     <Link 
-                      href={`/events/${event.id}`}
+                      href={`/events/${currentEvent.id}`}
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 text-white font-bold text-[10px] uppercase tracking-wider rounded transition-all shadow-md cursor-pointer"
                     >
                       Explore Event Items →
@@ -109,11 +168,11 @@ export function EventBannerSection() {
                 </div>
 
                 {/* Associated Event Products Showcase */}
-                {event.products && event.products.length > 0 && (
-                  <div className="lg:col-span-5 space-y-2.5">
+                {currentEvent.products && currentEvent.products.length > 0 && (
+                  <div className="lg:col-span-5 space-y-2.5 lg:max-w-[280px] lg:ml-auto w-full">
                     <h4 className="text-[9px] font-black text-secondary-text uppercase tracking-widest">Featured Promo items</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {event.products.slice(0, 2).map((prod: any) => {
+                    <div className="flex flex-col gap-3">
+                      {currentEvent.products.slice(0, 2).map((prod: any) => {
                         const primaryImg = prod.images?.find((img: any) => img.isPrimary)?.url || prod.image || '/placeholder.jpg'
                         return (
                           <Link 
@@ -141,9 +200,48 @@ export function EventBannerSection() {
                 )}
               </div>
             </motion.div>
-          ))}
+          </AnimatePresence>
+
+          {/* Navigation Arrows */}
+          {activeEvents.length > 1 && (
+            <>
+              <button
+                onClick={handlePrev}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-background/80 hover:bg-background border border-border/40 hover:border-primary/50 text-primary-text smooth-transition opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer shadow"
+                aria-label="Previous event"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleNext}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-background/80 hover:bg-background border border-border/40 hover:border-primary/50 text-primary-text smooth-transition opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer shadow"
+                aria-label="Next event"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
+          {/* Pagination Indicators / Dots */}
+          {activeEvents.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+              {activeEvents.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleDotClick(idx)}
+                  className={`w-2 h-2 rounded-full smooth-transition cursor-pointer ${
+                    idx === currentIndex 
+                      ? 'bg-primary w-4' 
+                      : 'bg-primary-text/30 hover:bg-primary-text/60'
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
   )
 }
+
