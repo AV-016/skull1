@@ -504,7 +504,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                  {/* Description */}
                  <div className="text-secondary-text leading-relaxed mb-8">
                    {sanitizedProduct.description.length > 250 ? (
-                     <p>
+                     <p className="whitespace-pre-line">
                        {isDescExpanded
                          ? sanitizedProduct.description
                          : `${sanitizedProduct.description.slice(0, 250)}...`}
@@ -517,7 +517,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                        </button>
                      </p>
                    ) : (
-                     <p>{sanitizedProduct.description}</p>
+                     <p className="whitespace-pre-line">{sanitizedProduct.description}</p>
                    )}
                  </div>
 

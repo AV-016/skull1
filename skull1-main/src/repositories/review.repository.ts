@@ -9,7 +9,23 @@ export class ReviewRepository {
       include: {
         user: true,
         images: true,
-        product: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            price: true,
+            compareAtPrice: true,
+            stock: true,
+            isActive: true,
+            isFeatured: true,
+            categoryId: true,
+            specifications: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     }) as Promise<ReviewWithDetails | null>;
   }
@@ -20,7 +36,6 @@ export class ReviewRepository {
       include: {
         user: true,
         images: true,
-        product: true,
       },
       orderBy: { createdAt: 'desc' },
     }) as Promise<ReviewWithDetails[]>;
@@ -33,7 +48,23 @@ export class ReviewRepository {
         include: {
           user: true,
           images: true,
-          product: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              description: true,
+              price: true,
+              compareAtPrice: true,
+              stock: true,
+              isActive: true,
+              isFeatured: true,
+              categoryId: true,
+              specifications: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip,

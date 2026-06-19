@@ -1,5 +1,6 @@
 import { Navbar } from '@/components/layout/Navbar'
 import { HeroSection } from '@/components/home/HeroSection'
+import { EventBannerSection } from '@/components/home/EventBannerSection'
 
 import { TrendingProductsSection } from '@/components/home/TrendingProductsSection'
 import { ShopByCategorySection } from '@/components/home/ShopByCategorySection'
@@ -17,6 +18,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
       <Navbar />
       <HeroSection />
+      <EventBannerSection />
 
       <TrendingProductsSection />
       <ShopByCategorySection />

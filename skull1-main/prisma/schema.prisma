@@ -86,6 +86,7 @@ model Product {
   reviews        Review[]
   tags           Tag[]          @relation("ProductToTag")
   inquiries      Inquiry[]
+  events         Event[]        @relation("EventToProduct")
 }
 
 model ProductImage {
@@ -391,6 +392,19 @@ model PhoneOTP {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  bannerUrl   String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[] @relation("EventToProduct")
 }
 
 

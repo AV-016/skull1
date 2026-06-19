@@ -4,16 +4,73 @@ import { ProductQueryFilters, CreateProductInput } from '../types/product.types'
 import { ProductWithDetails } from '../dto/product.dto';
 
 const productInclude = {
-  category: true,
-  images: true,
-  variants: {
-    include: {
-      images: true,
+  category: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
     },
   },
-  tags: true,
-  reviews: true,
-  orderItems: true,
+  images: {
+    select: {
+      id: true,
+      url: true,
+      isPrimary: true,
+    },
+  },
+  variants: {
+    select: {
+      id: true,
+      productId: true,
+      name: true,
+      price: true,
+      stock: true,
+      createdAt: true,
+      updatedAt: true,
+      images: {
+        select: {
+          id: true,
+          variantId: true,
+          url: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
+  },
+  tags: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  reviews: {
+    select: {
+      id: true,
+      productId: true,
+      userId: true,
+      rating: true,
+      comment: true,
+      isHidden: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  orderItems: {
+    select: {
+      id: true,
+      orderId: true,
+      productId: true,
+      variantId: true,
+      quantity: true,
+      price: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
 };
 
 export class ProductRepository {

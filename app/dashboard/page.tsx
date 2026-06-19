@@ -42,10 +42,64 @@ interface Address {
   isDefault: boolean
 }
 
+const EventCountdown = ({ endDate }: { endDate: string }) => {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const difference = +new Date(endDate) - +new Date()
+      if (difference <= 0) {
+        return 'Event Ended'
+      }
+
+      const parts = {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      }
+
+      return `${parts.days}d ${parts.hours}h ${parts.minutes}m ${parts.seconds}s remaining`
+    }
+
+    setTimeLeft(calculateTimeLeft())
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [endDate])
+
+  return (
+    <span className="font-bold bg-primary/20 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs uppercase tracking-wider animate-pulse">
+      {timeLeft}
+    </span>
+  )
+}
+
 export default function DashboardPage() {
   const { user, setUser } = useAuth()
   const [addresses, setAddresses] = useState<Address[]>([])
   const { data: recommendedProducts } = useProducts()
+  
+  // Active Events State
+  const [activeEvents, setActiveEvents] = useState<any[]>([])
+  const [loadingEvents, setLoadingEvents] = useState(true)
+
+  const fetchActiveEvents = async () => {
+    try {
+      const res = await api.get('/events/active')
+      setActiveEvents(res.data?.data || [])
+    } catch (e) {
+      console.error('Error fetching active events:', e)
+    } finally {
+      setLoadingEvents(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchActiveEvents()
+  }, [])
   
   const displayProducts = recommendedProducts
     ?.filter((p: any) => p.isActive && p.stock > 0)
@@ -614,6 +668,92 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Active Events & Offers Banner */}
+      {!loadingEvents && activeEvents.length > 0 && (
+        <div className="pt-8 pb-2">
+          <div className="container mx-auto px-4 md:px-8 max-w-7xl">
+            <div className="space-y-6">
+              {activeEvents.map((event) => (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative overflow-hidden rounded-2xl border border-primary/20 bg-white dark:bg-[#12131a] p-6 md:p-8 shadow-md flex flex-col gap-6"
+                >
+                  {/* Banner image background with premium gradient overlay */}
+                  {event.bannerUrl && (
+                    <div 
+                      className="absolute inset-0 bg-cover bg-center pointer-events-none transition-opacity duration-300 z-0"
+                      style={{ 
+                        backgroundImage: `linear-gradient(to right, rgba(18, 19, 26, 0.95) 40%, rgba(18, 19, 26, 0.6) 70%, rgba(18, 19, 26, 0.25) 100%), url(${event.bannerUrl})` 
+                      }}
+                    />
+                  )}
+                  
+                  <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                    {/* Event Info */}
+                    <div className="lg:col-span-7 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="bg-primary text-white text-[9px] font-black px-2.5 py-1 uppercase tracking-widest rounded">Active Promo</span>
+                        <EventCountdown endDate={event.endDate} />
+                      </div>
+                      
+                      <h2 className="text-xl md:text-2xl font-black text-primary-text uppercase tracking-wide">
+                        {event.title}
+                      </h2>
+                      
+                      <p className="text-xs text-muted-text leading-relaxed max-w-xl">
+                        {event.description}
+                      </p>
+                      <div className="pt-2">
+                        <Link 
+                          href={`/events/${event.id}`}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 text-white font-bold text-[10px] uppercase tracking-wider rounded transition-all shadow-md cursor-pointer"
+                        >
+                          Explore Event Items →
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Associated Event Products Showcase */}
+                    {event.products && event.products.length > 0 && (
+                      <div className="lg:col-span-5 space-y-2.5">
+                        <h4 className="text-[9px] font-black text-secondary-text uppercase tracking-widest">Event Products</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {event.products.slice(0, 2).map((prod: any) => {
+                            const primaryImg = prod.images?.find((img: any) => img.isPrimary)?.url || prod.image || '/placeholder.jpg'
+                            return (
+                              <Link 
+                                href={`/products/${prod.slug}`} 
+                                key={prod.id}
+                                className="group p-2.5 bg-secondary/20 dark:bg-card/25 border border-border/80 hover:border-primary/45 rounded-xl smooth-transition flex items-center gap-3 cursor-pointer shadow-sm"
+                              >
+                                <div className="w-10 h-10 rounded border border-border overflow-hidden bg-secondary flex-shrink-0">
+                                  <img 
+                                    src={primaryImg} 
+                                    alt={prod.name} 
+                                    className="w-full h-full object-cover group-hover:scale-105 smooth-transition" 
+                                  />
+                                </div>
+                                <div className="overflow-hidden flex-1 text-xs">
+                                  <p className="font-bold text-[11px] text-primary-text truncate group-hover:text-primary smooth-transition leading-tight">{prod.name}</p>
+                                  <p className="text-[9px] text-muted-text capitalize mt-0.5">{prod.category?.name || 'Category'}</p>
+                                  <p className="text-xs font-black text-primary mt-1">₹{prod.price}</p>
+                                </div>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="py-12 md:py-16">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl space-y-12">
           
@@ -638,14 +778,10 @@ export default function DashboardPage() {
                 hidden: { opacity: 0, y: 20 },
                 show: { opacity: 1, y: 0 }
               }}
-              whileHover={{ y: -6, boxShadow: '0 10px 30px -10px rgba(220, 38, 38, 0.1)' }}
-              className="group p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
+              className="p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
             >
               <div>
-                <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center mb-4 group-hover:scale-110 smooth-transition">
-                  <ShoppingBag className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-primary-text mb-1 group-hover:text-red-500 smooth-transition">My Orders</h3>
+                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">My Orders</h3>
                 <p className="text-muted-text text-xs leading-relaxed mb-6">Review your order history, track live shipments, and access invoices.</p>
               </div>
               <Link href="/orders" className="inline-flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-600 tracking-wider uppercase mt-auto">
@@ -659,14 +795,10 @@ export default function DashboardPage() {
                 hidden: { opacity: 0, y: 20 },
                 show: { opacity: 1, y: 0 }
               }}
-              whileHover={{ y: -6, boxShadow: '0 10px 30px -10px rgba(220, 38, 38, 0.1)' }}
-              className="group p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
+              className="p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
             >
               <div>
-                <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-4 group-hover:scale-110 smooth-transition">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-primary-text mb-1 group-hover:text-orange-500 smooth-transition">Custom Projects</h3>
+                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">Custom Projects</h3>
                 <p className="text-muted-text text-xs leading-relaxed mb-6">Upload 3D STL designs, check print quotations, and monitor printing logs.</p>
               </div>
               <Link href="/custom-requests" className="inline-flex items-center gap-1 text-xs font-bold text-orange-500 hover:text-orange-600 tracking-wider uppercase mt-auto">
@@ -680,14 +812,10 @@ export default function DashboardPage() {
                 hidden: { opacity: 0, y: 20 },
                 show: { opacity: 1, y: 0 }
               }}
-              whileHover={{ y: -6, boxShadow: '0 10px 30px -10px rgba(220, 38, 38, 0.1)' }}
-              className="group p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
+              className="p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
             >
               <div>
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-4 group-hover:scale-110 smooth-transition">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-primary-text mb-1 group-hover:text-blue-500 smooth-transition">Saved Addresses</h3>
+                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">Saved Addresses</h3>
                 <p className="text-muted-text text-xs leading-relaxed mb-6">Manage shipping addresses and billing information for faster checkouts.</p>
               </div>
               <button 
@@ -704,14 +832,10 @@ export default function DashboardPage() {
                 hidden: { opacity: 0, y: 20 },
                 show: { opacity: 1, y: 0 }
               }}
-              whileHover={{ y: -6, boxShadow: '0 10px 30px -10px rgba(220, 38, 38, 0.1)' }}
-              className="group p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
+              className="p-6 bg-white dark:bg-[#12131a] border border-[#e0e0e0] dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
             >
               <div>
-                <div className="w-10 h-10 rounded-xl bg-green-500/10 text-green-500 flex items-center justify-center mb-4 group-hover:scale-110 smooth-transition">
-                  <MessageSquare className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-primary-text mb-1 group-hover:text-green-500 smooth-transition">Support DMs</h3>
+                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">Support DMs</h3>
                 <p className="text-muted-text text-xs leading-relaxed mb-6">Chat directly with admin for help with orders, custom projects, or payments.</p>
               </div>
               <button 
@@ -728,14 +852,10 @@ export default function DashboardPage() {
                 hidden: { opacity: 0, y: 20 },
                 show: { opacity: 1, y: 0 }
               }}
-              whileHover={{ y: -6, boxShadow: '0 10px 30px -10px rgba(220, 38, 38, 0.1)' }}
-              className="group p-6 bg-white dark:bg-[#12131a] border border-border/80 dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
+              className="p-6 bg-white dark:bg-[#12131a] border border-[#e0e0e0] dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
             >
               <div>
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4 group-hover:scale-110 smooth-transition">
-                  <Settings className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-primary-text mb-1 group-hover:text-purple-500 smooth-transition">Account Settings</h3>
+                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">Account Settings</h3>
                 <p className="text-muted-text text-xs leading-relaxed mb-6">Update security credentials, configure dark mode, and modify contact cards.</p>
               </div>
               <Link href="/account" className="inline-flex items-center gap-1 text-xs font-bold text-purple-500 hover:text-purple-600 tracking-wider uppercase mt-auto">

@@ -59,16 +59,52 @@ export class OrderService {
     const items = [];
     let totalAmount = 0;
 
+    const productIds = cart.items.map((item: any) => item.productId);
+    const variantIds = cart.items
+      .map((item: any) => item.variantId)
+      .filter((id: any): id is string => !!id);
+
+    const [products, variants] = await Promise.all([
+      prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          stock: true,
+          isActive: true,
+        },
+      }),
+      variantIds.length > 0
+        ? prisma.productVariant.findMany({
+            where: { id: { in: variantIds } },
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              stock: true,
+              productId: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const variantMap = new Map(variants.map((v) => [v.id, v]));
+
     for (const cartItem of cart.items) {
-      const product = await productRepository.findById(cartItem.productId);
+      const product = productMap.get(cartItem.productId);
       if (!product) {
         throw new AppError(404, `Product not found: ${cartItem.productId}`);
+      }
+      if (!product.isActive) {
+        throw new AppError(400, `Product is no longer active: ${product.name}`);
       }
 
       let itemPrice = product.price;
       if (cartItem.variantId) {
-        const variant = product.variants?.find((v: any) => v.id === cartItem.variantId);
-        if (!variant) {
+        const variant = variantMap.get(cartItem.variantId);
+        if (!variant || variant.productId !== product.id) {
           throw new AppError(404, `Variant not found: ${cartItem.variantId} for product ${product.name}`);
         }
         if (variant.stock < cartItem.quantity) {
@@ -140,28 +176,30 @@ export class OrderService {
       });
     }
 
-    // 4. Update stock in database
-    for (const item of items) {
-      if (item.variantId) {
-        const currentProduct = await productRepository.findById(item.productId);
-        if (currentProduct) {
-          const variant = currentProduct.variants?.find((v: any) => v.id === item.variantId);
-          if (variant) {
-            await prisma.productVariant.update({
-              where: { id: item.variantId },
-              data: { stock: variant.stock - item.quantity },
-            });
-          }
-        }
-      } else {
-        const currentProduct = await productRepository.findById(item.productId);
-        if (currentProduct) {
-          await productRepository.update(item.productId, {
-            stock: currentProduct.stock - item.quantity,
+    // 4. Update stock in database concurrently using direct atomic decrements
+    await Promise.all(
+      items.map((item) => {
+        if (item.variantId) {
+          return prisma.productVariant.update({
+            where: { id: item.variantId },
+            data: {
+              stock: {
+                decrement: item.quantity,
+              },
+            },
+          });
+        } else {
+          return prisma.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                decrement: item.quantity,
+              },
+            },
           });
         }
-      }
-    }
+      })
+    );
 
     // 5. Send order confirmation email for COD orders
     if (paymentMethod === 'COD' && user && user.email) {

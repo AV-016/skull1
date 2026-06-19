@@ -3,72 +3,46 @@ import { Order, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { OrderWithDetails } from '../dto/order.dto';
 import { generateOrderNumber } from '../utils/generateOrderNumber';
 
+const orderInclude = {
+  address: true,
+  user: true,
+  items: {
+    include: {
+      product: {
+        include: {
+          images: {
+            where: { isPrimary: true },
+            take: 1,
+          },
+        },
+      },
+      variant: true,
+    },
+  },
+  statusHistory: {
+    orderBy: { createdAt: 'desc' as const },
+  },
+};
+
 export class OrderRepository {
   async findById(id: string): Promise<OrderWithDetails | null> {
     return prisma.order.findUnique({
       where: { id },
-      include: {
-        address: true,
-        user: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                images: true,
-              },
-            },
-            variant: true,
-          },
-        },
-        statusHistory: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: orderInclude,
     }) as Promise<OrderWithDetails | null>;
   }
 
   async findByOrderNumber(orderNumber: string): Promise<OrderWithDetails | null> {
     return prisma.order.findUnique({
       where: { orderNumber },
-      include: {
-        address: true,
-        user: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                images: true,
-              },
-            },
-            variant: true,
-          },
-        },
-        statusHistory: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: orderInclude,
     }) as Promise<OrderWithDetails | null>;
   }
 
   async findByUserId(userId: string): Promise<OrderWithDetails[]> {
     return prisma.order.findMany({
       where: { userId },
-      include: {
-        address: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                images: true,
-              },
-            },
-            variant: true,
-          },
-        },
-        statusHistory: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: orderInclude,
       orderBy: { createdAt: 'desc' },
     }) as Promise<OrderWithDetails[]>;
   }
@@ -85,23 +59,7 @@ export class OrderRepository {
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        include: {
-          address: true,
-          user: true,
-          items: {
-            include: {
-              product: {
-                include: {
-                  images: true,
-                },
-              },
-              variant: true,
-            },
-          },
-          statusHistory: {
-            orderBy: { createdAt: 'desc' },
-          },
-        },
+        include: orderInclude,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,

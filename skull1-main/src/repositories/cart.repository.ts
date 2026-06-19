@@ -1,48 +1,69 @@
 import { prisma } from '../config/database';
 import { Cart, CartItem } from '@prisma/client';
 
-export class CartRepository {
-  async findByUserId(userId: string): Promise<any> {
-    let cart = await prisma.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                images: true,
-              },
-            },
-            variant: {
-              include: {
-                images: true,
-              },
+const cartInclude = {
+  items: {
+    include: {
+      product: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          price: true,
+          compareAtPrice: true,
+          stock: true,
+          isActive: true,
+          images: {
+            where: { isPrimary: true },
+            take: 1,
+            select: {
+              id: true,
+              productId: true,
+              url: true,
+              isPrimary: true,
+              createdAt: true,
+              updatedAt: true,
             },
           },
         },
       },
+      variant: {
+        select: {
+          id: true,
+          productId: true,
+          name: true,
+          price: true,
+          stock: true,
+          createdAt: true,
+          updatedAt: true,
+          images: {
+            take: 1,
+            select: {
+              id: true,
+              variantId: true,
+              url: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+export class CartRepository {
+  async findByUserId(userId: string): Promise<any> {
+    let cart = await prisma.cart.findUnique({
+      where: { userId },
+      include: cartInclude,
     });
 
     // If no cart, create one
     if (!cart) {
       cart = await prisma.cart.create({
         data: { userId },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  images: true,
-                },
-              },
-              variant: {
-                include: {
-                  images: true,
-                },
-              },
-            },
-          },
-        },
+        include: cartInclude,
       });
     }
 

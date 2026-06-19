@@ -24,6 +24,7 @@ import inquiryRoutes from './routes/inquiry.routes';
 import uploadRoutes from './routes/upload.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import adminRoutes from './routes/admin.routes';
+import { eventRouter } from './routes/event.routes';
 import { prisma } from './config/database';
 import { env } from './config/env';
 
@@ -138,6 +139,7 @@ app.use('/api/quotations', quotationRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/events', eventRouter);
 
 // 4. Admin Compilation Routes
 app.use('/api/admin', adminRoutes);

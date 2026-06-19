@@ -221,15 +221,17 @@ export default function CheckoutPage() {
     setSubmitError(null)
 
     try {
-      // 1. Sync local cart items to the database cart
+      // 1. Sync local cart items to the database cart in parallel
       await api.delete('/cart/clear')
-      for (const item of cartItems) {
-        await api.post('/cart/items', {
-          productId: item.productId || item.id,
-          variantId: item.variantId || null,
-          quantity: item.quantity
-        })
-      }
+      await Promise.all(
+        cartItems.map((item) =>
+          api.post('/cart/items', {
+            productId: item.productId || item.id,
+            variantId: item.variantId || null,
+            quantity: item.quantity
+          })
+        )
+      )
 
       // 2. Resolve address ID
       let addressId = selectedAddressId

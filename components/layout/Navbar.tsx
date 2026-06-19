@@ -25,7 +25,7 @@ export const Navbar = () => {
   const [notifications, setNotifications] = useState<any[]>([])
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
 
-  // Fetch unread support replies
+  // Fetch unread support replies, order updates, and project updates
   useEffect(() => {
     if (!user) {
       setNotifications([])
@@ -34,18 +34,111 @@ export const Navbar = () => {
     
     const fetchNotifications = async () => {
       try {
-        const res = await api.get('/inquiries/my')
-        if (res.data?.success && res.data?.data) {
-          const unread = res.data.data.filter((inq: any) => !inq.isReadByCustomer)
-          setNotifications(unread)
+        // 1. Fetch Inquiries (Support)
+        let unreadInquiries: any[] = []
+        try {
+          const res = await api.get('/inquiries/my')
+          if (res.data?.success && res.data?.data) {
+            unreadInquiries = res.data.data
+              .filter((inq: any) => !inq.isReadByCustomer)
+              .map((inq: any) => ({
+                id: `inquiry_${inq.id}`,
+                type: 'support',
+                title: 'Support Reply',
+                message: inq.messages?.[inq.messages.length - 1]?.message || `Update on: ${inq.subject}`,
+                link: '/dashboard',
+                color: 'text-red-500',
+                updatedAt: inq.updatedAt
+              }))
+          }
+        } catch (e) {
+          console.error('Error fetching inquiries notifications:', e)
         }
+
+        // 2. Fetch Orders
+        let orderNotifications: any[] = []
+        try {
+          const res = await api.get('/orders')
+          if (res.data?.success && res.data?.data) {
+            const orders = res.data.data
+            const cachedStatuses = JSON.parse(localStorage.getItem('notification_orders') || '{}')
+            const newStatuses: Record<string, string> = { ...cachedStatuses }
+            
+            orders.forEach((order: any) => {
+              const prevStatus = cachedStatuses[order.id]
+              if (prevStatus && prevStatus !== order.status) {
+                orderNotifications.push({
+                  id: `order_${order.id}_${order.status}`,
+                  type: 'order',
+                  title: `Order #${order.orderNumber.slice(-6)} Updated`,
+                  message: `Status changed from ${prevStatus.toLowerCase()} to ${order.status.toLowerCase()}.`,
+                  link: `/orders`,
+                  color: 'text-teal-500',
+                  updatedAt: order.updatedAt,
+                  markRead: () => {
+                    const currentCache = JSON.parse(localStorage.getItem('notification_orders') || '{}')
+                    currentCache[order.id] = order.status
+                    localStorage.setItem('notification_orders', JSON.stringify(currentCache))
+                  }
+                })
+              }
+              newStatuses[order.id] = order.status
+            })
+            localStorage.setItem('notification_orders', JSON.stringify(newStatuses))
+          }
+        } catch (e) {
+          console.error('Error fetching orders notifications:', e)
+        }
+
+        // 3. Fetch Custom Requests
+        let requestNotifications: any[] = []
+        try {
+          const res = await api.get('/custom-requests')
+          if (res.data?.success && res.data?.data) {
+            const requests = res.data.data
+            const cachedStatuses = JSON.parse(localStorage.getItem('notification_requests') || '{}')
+            const newStatuses: Record<string, string> = { ...cachedStatuses }
+
+            requests.forEach((req: any) => {
+              const prevStatus = cachedStatuses[req.id]
+              const reqTitle = req.requirements ? (req.requirements.match(/Project Title:\s*([^\n]+)/)?.[1]?.trim() || 'Custom Project') : 'Custom Project'
+              
+              if (prevStatus && prevStatus !== req.status) {
+                requestNotifications.push({
+                  id: `request_${req.id}_${req.status}`,
+                  type: 'custom_request',
+                  title: 'Project Updated',
+                  message: `"${reqTitle}" is now ${req.status.toLowerCase()}.`,
+                  link: `/custom-requests/${req.id}`,
+                  color: 'text-orange-500',
+                  updatedAt: req.updatedAt,
+                  markRead: () => {
+                    const currentCache = JSON.parse(localStorage.getItem('notification_requests') || '{}')
+                    currentCache[req.id] = req.status
+                    localStorage.setItem('notification_requests', JSON.stringify(currentCache))
+                  }
+                })
+              }
+              newStatuses[req.id] = req.status
+            })
+            localStorage.setItem('notification_requests', JSON.stringify(newStatuses))
+          }
+        } catch (e) {
+          console.error('Error fetching custom requests notifications:', e)
+        }
+
+        // Combine and sort by updatedAt descending
+        const combined = [...unreadInquiries, ...orderNotifications, ...requestNotifications]
+        combined.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        setNotifications(combined)
+
       } catch (err) {
-        console.error('Error fetching notifications:', err)
+        console.error('Error in notification aggregation:', err)
       }
     }
 
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 10000)
+    const interval = setInterval(fetchNotifications, 12000)
 
     window.addEventListener('notifications-updated', fetchNotifications)
     return () => {
@@ -53,6 +146,53 @@ export const Navbar = () => {
       window.removeEventListener('notifications-updated', fetchNotifications)
     }
   }, [user])
+
+  const handleNotificationClick = (notif: any) => {
+    if (notif.markRead) {
+      notif.markRead()
+    }
+    setIsNotificationsOpen(false)
+    window.dispatchEvent(new Event('notifications-updated'))
+    router.push(notif.link)
+  }
+
+  const handleMarkAllRead = async () => {
+    try {
+      // 1. Mark support replies as read
+      for (const notif of notifications) {
+        if (notif.type === 'support') {
+          const inqId = notif.id.replace('inquiry_', '')
+          await api.get(`/inquiries/${inqId}`) // fetching marks it read
+        }
+      }
+      
+      // 2. Fetch fresh lists to sync cache
+      const [resOrders, resReqs] = await Promise.all([
+        api.get('/orders'),
+        api.get('/custom-requests')
+      ])
+
+      if (resOrders.data?.success && resOrders.data?.data) {
+        const orderStatuses: Record<string, string> = {}
+        resOrders.data.data.forEach((o: any) => {
+          orderStatuses[o.id] = o.status
+        })
+        localStorage.setItem('notification_orders', JSON.stringify(orderStatuses))
+      }
+
+      if (resReqs.data?.success && resReqs.data?.data) {
+        const reqStatuses: Record<string, string> = {}
+        resReqs.data.data.forEach((r: any) => {
+          reqStatuses[r.id] = r.status
+        })
+        localStorage.setItem('notification_requests', JSON.stringify(reqStatuses))
+      }
+
+      window.dispatchEvent(new Event('notifications-updated'))
+    } catch (e) {
+      console.error('Error marking all as read:', e)
+    }
+  }
 
   useEffect(() => {
     const updateCartCount = () => {
@@ -198,27 +338,35 @@ export const Navbar = () => {
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-3 w-72 bg-popover border border-border p-3 shadow-2xl z-50 flex flex-col rounded-xl"
+                      className="absolute right-0 mt-3 w-80 bg-popover border border-border p-3 shadow-2xl z-50 flex flex-col rounded-xl"
                     >
-                      <h4 className="font-bold text-xs uppercase tracking-wider text-primary-text pb-2 border-b border-border mb-2">Notifications ({notifications.length})</h4>
+                      <div className="flex justify-between items-center pb-2 border-b border-border mb-2">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-primary-text">Notifications ({notifications.length})</h4>
+                        {notifications.length > 0 && (
+                          <button
+                            onClick={handleMarkAllRead}
+                            className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wide cursor-pointer"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
                       {notifications.length === 0 ? (
                         <p className="text-[11px] text-muted-text py-4 text-center italic">No new messages or replies.</p>
                       ) : (
-                        <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-                          {notifications.map((inq: any) => (
-                            <Link
-                              key={inq.id}
-                              href="/dashboard"
-                              onClick={() => setIsNotificationsOpen(false)}
-                              className="text-left p-2.5 hover:bg-secondary rounded-lg border border-border/60 transition-colors flex flex-col gap-1"
+                        <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+                          {notifications.map((notif: any) => (
+                            <button
+                              key={notif.id}
+                              onClick={() => handleNotificationClick(notif)}
+                              className="text-left p-2.5 hover:bg-secondary rounded-lg border border-border/60 transition-colors flex flex-col gap-1 w-full"
                             >
-                              <div className="flex justify-between items-center text-[10px] font-bold text-red-500 uppercase tracking-wide">
-                                <span>Support Reply</span>
-                                <span>{new Date(inq.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wide">
+                                <span className={notif.color}>{notif.title}</span>
+                                <span className="text-muted-text">{new Date(notif.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
-                              <p className="text-xs text-primary-text font-bold line-clamp-1">{inq.subject}</p>
-                              <p className="text-[10px] text-secondary-text line-clamp-2 leading-normal">{inq.messages?.[0]?.message}</p>
-                            </Link>
+                              <p className="text-xs text-primary-text font-semibold line-clamp-2 leading-relaxed">{notif.message}</p>
+                            </button>
                           ))}
                         </div>
                       )}

@@ -13,6 +13,7 @@ import { adminCustomRequestRouter } from './customRequest.routes';
 import { adminQuotationRouter } from './quotation.routes';
 import { adminInquiryRouter } from './inquiry.routes';
 import { adminDashboardRouter } from './dashboard.routes';
+import { adminEventRouter } from './event.routes';
 
 const router = Router();
 const controller = new AdminController();
@@ -43,5 +44,6 @@ router.use('/custom-requests', adminCustomRequestRouter);
 router.use('/quotations', adminQuotationRouter);
 router.use('/inquiries', adminInquiryRouter);
 router.use('/dashboard', adminDashboardRouter);
+router.use('/events', adminEventRouter);
 
 export default router;

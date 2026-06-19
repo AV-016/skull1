@@ -18,7 +18,8 @@ import {
   MessageSquare, 
   Users, 
   Award,
-  Globe
+  Globe,
+  Calendar
 } from 'lucide-react'
 
 export function AdminSidebar() {
@@ -30,6 +31,7 @@ export function AdminSidebar() {
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { label: 'Products', href: '/admin/products', icon: Package },
     { label: 'Categories', href: '/admin/categories', icon: Tag },
+    { label: 'Events & Offers', href: '/admin/events', icon: Calendar },
     { label: 'Orders', href: '/admin/orders', icon: ShoppingCart },
     { label: 'Custom Requests', href: '/admin/custom-requests', icon: Sparkles },
     { label: 'Reviews', href: '/admin/reviews', icon: Star },
