@@ -39,8 +39,9 @@ export class OrderController {
   async createOrder(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const { addressId, paymentMethod } = req.body;
-      const order = await orderService.createOrder(userId, addressId, paymentMethod);
+      const { addressId, paymentMethod, idempotencyKey } = req.body;
+      const key = idempotencyKey || (req.headers['idempotency-key'] as string);
+      const order = await orderService.createOrder(userId, addressId, paymentMethod, key);
       res.status(201).json({
         success: true,
         message: MESSAGES.ORDER.CREATED,
@@ -143,6 +144,34 @@ export class OrderController {
         success: true,
         message: 'Order status history retrieved',
         data: history,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async markOrderPaid(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orderId = req.params.id;
+      const order = await orderService.markOrderPaid(orderId);
+      res.status(200).json({
+        success: true,
+        message: 'Order successfully marked as paid & confirmed.',
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async refundOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orderId = req.params.id;
+      const order = await orderService.refundOrder(orderId);
+      res.status(200).json({
+        success: true,
+        message: 'Order successfully cancelled and refund processed.',
+        data: order,
       });
     } catch (error) {
       next(error);

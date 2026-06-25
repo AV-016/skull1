@@ -179,6 +179,7 @@ model Order {
   statusHistory OrderStatusHistory[]
   payments      Payment[]
   inquiries     Inquiry[]
+  idempotencyKey String?              @unique
 }
 
 model OrderItem {
@@ -407,6 +408,20 @@ model Event {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   products           Product[] @relation("EventToProduct")
+}
+
+model ProcessedWebhook {
+  id        String   @id
+  createdAt DateTime @default(now())
+}
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  level     String   @default("error")
+  category  String
+  message   String
+  stack     String?  @db.Text
+  timestamp DateTime @default(now())
 }
 
 

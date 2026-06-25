@@ -25,5 +25,7 @@ adminOrderRouter.get('/:id', controller.getOrderById);
 adminOrderRouter.patch('/:id/status', validate(updateOrderStatusSchema), controller.updateOrderStatus);
 adminOrderRouter.patch('/:id/shipping', validate(updateOrderShippingSchema), controller.updateOrderShipping);
 adminOrderRouter.get('/:id/history', controller.getOrderHistory);
+adminOrderRouter.post('/:id/mark-paid', controller.markOrderPaid);
+adminOrderRouter.post('/:id/refund', controller.refundOrder);
 
 export default router;

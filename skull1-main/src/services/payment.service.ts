@@ -163,50 +163,133 @@ export class PaymentService {
 
     const payload = JSON.parse(rawBody);
     const event = payload.event;
-    logger.info(`Processing payment webhook event: ${event}`);
+    const eventId = payload.id;
+    logger.info(`Processing payment webhook event: ${event} (Event ID: ${eventId})`);
+
+    // Webhook event idempotency check: store event ID in DB
+    if (eventId) {
+      try {
+        await prisma.processedWebhook.create({
+          data: { id: eventId }
+        });
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          logger.warn(`Duplicate webhook event ignored - Event ID: ${eventId}`);
+          return;
+        }
+        throw err;
+      }
+    }
 
     if (event === 'payment.captured') {
       const paymentDetails = payload.payload.payment.entity;
       const razorpayOrderId = paymentDetails.order_id;
       const razorpayPaymentId = paymentDetails.id;
 
-      const payment = await paymentRepository.findByRazorpayOrderId(razorpayOrderId);
-      if (payment) {
-        const order = await orderRepository.findById(payment.orderId);
-        if (order && order.paymentStatus !== PaymentStatus.PAID) {
-          await paymentRepository.updateStatus(
-            razorpayOrderId,
-            'success',
-            razorpayPaymentId,
-            signature
-          );
-          await orderRepository.updatePaymentStatus(payment.orderId, PaymentStatus.PAID, razorpayPaymentId);
-          await orderRepository.updateStatus(payment.orderId, OrderStatus.CONFIRMED, 'Payment confirmed via webhook.');
-          logger.info(`Webhook payment success - Order ID: ${payment.orderId}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
+      // We run everything in a transaction to make it atomic
+      await prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { razorpayOrderId },
+          include: { order: { include: { user: true } } }
+        });
 
-          // Send order confirmation email
-          const email = order.user?.email;
-          const name = order.user?.name;
-          if (email) {
-            sendOrderConfirmationEmail(
-              email,
-              name || 'Customer',
-              order.orderNumber,
-              order.totalAmount
-            ).catch((err) => logger.error(`Error sending online order confirmation email to ${email}:`, err));
-          }
+        if (!payment) {
+          logger.warn(`No payment record found for Razorpay Order: ${razorpayOrderId}`);
+          return;
         }
-      }
+
+        // Lock/update payment atomically using updateMany to verify status has not been set to 'success'
+        const updatedPayment = await tx.payment.updateMany({
+          where: {
+            id: payment.id,
+            status: { not: 'success' }
+          },
+          data: {
+            status: 'success',
+            razorpayPaymentId,
+            razorpaySignature: signature
+          }
+        });
+
+        if (updatedPayment.count === 0) {
+          logger.info(`Payment status is already success for Razorpay Order: ${razorpayOrderId}. Skipping status update.`);
+          return;
+        }
+
+        // Update the order details
+        await tx.order.update({
+          where: { id: payment.orderId },
+          data: {
+            paymentStatus: PaymentStatus.PAID,
+            paymentId: razorpayPaymentId,
+            status: OrderStatus.CONFIRMED
+          }
+        });
+
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: payment.orderId,
+            status: OrderStatus.CONFIRMED,
+            notes: 'Payment confirmed via webhook.'
+          }
+        });
+
+        logger.info(`Webhook payment success - Order ID: ${payment.orderId}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
+
+        // Send order confirmation email
+        const email = payment.order.user?.email;
+        const name = payment.order.user?.name;
+        if (email) {
+          sendOrderConfirmationEmail(
+            email,
+            name || 'Customer',
+            payment.order.orderNumber,
+            payment.order.totalAmount
+          ).catch((err) => logger.error(`Error sending online order confirmation email to ${email}:`, err));
+        }
+      });
     } else if (event === 'payment.failed') {
       const paymentDetails = payload.payload.payment.entity;
       const razorpayOrderId = paymentDetails.order_id;
-      
-      const payment = await paymentRepository.findByRazorpayOrderId(razorpayOrderId);
-      if (payment) {
-        logger.warn(`Webhook payment failed event received - Razorpay Order: ${razorpayOrderId}`);
-        await paymentRepository.updateStatus(razorpayOrderId, 'failed');
-        await orderRepository.updatePaymentStatus(payment.orderId, PaymentStatus.FAILED);
-      }
+
+      await prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { razorpayOrderId }
+        });
+
+        if (!payment) {
+          logger.warn(`No payment record found for Razorpay Order on failure: ${razorpayOrderId}`);
+          return;
+        }
+
+        const updatedPayment = await tx.payment.updateMany({
+          where: {
+            id: payment.id,
+            status: { not: 'success' }
+          },
+          data: {
+            status: 'failed'
+          }
+        });
+
+        if (updatedPayment.count > 0) {
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: {
+              paymentStatus: PaymentStatus.FAILED
+            }
+          });
+
+          await tx.orderStatusHistory.create({
+            data: {
+              orderId: payment.orderId,
+              status: OrderStatus.PENDING,
+              notes: 'Payment failed via webhook.'
+            }
+          });
+          logger.warn(`Webhook payment failed event received - Razorpay Order: ${razorpayOrderId}`);
+        }
+      });
     }
   }
 

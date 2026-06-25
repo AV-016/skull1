@@ -35,6 +35,7 @@ function CheckoutContent() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isOrdered, setIsOrdered] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [idempotencyKey, setIdempotencyKey] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'COD'>('CARD')
   const [codChargeVal, setCodChargeVal] = useState<number>(50)
@@ -141,6 +142,8 @@ function CheckoutContent() {
         setCartItems(items)
       }
       setIsLoaded(true)
+      const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      setIdempotencyKey(uuid);
     }
 
     // Fetch COD settings
@@ -303,7 +306,8 @@ function CheckoutContent() {
       // 3. Create the order
       const orderRes = await api.post('/orders', {
         addressId,
-        paymentMethod
+        paymentMethod,
+        idempotencyKey
       })
       const order = orderRes.data.data
 

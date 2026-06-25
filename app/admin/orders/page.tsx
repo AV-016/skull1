@@ -6,12 +6,39 @@ import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useAdminOrders, useUpdateOrderStatus } from '@/hooks/useAdmin'
 import { Eye, Loader2, AlertTriangle, Search } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 export default function AdminOrders() {
   const { data: orders, isLoading, error, refetch } = useAdminOrders()
   const updateStatusMutation = useUpdateOrderStatus()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+
+  const handleMarkPaid = async (orderId: string) => {
+    setActionLoadingId(orderId)
+    try {
+      await api.post(`/admin/orders/${orderId}/mark-paid`)
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Failed to mark order as paid')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleRefund = async (orderId: string) => {
+    if (!confirm('Are you sure you want to refund this order? This will cancel the order and restock items.')) return
+    setActionLoadingId(orderId)
+    try {
+      await api.post(`/admin/orders/${orderId}/refund`)
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Failed to process refund')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
 
   // Compute metrics dynamically from the fetched orders
   const totalOrders = orders?.length || 0
@@ -150,6 +177,7 @@ export default function AdminOrders() {
                   <th className="px-6 py-4">Customer Email</th>
                   <th className="px-6 py-4">Date</th>
                   <th className="px-6 py-4">Total Amount</th>
+                  <th className="px-6 py-4">Payment</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -166,6 +194,16 @@ export default function AdminOrders() {
                     <td className="px-6 py-4 text-muted-text">{formatDate(order.createdAt)}</td>
                     <td className="px-6 py-4 font-bold text-primary-text">
                       {formatCurrency(order.totalAmount || order.total)}
+                    </td>
+                    <td className="px-6 py-4 font-medium">
+                      <span className="text-[10px] uppercase font-bold tracking-wider">{order.paymentMethod}</span>
+                      <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        order.paymentStatus === 'PAID' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                        order.paymentStatus === 'REFUNDED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                        order.paymentStatus === 'PENDING' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                        order.paymentStatus === 'FAILED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        'bg-secondary text-muted-text'
+                      }`}>{order.paymentStatus}</span>
                     </td>
                     <td className="px-6 py-4">
                       <select
@@ -185,20 +223,44 @@ export default function AdminOrders() {
                       </select>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => window.location.href = `/orders/${order.id}`}
-                        className="p-2 border border-border hover:border-primary/50 text-secondary-text hover:text-primary smooth-transition cursor-pointer inline-flex items-center gap-1.5"
-                        title="View Details"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span className="text-[10px] uppercase font-bold tracking-wider">Details</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => window.location.href = `/orders/${order.id}`}
+                          className="p-2 border border-border hover:border-primary/50 text-secondary-text hover:text-primary smooth-transition cursor-pointer inline-flex items-center gap-1.5"
+                          title="View Details"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="text-[10px] uppercase font-bold tracking-wider">Details</span>
+                        </button>
+                        
+                        {(order.paymentStatus === 'PENDING' || order.paymentStatus === 'FAILED') && order.paymentMethod === 'CARD' && (
+                          <button
+                            onClick={() => handleMarkPaid(order.id)}
+                            disabled={actionLoadingId === order.id}
+                            className="p-2 bg-green-500/10 border border-green-500/20 hover:border-green-500/50 text-green-400 disabled:opacity-50 smooth-transition cursor-pointer inline-flex items-center text-[10px] uppercase font-bold tracking-wider"
+                            title="Manually Confirm Payment"
+                          >
+                            {actionLoadingId === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Mark Paid'}
+                          </button>
+                        )}
+
+                        {order.paymentStatus === 'PAID' && (
+                          <button
+                            onClick={() => handleRefund(order.id)}
+                            disabled={actionLoadingId === order.id}
+                            className="p-2 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 text-red-400 disabled:opacity-50 smooth-transition cursor-pointer inline-flex items-center text-[10px] uppercase font-bold tracking-wider"
+                            title="Refund & Cancel Order"
+                          >
+                            {actionLoadingId === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Refund'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
+                    <td colSpan={7} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
                       No orders matching your filters.
                     </td>
                   </tr>
