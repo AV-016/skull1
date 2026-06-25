@@ -4,7 +4,7 @@ export const createCustomRequestSchema = z.object({
   body: z.object({
     description: z.string().min(10, 'Description must be at least 10 characters long'),
     requirements: z.string().optional(),
-    phone: z.string().optional(),
+    phone: z.string().regex(/^\+91\d{10}$/, 'Phone number must be exactly 10 digits (excluding +91)').optional(),
     files: z.array(z.object({
       url: z.string().url('Invalid file URL'),
       fileType: z.string().min(1, 'File type is required'),

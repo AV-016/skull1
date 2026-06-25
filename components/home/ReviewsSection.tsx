@@ -96,7 +96,7 @@ export const ReviewsSection = () => {
     <section className="py-24 bg-secondary border-b border-border overflow-hidden relative">
       <div className="container mx-auto px-4 md:px-6 mb-16">
         <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-3">Trusted By Thousands Of Customers</h2>
+          <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-3">What Our Customers Say</h2>
           <h3 className="heading-2 text-primary-text">Built For Collectors, Creators & Dreamers</h3>
         </div>
       </div>
@@ -144,11 +144,6 @@ export const ReviewsSection = () => {
 
               {/* User details */}
               <div className="flex items-center gap-3 border-t border-border pt-4">
-                <img
-                  src={review.avatar}
-                  alt={review.name}
-                  className="w-10 h-10 rounded-full object-cover border border-border"
-                />
                 <div>
                   <h4 className="text-sm font-bold text-primary-text group-hover:text-primary transition-colors duration-300">
                     {review.name}

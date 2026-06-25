@@ -6,7 +6,7 @@ import Link from 'next/link'
 import api from '@/lib/api'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-const EventCountdown = ({ endDate }: { endDate: string }) => {
+const EventCountdown = ({ endDate, themeColor }: { endDate: string, themeColor?: string }) => {
   const [timeLeft, setTimeLeft] = useState('')
 
   useEffect(() => {
@@ -34,8 +34,25 @@ const EventCountdown = ({ endDate }: { endDate: string }) => {
     return () => clearInterval(timer)
   }, [endDate])
 
+  // Helper to convert hex to RGBA for transparent backgrounds
+  const getRgba = (hex: string, alpha: number) => {
+    if (!hex) return '';
+    const cleanHex = hex.replace('#', '');
+    const r = parseInt(cleanHex.substring(0, 2), 16);
+    const g = parseInt(cleanHex.substring(2, 4), 16);
+    const b = parseInt(cleanHex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
   return (
-    <span className="font-bold bg-primary/25 text-primary border border-primary/20 px-3 py-1 rounded text-xs uppercase tracking-wider animate-pulse">
+    <span 
+      className="font-bold px-3 py-1 rounded text-xs uppercase tracking-wider animate-pulse border"
+      style={{
+        backgroundColor: themeColor ? getRgba(themeColor, 0.2) : 'rgba(var(--primary-rgb), 0.25)',
+        color: themeColor || 'var(--primary)',
+        borderColor: themeColor ? getRgba(themeColor, 0.3) : 'rgba(var(--primary-rgb), 0.2)'
+      }}
+    >
       {timeLeft}
     </span>
   )
@@ -145,22 +162,39 @@ export function EventBannerSection() {
                 {/* Event Info */}
                 <div className="lg:col-span-7 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="bg-primary text-white text-[9px] font-black px-2.5 py-1 uppercase tracking-widest rounded">Active Promo</span>
-                    <EventCountdown endDate={currentEvent.endDate} />
+                    <span 
+                      className="text-white text-[9px] font-black px-2.5 py-1 uppercase tracking-widest rounded"
+                      style={{ backgroundColor: currentEvent.themeColor || 'var(--primary)' }}
+                    >
+                      Active Promo
+                    </span>
+                    <EventCountdown endDate={currentEvent.endDate} themeColor={currentEvent.themeColor} />
                   </div>
                   
                   <h2 className="text-xl md:text-2xl font-black text-primary-text uppercase tracking-wide">
                     {currentEvent.title}
                   </h2>
                   
-                  <p className="text-xs text-muted-text leading-relaxed max-w-xl">
+                  <p 
+                    className="text-xs leading-relaxed max-w-xl font-medium"
+                    style={{ color: currentEvent.themeColor || 'var(--muted-text)', opacity: currentEvent.themeColor ? 0.9 : undefined }}
+                  >
                     {currentEvent.description}
                   </p>
                   
                   <div className="pt-2">
                     <Link 
                       href={`/events/${currentEvent.id}`}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 text-white font-bold text-[10px] uppercase tracking-wider rounded transition-all shadow-md cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold text-[10px] uppercase tracking-wider rounded transition-all shadow-md cursor-pointer"
+                      style={{ backgroundColor: currentEvent.themeColor || 'var(--primary)' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = currentEvent.themeColor 
+                          ? `${currentEvent.themeColor}dd` 
+                          : 'var(--primary-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = currentEvent.themeColor || 'var(--primary)';
+                      }}
                     >
                       Explore Event Items →
                     </Link>

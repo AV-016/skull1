@@ -250,11 +250,11 @@ export const HeroSection = () => {
             >
               <div>
                 <div className="text-2xl font-bold text-primary-text tracking-tight">500+</div>
-                <div className="text-muted-text text-xs mt-1">Orders Delivered</div>
+                <div className="text-muted-text text-xs mt-1">Offline Orders</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-primary-text tracking-tight">
-                  {stats.reviewsCount === 100 ? '100+' : stats.reviewsCount}
+                  500+
                 </div>
                 <div className="text-muted-text text-xs mt-1">Happy Customers</div>
               </div>

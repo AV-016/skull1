@@ -58,6 +58,7 @@ export default function AdminOrders() {
       orderNo.includes(query) || 
       shortId.includes(query) || 
       email.includes(query) || 
+      (order.paymentId && order.paymentId.toLowerCase().includes(query)) ||
       order.id.toLowerCase().includes(query)
       
     const matchesStatus = statusFilter === 'ALL' || order.status.toUpperCase() === statusFilter.toUpperCase()
@@ -131,7 +132,7 @@ export default function AdminOrders() {
             <Search className="w-4 h-4 text-muted-text ml-3 flex-shrink-0" />
             <input
               type="text"
-              placeholder="Search by Order ID or Email..."
+              placeholder="Search by Order ID, Email, or Payment ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full py-2 px-3 bg-transparent text-primary-text placeholder:text-muted-text text-xs focus:outline-none tracking-wide"
@@ -196,14 +197,23 @@ export default function AdminOrders() {
                       {formatCurrency(order.totalAmount || order.total)}
                     </td>
                     <td className="px-6 py-4 font-medium">
-                      <span className="text-[10px] uppercase font-bold tracking-wider">{order.paymentMethod}</span>
-                      <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                        order.paymentStatus === 'PAID' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                        order.paymentStatus === 'REFUNDED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                        order.paymentStatus === 'PENDING' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
-                        order.paymentStatus === 'FAILED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                        'bg-secondary text-muted-text'
-                      }`}>{order.paymentStatus}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center">
+                          <span className="text-[10px] uppercase font-bold tracking-wider">{order.paymentMethod}</span>
+                          <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            order.paymentStatus === 'PAID' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                            order.paymentStatus === 'REFUNDED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                            order.paymentStatus === 'PENDING' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                            order.paymentStatus === 'FAILED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                            'bg-secondary text-muted-text'
+                          }`}>{order.paymentStatus}</span>
+                        </div>
+                        {order.paymentId && (
+                          <div className="text-[9px] font-mono text-muted-text mt-0.5 select-all">
+                            ID: {order.paymentId}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <select

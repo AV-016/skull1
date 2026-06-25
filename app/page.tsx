@@ -9,9 +9,9 @@ import { NewArrivalsSection } from '@/components/home/NewArrivalsSection'
 import { CustomOrderBannerSection } from '@/components/home/CustomOrderBannerSection'
 import { CustomerCreationsSection } from '@/components/home/CustomerCreationsSection'
 import { ReviewsSection } from '@/components/home/ReviewsSection'
-import { FAQSection } from '@/components/home/FAQSection'
 import { FinalCTASection } from '@/components/home/FinalCTASection'
 import { Footer } from '@/components/layout/Footer'
+import { DevStickyPanel } from '@/components/dev/DevStickyPanel'
 
 export default function HomePage() {
   return (
@@ -27,9 +27,9 @@ export default function HomePage() {
       <CustomOrderBannerSection />
       <CustomerCreationsSection />
       <ReviewsSection />
-      <FAQSection />
       <FinalCTASection />
       <Footer />
+      <DevStickyPanel />
     </main>
   )
 }

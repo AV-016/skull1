@@ -84,11 +84,19 @@ export default function AccountPage() {
     state: 'N/A',
     postalCode: '',
     country: 'India',
-    phone: '',
+    phone: '+91',
     isDefault: false
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [isLocating, setIsLocating] = useState(false)
+
+  // Address Phone verification states
+  const [isAddrPhoneVerified, setIsAddrPhoneVerified] = useState(false)
+  const [addrOtpSent, setAddrOtpSent] = useState(false)
+  const [addrOtpInput, setAddrOtpInput] = useState('')
+  const [isSendingAddrOtp, setIsSendingAddrOtp] = useState(false)
+  const [isVerifyingAddrOtp, setIsVerifyingAddrOtp] = useState(false)
+  const [addrConfirmationResult, setAddrConfirmationResult] = useState<ConfirmationResult | null>(null)
 
   // Postal code auto-lookup
   useEffect(() => {
@@ -174,7 +182,15 @@ export default function AccountPage() {
       setFirstName(parts[0] || '')
       setLastName(parts.slice(1).join(' ') || '')
       setEmail(user.email || '')
-      setPhoneInput(user.phone || '')
+      let phone = user.phone || ''
+      if (phone) {
+        if (!phone.startsWith('+91')) {
+          phone = '+91' + phone.replace(/^\+?91?/, '').replace(/\D/g, '').substring(0, 10);
+        }
+      } else {
+        phone = '+91';
+      }
+      setPhoneInput(phone)
     }
   }, [user])
 
@@ -273,6 +289,12 @@ export default function AccountPage() {
     setErrorMsg(null)
     setSuccessMsg(null)
     setIsSendingOtp(true)
+    const phoneDigits = phoneInput.replace(/^\+91/, '').replace(/\D/g, '')
+    if (phoneDigits.length !== 10) {
+      setErrorMsg('Phone number must be exactly 10 digits (excluding +91)')
+      setIsSendingOtp(false)
+      return
+    }
     if (!auth) {
       setErrorMsg('Firebase is not configured on this website. Please add Firebase credentials to your environment variables.')
       setIsSendingOtp(false)
@@ -351,10 +373,86 @@ export default function AccountPage() {
   // Addresses CRUD
   const handleAddressInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
+    if (name === 'phone') {
+      setIsAddrPhoneVerified(false)
+      setAddrOtpSent(false)
+      let val = value;
+      if (!val.startsWith('+91')) {
+        val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+      }
+      const prefix = '+91';
+      const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+      setAddressForm(prev => ({
+        ...prev,
+        phone: prefix + rest
+      }));
+      return;
+    }
     setAddressForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+  }
+
+  const handleSendAddrPhoneOtp = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    setFormError(null)
+    setIsSendingAddrOtp(true)
+    const phoneDigits = addressForm.phone.replace(/^\+91/, '').replace(/\D/g, '')
+    if (phoneDigits.length !== 10) {
+      setFormError('Phone number must be exactly 10 digits (excluding +91).')
+      setIsSendingAddrOtp(false)
+      return
+    }
+    if (!auth) {
+      setFormError('Firebase is not configured.')
+      setIsSendingAddrOtp(false)
+      return
+    }
+    try {
+      if (typeof window !== 'undefined') {
+        const wrapper = document.getElementById('recaptcha-container-wrapper')
+        if (wrapper) {
+          wrapper.innerHTML = '<div id="recaptcha-container"></div>'
+        }
+      }
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {},
+        'expired-callback': () => {
+          setFormError('reCAPTCHA expired. Please try again.')
+        }
+      })
+      const confirmation = await signInWithPhoneNumber(auth, addressForm.phone, verifier)
+      setAddrConfirmationResult(confirmation)
+      setAddrOtpSent(true)
+    } catch (err: any) {
+      console.error('Firebase send phone OTP error:', err)
+      setFormError(err.message || 'Failed to send OTP. Please check your phone number and try again.')
+    } finally {
+      setIsSendingAddrOtp(false)
+    }
+  }
+
+  const handleVerifyAddrPhoneOtp = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    setFormError(null)
+    if (!addrConfirmationResult) {
+      setFormError('No active verification session. Please request a new OTP.')
+      return
+    }
+    setIsVerifyingAddrOtp(true)
+    try {
+      await addrConfirmationResult.confirm(addrOtpInput)
+      setIsAddrPhoneVerified(true)
+      setAddrOtpSent(false)
+      setAddrOtpInput('')
+    } catch (err: any) {
+      console.error('Firebase verify phone OTP error:', err)
+      setFormError(err.message || 'Invalid or expired OTP. Please try again.')
+    } finally {
+      setIsVerifyingAddrOtp(false)
+    }
   }
 
   const openAddForm = () => {
@@ -365,9 +463,12 @@ export default function AccountPage() {
       state: 'N/A',
       postalCode: '',
       country: 'India',
-      phone: '',
+      phone: '+91',
       isDefault: false
     })
+    setIsAddrPhoneVerified(false)
+    setAddrOtpSent(false)
+    setAddrOtpInput('')
     setFormError(null)
     setIsFormOpen(true)
   }
@@ -383,6 +484,9 @@ export default function AccountPage() {
       phone: (addr as any).phone || '',
       isDefault: addr.isDefault
     })
+    setIsAddrPhoneVerified(true)
+    setAddrOtpSent(false)
+    setAddrOtpInput('')
     setFormError(null)
     setIsFormOpen(true)
   }
@@ -401,6 +505,12 @@ export default function AccountPage() {
     }
     if (addressForm.postalCode.length < 4) {
       setFormError('Postal code must be at least 4 characters long')
+      return
+    }
+
+    const phoneDigits = addressForm.phone.replace(/^\+91/, '').replace(/\D/g, '')
+    if (phoneDigits.length !== 10) {
+      setFormError('Phone number must be exactly 10 digits (excluding +91)')
       return
     }
 
@@ -751,7 +861,15 @@ export default function AccountPage() {
                       type="tel"
                       disabled={!editMobile}
                       value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (!val.startsWith('+91')) {
+                          val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+                        }
+                        const prefix = '+91';
+                        const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+                        setPhoneInput(prefix + rest);
+                      }}
                       placeholder="Mobile Number"
                       className="w-full px-4 py-3 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white disabled:bg-gray-100 dark:disabled:bg-black/20 disabled:text-gray-500 disabled:cursor-not-allowed focus:outline-none focus:border-red-500 text-xs"
                     />
@@ -772,7 +890,8 @@ export default function AccountPage() {
                   {editMobile && (
                     <button
                       onClick={() => setIsModalOpen(true)}
-                      className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded uppercase tracking-wider transition cursor-pointer"
+                      disabled={phoneInput.replace(/^\+91/, '').replace(/\D/g, '').length !== 10}
+                      className="px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold rounded uppercase tracking-wider transition cursor-pointer"
                     >
                       Verify with OTP
                     </button>
@@ -904,15 +1023,51 @@ export default function AccountPage() {
 
                       <div>
                         <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Phone Number</label>
-                        <input
-                          type="text"
-                          name="phone"
-                          required
-                          value={addressForm.phone}
-                          onChange={handleAddressInputChange}
-                          className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
-                          placeholder="e.g. +91 98765 43210"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            name="phone"
+                            required
+                            value={addressForm.phone}
+                            onChange={handleAddressInputChange}
+                            className="flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                            placeholder="e.g. +91 98765 43210"
+                          />
+                          {!isAddrPhoneVerified && (
+                            <button
+                              type="button"
+                              onClick={handleSendAddrPhoneOtp}
+                              disabled={isSendingAddrOtp || addressForm.phone.replace(/^\+91/, '').replace(/\D/g, '').length !== 10}
+                              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold rounded text-xs transition cursor-pointer"
+                            >
+                              {isSendingAddrOtp ? 'Sending...' : 'Verify'}
+                            </button>
+                          )}
+                          {isAddrPhoneVerified && (
+                            <span className="flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1.5 rounded font-bold uppercase tracking-wider text-[9px]">
+                              <ShieldCheck className="w-3.5 h-3.5" /> Verified
+                            </span>
+                          )}
+                        </div>
+                        {addrOtpSent && !isAddrPhoneVerified && (
+                          <div className="mt-3 flex gap-2 items-center bg-gray-50 dark:bg-black/30 p-3 rounded border border-border">
+                            <input
+                              type="text"
+                              placeholder="Enter OTP"
+                              value={addrOtpInput}
+                              onChange={(e) => setAddrOtpInput(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                              className="px-3 py-2 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-xs text-black dark:text-white w-32 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleVerifyAddrPhoneOtp}
+                              disabled={isVerifyingAddrOtp || addrOtpInput.length !== 6}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded text-xs transition cursor-pointer"
+                            >
+                              {isVerifyingAddrOtp ? 'Verifying...' : 'Confirm'}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -1226,19 +1381,23 @@ export default function AccountPage() {
                       required
                       placeholder="+919876543210"
                       value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (!val.startsWith('+91')) {
+                          val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+                        }
+                        const prefix = '+91';
+                        const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+                        setPhoneInput(prefix + rest);
+                      }}
                       className="w-full px-4 py-2.5 bg-gray-50 dark:bg-[#0b0c10] border border-gray-200 dark:border-[#1f2833]/60 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
                     />
                   </div>
 
-                  <div id="recaptcha-container-wrapper">
-                    <div id="recaptcha-container"></div>
-                  </div>
-
                   <button
                     type="submit"
-                    disabled={isSendingOtp}
-                    className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded font-bold uppercase tracking-wider transition shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    disabled={isSendingOtp || phoneInput.replace(/^\+91/, '').replace(/\D/g, '').length !== 10}
+                    className="w-full py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded font-bold uppercase tracking-wider transition shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
                     {isSendingOtp ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1299,6 +1458,7 @@ export default function AccountPage() {
           </div>
         )}
       </AnimatePresence>
+      <div id="recaptcha-container-wrapper" style={{ display: 'none' }}></div>
     </main>
   )
 }

@@ -21,6 +21,7 @@ export default function AdminEvents() {
     endDate: '',
     isActive: true,
     discountPercentage: 0,
+    themeColor: '#EF4444',
     productIds: [] as string[]
   })
 
@@ -107,6 +108,7 @@ export default function AdminEvents() {
       endDate: '',
       isActive: true,
       discountPercentage: 0,
+      themeColor: '#EF4444',
       productIds: []
     })
     setIsModalOpen(true)
@@ -130,6 +132,7 @@ export default function AdminEvents() {
       endDate: formatDateTime(event.endDate),
       isActive: event.isActive ?? true,
       discountPercentage: event.discountPercentage || 0,
+      themeColor: event.themeColor || '#EF4444',
       productIds: event.products?.map((p: any) => p.id) || []
     })
     setIsModalOpen(true)
@@ -347,6 +350,27 @@ export default function AdminEvents() {
                     onChange={(e) => setFormData({ ...formData, discountPercentage: parseFloat(e.target.value) || 0 })}
                     className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
                   />
+                </div>
+
+                {/* Theme Color Picker */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Theme Color</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={formData.themeColor}
+                      onChange={(e) => setFormData({ ...formData, themeColor: e.target.value })}
+                      className="w-10 h-10 border border-border bg-secondary cursor-pointer rounded"
+                    />
+                    <input
+                      type="text"
+                      required
+                      value={formData.themeColor}
+                      onChange={(e) => setFormData({ ...formData, themeColor: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 font-mono text-xs uppercase"
+                      placeholder="#EF4444"
+                    />
+                  </div>
                 </div>
 
                 {/* Description */}

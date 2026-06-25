@@ -49,7 +49,7 @@ function CheckoutContent() {
     address: '',
     city: '',
     postalCode: '',
-    phone: '',
+    phone: '+91',
     cardNumber: '',
     cardExpiry: '',
     cardCvc: '',
@@ -73,7 +73,7 @@ function CheckoutContent() {
       address: '',
       city: '',
       postalCode: '',
-      phone: '',
+      phone: '+91',
     }))
   }
   
@@ -258,12 +258,27 @@ function CheckoutContent() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+    if (name === 'phone') {
+      let val = value;
+      if (!val.startsWith('+91')) {
+        val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+      }
+      const prefix = '+91';
+      const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+      setFormData(prev => ({
+        ...prev,
+        phone: prefix + rest
+      }));
+      // If the user starts editing shipping address fields, switch selection to 'new'
+      setSelectedAddressId('new')
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       [name]: value
     }))
     // If the user starts editing shipping address fields, switch selection to 'new'
-    if (['address', 'city', 'postalCode', 'phone'].includes(name)) {
+    if (['address', 'city', 'postalCode'].includes(name)) {
       setSelectedAddressId('new')
     }
   }
@@ -273,6 +288,13 @@ function CheckoutContent() {
     setIsSubmitting(true)
     setSubmitError(null)
     setOrderedItems([...cartItems])
+
+    const phoneDigits = formData.phone.replace(/^\+91/, '').replace(/\D/g, '')
+    if (phoneDigits.length !== 10) {
+      setSubmitError('Phone number must be exactly 10 digits (excluding +91)')
+      setIsSubmitting(false)
+      return
+    }
 
     try {
       // 1. Sync local cart items to the database cart in parallel

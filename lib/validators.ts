@@ -29,7 +29,7 @@ export const ResetPasswordSchema = z.object({
 export const AddressSchema = z.object({
   fullName: z.string().min(2, 'Full name is required'),
   email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Invalid phone number'),
+  phone: z.string().regex(/^\+91\d{10}$/, 'Phone number must be exactly 10 digits (excluding +91)'),
   street: z.string().min(5, 'Street address is required'),
   city: z.string().min(2, 'City is required'),
   state: z.string().min(2, 'State is required'),
@@ -48,7 +48,7 @@ export const ReviewSchema = z.object({
 export const CustomRequestSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters'),
   description: z.string().min(20, 'Description must be at least 20 characters'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  phone: z.string().regex(/^\+91\d{10}$/, 'Phone number must be exactly 10 digits (excluding +91)'),
 })
 
 // Contact/Inquiry Schema

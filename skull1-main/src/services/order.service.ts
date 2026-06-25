@@ -8,6 +8,7 @@ import { prisma } from '../config/database';
 import { sendOrderConfirmationEmail } from '../utils/mail';
 import logger from '../utils/logger';
 import { generateOrderNumber } from '../utils/generateOrderNumber';
+import { razorpay } from '../config/razorpay';
 
 const orderRepository = new OrderRepository();
 const cartRepository = new CartRepository();
@@ -285,18 +286,40 @@ export class OrderService {
       throw new AppError(400, 'Cannot cancel order that is already being processed or shipped');
     }
 
+    // If the payment status is PAID and payment method was CARD, trigger Razorpay refund
+    let targetPaymentStatus = order.paymentStatus;
+    if (order.paymentStatus === PaymentStatus.PAID && order.paymentMethod === 'CARD' && order.paymentId) {
+      try {
+        await razorpay.payments.refund(order.paymentId, {
+          amount: Math.round(order.totalAmount * 100),
+          notes: {
+            reason: 'Order cancelled by customer'
+          }
+        });
+        targetPaymentStatus = PaymentStatus.REFUNDED;
+      } catch (rzpErr: any) {
+        logger.error(`Failed to trigger refund on Razorpay for cancelled payment ${order.paymentId}:`, rzpErr);
+        throw new AppError(400, `Failed to refund on Razorpay: ${rzpErr.description || rzpErr.message || 'Unknown error'}`);
+      }
+    }
+
     // Transaction to update order status, status history, and restock items
     const updatedOrder = await prisma.$transaction(async (tx) => {
       const ord = await tx.order.update({
         where: { id: orderId },
-        data: { status: OrderStatus.CANCELLED },
+        data: { 
+          status: OrderStatus.CANCELLED,
+          paymentStatus: targetPaymentStatus
+        },
       });
 
       await tx.orderStatusHistory.create({
         data: {
           orderId,
           status: OrderStatus.CANCELLED,
-          notes: 'Cancelled by customer.',
+          notes: order.paymentStatus === PaymentStatus.PAID && order.paymentMethod === 'CARD'
+            ? 'Cancelled by customer. Refund processed successfully via Razorpay.'
+            : 'Cancelled by customer.',
         },
       });
 
@@ -439,6 +462,20 @@ export class OrderService {
     }
     if (order.paymentStatus === PaymentStatus.REFUNDED) {
       throw new AppError(400, 'Order is already refunded');
+    }
+
+    if (order.paymentMethod === 'CARD' && order.paymentId) {
+      try {
+        await razorpay.payments.refund(order.paymentId, {
+          amount: Math.round(order.totalAmount * 100),
+          notes: {
+            reason: 'Order refunded by Admin'
+          }
+        });
+      } catch (rzpErr: any) {
+        logger.error(`Failed to trigger refund on Razorpay for payment ${order.paymentId}:`, rzpErr);
+        throw new AppError(400, `Failed to refund on Razorpay: ${rzpErr.description || rzpErr.message || 'Unknown Razorpay error'}`);
+      }
     }
 
     const updated = await prisma.$transaction(async (tx) => {

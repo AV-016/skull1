@@ -75,6 +75,7 @@ export const Footer = () => {
               <h4 className="text-sm font-semibold text-primary-text tracking-wider uppercase">Support & Account</h4>
               <ul className="space-y-2.5">
                 <li><Link href="/contact" className="text-secondary-text hover:text-primary text-sm smooth-transition">Contact Us</Link></li>
+                <li><Link href="/faq" className="text-secondary-text hover:text-primary text-sm smooth-transition">FAQs</Link></li>
                 <li><Link href="/dashboard" className="text-secondary-text hover:text-primary text-sm smooth-transition">Member Dashboard</Link></li>
                 <li><Link href="/account" className="text-secondary-text hover:text-primary text-sm smooth-transition">My Account</Link></li>
                 <li><Link href="/terms" className="text-secondary-text hover:text-primary text-sm smooth-transition">Terms & Conditions</Link></li>
