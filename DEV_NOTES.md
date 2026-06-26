@@ -136,3 +136,30 @@ Added an interactive, locally-persisted Developer Board widget to track local hi
 * Expands into a slide-over panel where developers can add, edit, and filter sticky notes.
 * Saved state changes dynamically inside `localStorage` to persist notes between page reloads.
 
+---
+
+## 10. Shipping Calculation Performance Optimization (Latency Fix)
+
+### Issue
+Placing an order was experiencing severe latency ("PLACING ORDER..." taking too much runtime or causing gateway timeouts).
+
+### Root Cause
+The database transaction was wrapping the external pincode lookup API call. Because network calls are slow and blocking, the transaction held database row-locks on product tables for too long, causing pool congestion and timeouts.
+
+### Solution
+Moved the pincode lookup and shipping rate computation out of the interactive `$transaction` block in [order.service.ts](file:///c:/Users/ARYAN/Downloads/skull1/skull1-main/src/services/order.service.ts#L68-L90). The shipping price is calculated first, and then the transaction only performs stock updates and final order persistence, reducing write lock times to milliseconds.
+
+---
+
+## 11. Order Details Page UI Redesign & 3D Manufacturing Timeline
+
+### Change
+Overhauled the order details screen ([page.tsx](file:///c:/Users/ARYAN/Downloads/skull1/app/orders/%5Bid%5D/page.tsx)) into a modern, marketplace-oriented layout while preserving the dark theme.
+
+### Details
+* **Production Timeline:** Replaced basic radio buttons with an index-evaluated progress bar mapping: `Order Placed` → `Printing` → `Quality Check` → `Packed` → `Shipped` → `Delivered`. Timeline maps timestamps from status history and turns horizontal on mobile viewports.
+* **Payment Card & COD logic:** Enabled dynamic invoice generation for paid online orders and COD orders that have reached the `DELIVERED` status. Delivers the updated payment status **Paid (Collected on Delivery)** for COD orders.
+* **Print Specifications:** Renders 3D printer specification attributes (Material, Infill, Color, Layer Height, Nozzle, Dimensions, Weight, and Qty) directly from the admin JSON payload mapping.
+* **Support Card:** Integrates quick-action toggles for Live Chat, Raising Tickets, and visualizes active ticket status threads.
+
+
