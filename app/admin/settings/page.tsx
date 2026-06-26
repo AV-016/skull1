@@ -1,25 +1,71 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { AdminLayout } from '@/components/admin/AdminLayout'
-import { Save, Loader2 } from 'lucide-react'
+import { Save, Loader2, Plus, Trash2, Edit2, Check, X, ShieldAlert } from 'lucide-react'
 import { api } from '@/lib/api'
+
+interface ShippingRate {
+  id: string
+  weightFrom: number
+  weightTo: number
+  localRate: number
+  sameStateRate: number
+  nationalRate: number
+}
 
 export default function AdminSettings() {
   const [businessName, setBusinessName] = useState('Skulture')
   const [codCharge, setCodCharge] = useState<number>(50)
+  const [sellerPincode, setSellerPincode] = useState('400001')
+  const [isGstEnabled, setIsGstEnabled] = useState(true)
+  const [defaultGstRate, setDefaultGstRate] = useState(18.0)
+  const [platformFeeType, setPlatformFeeType] = useState('FIXED')
+  const [platformFeeValue, setPlatformFeeValue] = useState(0.0)
+  const [volumetricDivisor, setVolumetricDivisor] = useState(5000.0)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // Shipping rates state
+  const [rates, setRates] = useState<ShippingRate[]>([])
+  const [isRatesLoading, setIsRatesLoading] = useState(true)
+  const [editingRateId, setEditingRateId] = useState<string | null>(null)
+  const [rateForm, setRateForm] = useState({
+    weightFrom: '',
+    weightTo: '',
+    localRate: '',
+    sameStateRate: '',
+    nationalRate: '',
+  })
+
+  const fetchRates = () => {
+    setIsRatesLoading(true)
+    api.get('/shipping/rates')
+      .then(res => {
+        if (res.data?.success && res.data?.data) {
+          setRates(res.data.data)
+        }
+      })
+      .catch(err => console.error('Failed to fetch shipping rates:', err))
+      .finally(() => setIsRatesLoading(false))
+  }
+
   useEffect(() => {
+    // Fetch Settings
     api.get('/admin/settings')
       .then(res => {
         if (res.data?.success && res.data?.data) {
           setBusinessName(res.data.data.businessName || 'Skulture')
           setCodCharge(res.data.data.codCharge ?? 50)
+          setSellerPincode(res.data.data.sellerPincode || '400001')
+          setIsGstEnabled(res.data.data.isGstEnabled ?? true)
+          setDefaultGstRate(res.data.data.defaultGstRate ?? 18.0)
+          setPlatformFeeType(res.data.data.platformFeeType || 'FIXED')
+          setPlatformFeeValue(res.data.data.platformFeeValue ?? 0.0)
+          setVolumetricDivisor(res.data.data.volumetricDivisor ?? 5000.0)
         }
       })
       .catch(err => {
@@ -27,19 +73,27 @@ export default function AdminSettings() {
         setErrorMsg('Failed to load settings from server.')
       })
       .finally(() => setIsLoading(false))
+
+    // Fetch Shipping Rates
+    fetchRates()
   }, [])
 
-  const handleSave = async () => {
+  const handleSaveSettings = async () => {
     setIsSaving(true)
     setSuccessMsg(null)
     setErrorMsg(null)
     try {
       await api.patch('/admin/settings', {
         businessName,
-        codCharge: Number(codCharge)
+        codCharge: Number(codCharge),
+        sellerPincode,
+        isGstEnabled,
+        defaultGstRate: Number(defaultGstRate),
+        platformFeeType,
+        platformFeeValue: Number(platformFeeValue),
+        volumetricDivisor: Number(volumetricDivisor)
       })
       setSuccessMsg('Settings updated successfully!')
-      // Clear message after 3 seconds
       setTimeout(() => setSuccessMsg(null), 3000)
     } catch (err: any) {
       console.error('Failed to save settings:', err)
@@ -49,12 +103,64 @@ export default function AdminSettings() {
     }
   }
 
+  const handleSaveRate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const payload = {
+        id: editingRateId || undefined,
+        weightFrom: Number(rateForm.weightFrom),
+        weightTo: Number(rateForm.weightTo),
+        localRate: Number(rateForm.localRate),
+        sameStateRate: Number(rateForm.sameStateRate),
+        nationalRate: Number(rateForm.nationalRate)
+      }
+
+      await api.post('/shipping/rates', payload)
+      
+      // Reset form
+      setRateForm({
+        weightFrom: '',
+        weightTo: '',
+        localRate: '',
+        sameStateRate: '',
+        nationalRate: ''
+      })
+      setEditingRateId(null)
+      fetchRates()
+    } catch (err: any) {
+      console.error('Failed to save rate:', err)
+      alert(err.response?.data?.message || 'Failed to save shipping rate.')
+    }
+  }
+
+  const handleEditRate = (rate: ShippingRate) => {
+    setEditingRateId(rate.id)
+    setRateForm({
+      weightFrom: rate.weightFrom.toString(),
+      weightTo: rate.weightTo.toString(),
+      localRate: rate.localRate.toString(),
+      sameStateRate: rate.sameStateRate.toString(),
+      nationalRate: rate.nationalRate.toString(),
+    })
+  }
+
+  const handleDeleteRate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this shipping rate slab?')) return
+    try {
+      await api.delete(`/shipping/rates/${id}`)
+      fetchRates()
+    } catch (err: any) {
+      console.error('Failed to delete rate:', err)
+      alert(err.response?.data?.message || 'Failed to delete shipping rate.')
+    }
+  }
+
   return (
     <AdminLayout>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-2xl">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 max-w-4xl pb-16">
         <div>
-          <h1 className="heading-2">Settings</h1>
-          <p className="text-muted">Configure platform settings</p>
+          <h1 className="heading-2 text-white">Settings</h1>
+          <p className="text-white/60 text-sm mt-1">Configure platform settings, origin shipping, and postal charges</p>
         </div>
 
         {isLoading ? (
@@ -62,68 +168,282 @@ export default function AdminSettings() {
             <Loader2 className="w-8 h-8 animate-spin text-white/50" />
           </div>
         ) : (
-          <div className="glass-card p-6 space-y-6">
+          <div className="space-y-6">
             {successMsg && (
-              <div className="p-3 bg-green-500/15 border border-green-500/30 text-green-400 rounded-lg text-sm">
+              <div className="p-3.5 bg-green-500/15 border border-green-500/30 text-green-400 rounded-xl text-sm font-semibold">
                 {successMsg}
               </div>
             )}
             {errorMsg && (
-              <div className="p-3 bg-red-500/15 border border-red-500/30 text-red-400 rounded-lg text-sm">
+              <div className="p-3.5 bg-red-500/15 border border-red-500/30 text-red-400 rounded-xl text-sm font-semibold">
                 {errorMsg}
               </div>
             )}
 
-            <div>
-              <h3 className="text-lg font-semibold mb-4">General Settings</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Platform Name</label>
-                  <input
-                    type="text"
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder="Skulture"
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-white/40 text-white focus:outline-none"
-                  />
+            {/* General and Payment Settings */}
+            <div className="glass-card p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wide">General Settings</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-white/70 uppercase mb-2">Platform Name</label>
+                    <input
+                      type="text"
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      placeholder="Skulture"
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-white/70 uppercase mb-2">Origin Pincode (Warehouse/Seller)</label>
+                    <input
+                      type="text"
+                      value={sellerPincode}
+                      onChange={(e) => setSellerPincode(e.target.value)}
+                      placeholder="400001"
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                    />
+                  </div>
                 </div>
+              </div>
+
+              {/* Payment & Tax Settings */}
+              <div className="border-t border-white/10 pt-6 space-y-4">
+                <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wide">Payment & Tax Settings</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-white/70 uppercase mb-2">Cash on Delivery (COD) Handling Charge (INR)</label>
+                    <input
+                      type="number"
+                      value={codCharge}
+                      onChange={(e) => setCodCharge(Number(e.target.value))}
+                      placeholder="50"
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-white/70 uppercase mb-2">Volumetric Divisor</label>
+                    <input
+                      type="number"
+                      value={volumetricDivisor}
+                      onChange={(e) => setVolumetricDivisor(Number(e.target.value))}
+                      placeholder="5000"
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div className="flex items-center gap-2 pt-6">
+                    <input
+                      type="checkbox"
+                      id="isGstEnabled"
+                      checked={isGstEnabled}
+                      onChange={(e) => setIsGstEnabled(e.target.checked)}
+                      className="rounded border-neutral-700 bg-white/5 text-primary focus:ring-primary w-4 h-4 cursor-pointer accent-white"
+                    />
+                    <label htmlFor="isGstEnabled" className="text-xs font-bold text-white/70 uppercase select-none cursor-pointer">
+                      Enable Goods & Services Tax (GST)
+                    </label>
+                  </div>
+                  {isGstEnabled && (
+                    <div>
+                      <label className="block text-xs font-bold text-white/70 uppercase mb-2">Default GST Rate (%)</label>
+                      <input
+                        type="number"
+                        value={defaultGstRate}
+                        onChange={(e) => setDefaultGstRate(Number(e.target.value))}
+                        placeholder="18"
+                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-bold text-white/70 uppercase mb-2">Platform Fee Value</label>
+                    <input
+                      type="number"
+                      value={platformFeeValue}
+                      onChange={(e) => setPlatformFeeValue(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-white/70 uppercase mb-2">Platform Fee Type</label>
+                    <select
+                      value={platformFeeType}
+                      onChange={(e) => setPlatformFeeType(e.target.value)}
+                      className="w-full px-4 py-2 bg-[#1C1F22] border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                    >
+                      <option value="FIXED">Fixed Amount (₹)</option>
+                      <option value="PERCENTAGE">Percentage (%)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="border-t border-white/10 pt-6 flex justify-end">
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={isSaving}
+                  className="px-6 py-2 bg-white text-black font-semibold rounded-lg hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer text-sm"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" /> Save Settings
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* Payment Settings */}
-            <div className="border-t border-white/10 pt-6">
-              <h3 className="text-lg font-semibold mb-4">Payment Settings</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Cash on Delivery (COD) Handling Charge (INR)</label>
-                  <input
-                    type="number"
-                    value={codCharge}
-                    onChange={(e) => setCodCharge(Number(e.target.value))}
-                    placeholder="50"
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-white/40 text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Shipping Calculator Settings */}
+            <div className="glass-card p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">India Post Shipping Slabs</h3>
+                <p className="text-white/60 text-xs mb-6">Manage shipping charges based on weight slabs and delivery zones (Local, Same State, National)</p>
+                
+                {/* Slab Manager Form */}
+                <form onSubmit={handleSaveRate} className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-[10px] font-bold text-white/60 uppercase mb-1.5">Weight From (g)</label>
+                    <input
+                      type="number"
+                      required
+                      value={rateForm.weightFrom}
+                      onChange={(e) => setRateForm(prev => ({ ...prev, weightFrom: e.target.value }))}
+                      placeholder="0"
+                      className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-md focus:border-white/30 text-white focus:outline-none text-xs"
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-[10px] font-bold text-white/60 uppercase mb-1.5">Weight To (g)</label>
+                    <input
+                      type="number"
+                      required
+                      value={rateForm.weightTo}
+                      onChange={(e) => setRateForm(prev => ({ ...prev, weightTo: e.target.value }))}
+                      placeholder="500"
+                      className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-md focus:border-white/30 text-white focus:outline-none text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase mb-1.5">Local Rate (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      value={rateForm.localRate}
+                      onChange={(e) => setRateForm(prev => ({ ...prev, localRate: e.target.value }))}
+                      placeholder="45"
+                      className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-md focus:border-white/30 text-white focus:outline-none text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-white/60 uppercase mb-1.5">Same State (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      value={rateForm.sameStateRate}
+                      onChange={(e) => setRateForm(prev => ({ ...prev, sameStateRate: e.target.value }))}
+                      placeholder="55"
+                      className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-md focus:border-white/30 text-white focus:outline-none text-xs"
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1 flex gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-white/60 uppercase mb-1.5">National (₹)</label>
+                      <input
+                        type="number"
+                        required
+                        value={rateForm.nationalRate}
+                        onChange={(e) => setRateForm(prev => ({ ...prev, nationalRate: e.target.value }))}
+                        placeholder="70"
+                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-md focus:border-white/30 text-white focus:outline-none text-xs"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="p-2 bg-white text-black rounded-md hover:bg-gray-150 flex items-center justify-center shrink-0 cursor-pointer shadow"
+                      title={editingRateId ? 'Save Edit' : 'Add Slab'}
+                    >
+                      {editingRateId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
+                    {editingRateId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRateId(null)
+                          setRateForm({ weightFrom: '', weightTo: '', localRate: '', sameStateRate: '', nationalRate: '' })
+                        }}
+                        className="p-2 bg-red-500/20 text-red-400 rounded-md hover:bg-red-500/30 flex items-center justify-center shrink-0 cursor-pointer"
+                        title="Cancel Edit"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </form>
 
-            {/* Save Button */}
-            <div className="border-t border-white/10 pt-6 flex justify-end">
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-6 py-2 bg-white text-black font-semibold rounded-lg hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-                  </>
+                {/* Slabs List */}
+                {isRatesLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+                  </div>
+                ) : rates.length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-white/10 rounded-xl bg-white/5 text-white/40 text-xs">
+                    No shipping rate slabs configured. Using fallback default rates.
+                  </div>
                 ) : (
-                  <>
-                    <Save className="w-4 h-4" /> Save Settings
-                  </>
+                  <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/5">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider">
+                          <th className="p-3">Weight Range</th>
+                          <th className="p-3 text-right">Local (City)</th>
+                          <th className="p-3 text-right">Same State</th>
+                          <th className="p-3 text-right">National</th>
+                          <th className="p-3 text-center w-24">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10 text-white/80">
+                        {rates.map(rate => (
+                          <tr key={rate.id} className="hover:bg-white/5 transition-colors">
+                            <td className="p-3 font-semibold">{rate.weightFrom} g – {rate.weightTo} g</td>
+                            <td className="p-3 text-right font-medium text-white">₹{rate.localRate}</td>
+                            <td className="p-3 text-right font-medium text-white">₹{rate.sameStateRate}</td>
+                            <td className="p-3 text-right font-medium text-white">₹{rate.nationalRate}</td>
+                            <td className="p-3 text-center flex justify-center gap-1">
+                              <button
+                                onClick={() => handleEditRate(rate)}
+                                className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded transition-all cursor-pointer"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRate(rate.id)}
+                                className="p-1.5 text-red-500/70 hover:text-red-400 hover:bg-red-500/10 rounded transition-all cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
-              </button>
+              </div>
             </div>
           </div>
         )}
@@ -131,4 +451,3 @@ export default function AdminSettings() {
     </AdminLayout>
   )
 }
-

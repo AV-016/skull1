@@ -8,6 +8,7 @@ export interface OrderResponseDTO {
   paymentStatus: string;
   paymentId: string | null;
   createdAt: Date;
+  paymentMethod: string;
   address: {
     id: string;
     street: string;
@@ -24,6 +25,9 @@ export interface OrderResponseDTO {
     price: number;
     quantity: number;
     image?: string;
+    specifications?: any;
+    weightGrams?: number;
+    dimensions?: string;
   }[];
   statusHistory: {
     id: string;
@@ -36,6 +40,21 @@ export interface OrderResponseDTO {
   trackingUrl?: string | null;
   returnReason?: string | null;
   returnImage?: string | null;
+  codCharge: number;
+  shippingCharge: number;
+  subtotal: number;
+  gstAmount: number;
+  platformFee: number;
+  discountAmount: number;
+  shippingZone?: string | null;
+  shippingActualWeight?: number | null;
+  shippingVolumetricWeight?: number | null;
+  shippingWeightGrams?: number | null;
+  shippingEstDays?: string | null;
+  sellerPincode?: string | null;
+  customerPincode?: string | null;
+  shippingRateId?: string | null;
+  shippingRuleVersion?: number;
   user?: {
     id: string;
     name: string | null;
@@ -59,11 +78,27 @@ export const formatOrderResponse = (order: OrderWithDetails): OrderResponseDTO =
     paymentStatus: order.paymentStatus,
     paymentId: order.paymentId,
     createdAt: order.createdAt,
+    paymentMethod: order.paymentMethod,
     trackingId: order.trackingId,
     carrier: order.carrier,
     trackingUrl: order.trackingUrl,
     returnReason: order.returnReason,
     returnImage: order.returnImage,
+    codCharge: order.codCharge,
+    shippingCharge: order.shippingCharge,
+    subtotal: order.subtotal,
+    gstAmount: order.gstAmount,
+    platformFee: order.platformFee,
+    discountAmount: order.discountAmount,
+    shippingZone: order.shippingZone,
+    shippingActualWeight: order.shippingActualWeight,
+    shippingVolumetricWeight: order.shippingVolumetricWeight,
+    shippingWeightGrams: order.shippingWeightGrams,
+    shippingEstDays: order.shippingEstDays,
+    sellerPincode: order.sellerPincode,
+    customerPincode: order.customerPincode,
+    shippingRateId: order.shippingRateId,
+    shippingRuleVersion: order.shippingRuleVersion,
     address: {
       id: order.address.id,
       street: order.address.street,
@@ -82,6 +117,9 @@ export const formatOrderResponse = (order: OrderWithDetails): OrderResponseDTO =
         price: item.price,
         quantity: item.quantity,
         image: primaryImage,
+        specifications: item.product.specifications || null,
+        weightGrams: item.product.weightGrams,
+        dimensions: `${item.product.lengthCm || 0} x ${item.product.widthCm || 0} x ${item.product.heightCm || 0} cm`,
       };
     }),
     statusHistory: order.statusHistory.map((history) => ({

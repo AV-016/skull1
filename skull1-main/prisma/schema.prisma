@@ -77,6 +77,10 @@ model Product {
   isFeatured     Boolean        @default(false)
   categoryId     String
   specifications Json?
+  weightGrams    Float          @default(0.0)
+  lengthCm       Float          @default(0.0)
+  widthCm        Float          @default(0.0)
+  heightCm       Float          @default(0.0)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   cartItems      CartItem[]
@@ -155,28 +159,42 @@ model CartItem {
 }
 
 model Order {
-  id            String               @id @default(cuid())
-  orderNumber   String               @unique
-  userId        String
-  addressId     String
-  totalAmount   Float
-  status        OrderStatus          @default(PENDING)
-  paymentStatus PaymentStatus        @default(PENDING)
-  paymentId     String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  address       Address              @relation(fields: [addressId], references: [id])
-  user          User                 @relation(fields: [userId], references: [id])
-  items         OrderItem[]
-  loyaltyStampAwarded Boolean        @default(false)
-  paymentMethod       String         @default("CARD")
-  codCharge           Float          @default(0.0)
-  trackingId          String?
-  carrier             String?
-  trackingUrl         String?
-  returnReason        String?
-  returnImage         String?
-  statusHistory OrderStatusHistory[]
+  id                       String               @id @default(cuid())
+  orderNumber              String               @unique
+  userId                   String
+  addressId                String
+  subtotal                 Float                @default(0.0)
+  gstAmount                Float                @default(0.0)
+  platformFee              Float                @default(0.0)
+  discountAmount           Float                @default(0.0)
+  shippingCharge           Float                @default(0.0)
+  codCharge                Float                @default(0.0)
+  totalAmount              Float
+  status                   OrderStatus          @default(PENDING)
+  paymentStatus            PaymentStatus        @default(PENDING)
+  paymentId                String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  address                  Address              @relation(fields: [addressId], references: [id])
+  user                     User                 @relation(fields: [userId], references: [id])
+  items                    OrderItem[]
+  loyaltyStampAwarded      Boolean              @default(false)
+  paymentMethod            String               @default("CARD")
+  trackingId               String?
+  carrier                  String?
+  trackingUrl              String?
+  returnReason             String?
+  returnImage              String?
+  shippingZone             String?
+  shippingActualWeight     Float?
+  shippingVolumetricWeight Float?
+  shippingWeightGrams      Float?
+  shippingEstDays          String?
+  sellerPincode            String?
+  customerPincode          String?
+  shippingRateId           String?
+  shippingRuleVersion      Int                  @default(1)
+  statusHistory            OrderStatusHistory[]
   payments      Payment[]
   inquiries     Inquiry[]
   idempotencyKey String?              @unique
@@ -307,14 +325,31 @@ model InquiryMessage {
 
 
 model Settings {
-  id           String   @id @default("global")
-  businessName String   @default("Skulture")
-  upiId        String?
-  supportEmail String?
-  supportPhone String?
-  codCharge    Float    @default(50.0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default("global")
+  businessName      String   @default("Skulture")
+  upiId             String?
+  supportEmail      String?
+  supportPhone      String?
+  codCharge         Float    @default(50.0)
+  sellerPincode     String   @default("400001")
+  isGstEnabled      Boolean  @default(true)
+  defaultGstRate    Float    @default(18.0)
+  platformFeeType   String   @default("FIXED") // FIXED or PERCENTAGE
+  platformFeeValue  Float    @default(0.0)
+  volumetricDivisor Float    @default(5000.0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ShippingRate {
+  id            String   @id @default(cuid())
+  weightFrom    Float    // in grams
+  weightTo      Float    // in grams
+  localRate     Float
+  sameStateRate Float
+  nationalRate  Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model ActivityLog {

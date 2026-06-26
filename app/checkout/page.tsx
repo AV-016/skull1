@@ -39,6 +39,13 @@ function CheckoutContent() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'COD'>('CARD')
   const [codChargeVal, setCodChargeVal] = useState<number>(50)
+  const [platformFeeVal, setPlatformFeeVal] = useState<number>(0)
+  const [platformFeeType, setPlatformFeeType] = useState<string>('FIXED')
+  const [isGstEnabled, setIsGstEnabled] = useState<boolean>(true)
+  const [gstRateVal, setGstRateVal] = useState<number>(18.0)
+  const [shippingCost, setShippingCost] = useState<number | null>(null)
+  const [shippingDetails, setShippingDetails] = useState<any | null>(null)
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [savedAddresses, setSavedAddresses] = useState<any[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string>('new')
@@ -146,11 +153,16 @@ function CheckoutContent() {
       setIdempotencyKey(uuid);
     }
 
-    // Fetch COD settings
+    // Fetch dynamic settings
     api.get('/settings')
       .then(res => {
         if (res.data?.success && res.data?.data) {
-          setCodChargeVal(res.data.data.codCharge ?? 50)
+          const s = res.data.data
+          setCodChargeVal(s.codCharge ?? 50)
+          setPlatformFeeVal(s.platformFeeValue ?? 0)
+          setPlatformFeeType(s.platformFeeType ?? 'FIXED')
+          setIsGstEnabled(s.isGstEnabled ?? true)
+          setGstRateVal(s.defaultGstRate ?? 18.0)
         }
       })
       .catch(err => console.error('Error fetching settings:', err))
@@ -206,6 +218,39 @@ function CheckoutContent() {
         .catch(err => console.error('Error looking up pincode:', err))
     }
   }, [formData.postalCode])
+
+  // Dynamic shipping calculation
+  const activePincode = selectedAddressId === 'new'
+    ? formData.postalCode.trim()
+    : savedAddresses.find(a => a.id === selectedAddressId)?.postalCode?.trim() || '';
+
+  useEffect(() => {
+    if (/^\d{6}$/.test(activePincode) && cartItems.length > 0) {
+      setIsCalculatingShipping(true);
+      api.post('/shipping/calculate', {
+        customerPincode: activePincode,
+        items: cartItems.map(item => ({
+          productId: item.productId || item.id,
+          quantity: item.quantity
+        }))
+      })
+      .then(res => {
+        if (res.data?.success && res.data?.data) {
+          setShippingCost(res.data.data.shipping);
+          setShippingDetails(res.data.data);
+        }
+      })
+      .catch(err => {
+        console.error('Error calculating shipping:', err);
+      })
+      .finally(() => {
+        setIsCalculatingShipping(false);
+      });
+    } else {
+      setShippingCost(null);
+      setShippingDetails(null);
+    }
+  }, [activePincode, cartItems]);
 
   const handleGeolocation = () => {
     if (!navigator.geolocation) {
@@ -456,9 +501,11 @@ function CheckoutContent() {
   const discountRate = hasDiscount ? (user?.loyaltyDiscountValue || 0) : 0
   const discountAmount = hasDiscount ? (subtotal * (discountRate / 100)) : 0
   const discountedSubtotal = subtotal - discountAmount
-  const tax = discountedSubtotal * 0.1
-  const codCharge = paymentMethod === 'COD' ? codChargeVal : 0
-  const total = discountedSubtotal + tax + codCharge
+  const tax = isGstEnabled ? (discountedSubtotal * (gstRateVal / 100)) : 0
+  const platformFee = platformFeeType === 'PERCENTAGE' ? (discountedSubtotal * (platformFeeVal / 100)) : platformFeeVal
+  const codCharge = 0
+  const shippingCharge = shippingCost ?? 0
+  const total = discountedSubtotal + tax + platformFee + shippingCharge
 
   if (!isLoaded) {
     return (
@@ -479,8 +526,9 @@ function CheckoutContent() {
     const orderedSubtotal = orderedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     const orderedDiscountAmount = hasDiscount ? (orderedSubtotal * (discountRate / 100)) : 0
     const orderedDiscountedSubtotal = orderedSubtotal - orderedDiscountAmount
-    const orderedTax = orderedDiscountedSubtotal * 0.1
-    const orderedTotal = orderedDiscountedSubtotal + orderedTax + (paymentMethod === 'COD' ? codChargeVal : 0)
+    const orderedTax = isGstEnabled ? (orderedDiscountedSubtotal * (gstRateVal / 100)) : 0
+    const orderedPlatformFee = platformFeeType === 'PERCENTAGE' ? (orderedDiscountedSubtotal * (platformFeeVal / 100)) : platformFeeVal
+    const orderedTotal = orderedDiscountedSubtotal + orderedTax + orderedPlatformFee + (shippingCost ?? 0)
     const recommendedProducts = allProducts.filter((p: any) => p.isActive && p.stock > 0).slice(0, 4)
 
     return (
@@ -581,16 +629,23 @@ function CheckoutContent() {
                         <span>-{formatPrice(orderedDiscountAmount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-xs text-secondary-text">
-                      <span>Tax</span>
-                      <span>{formatPrice(orderedTax)}</span>
-                    </div>
-                    {paymentMethod === 'COD' && (
+                    {isGstEnabled && (
                       <div className="flex justify-between text-xs text-secondary-text">
-                        <span>COD Charge</span>
-                        <span>{formatPrice(codChargeVal)}</span>
+                        <span>GST ({gstRateVal}%)</span>
+                        <span>{formatPrice(orderedTax)}</span>
                       </div>
                     )}
+                    {platformFeeVal > 0 && (
+                      <div className="flex justify-between text-xs text-secondary-text">
+                        <span>Platform Fee</span>
+                        <span>{formatPrice(orderedPlatformFee)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs text-secondary-text">
+                      <span>Shipping</span>
+                      <span>{shippingCost !== null ? formatPrice(shippingCost) : 'Free'}</span>
+                    </div>
+
                     <div className="border-t border-border pt-3 flex justify-between font-bold text-sm text-primary-text">
                       <span>Total Paid</span>
                       <span className="text-primary">{formatPrice(orderedTotal)}</span>
@@ -862,7 +917,7 @@ function CheckoutContent() {
                       </div>
                     ) : (
                       <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg text-sm text-secondary-text">
-                        You will pay for your order in cash upon delivery. A standard COD handling charge of <span className="font-bold text-primary-text">{formatPrice(codChargeVal)}</span> will be added to your total.
+                        You will pay for your order in cash upon delivery.
                       </div>
                     )}
                   </div>
@@ -957,20 +1012,35 @@ function CheckoutContent() {
                         <span>-{formatPrice(discountAmount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-secondary-text text-xs">
-                      <span>Estimated Tax</span>
-                      <span className="font-medium text-primary-text">{formatPrice(tax)}</span>
-                    </div>
-                    <div className="flex justify-between text-secondary-text text-xs">
-                      <span>Shipping</span>
-                      <span className="text-green-500 font-medium">Free</span>
-                    </div>
-                    {paymentMethod === 'COD' && (
+                    {isGstEnabled && (
                       <div className="flex justify-between text-secondary-text text-xs">
-                        <span>COD Handling Charge</span>
-                        <span className="font-medium text-primary-text">{formatPrice(codChargeVal)}</span>
+                        <span>GST ({gstRateVal}%)</span>
+                        <span className="font-medium text-primary-text">{formatPrice(tax)}</span>
                       </div>
                     )}
+                    {platformFeeVal > 0 && (
+                      <div className="flex justify-between text-secondary-text text-xs">
+                        <span>Platform Fee</span>
+                        <span className="font-medium text-primary-text">{formatPrice(platformFee)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-secondary-text text-xs">
+                      <span>Shipping</span>
+                      {isCalculatingShipping ? (
+                        <span className="text-muted-text italic">Calculating...</span>
+                      ) : shippingCost !== null ? (
+                        <span className="font-medium text-primary-text">{formatPrice(shippingCost)}</span>
+                      ) : (
+                        <span className="text-red-500 font-medium">Enter PIN Code</span>
+                      )}
+                    </div>
+                    {shippingDetails && (
+                      <div className="flex justify-between text-[10px] text-muted-text -mt-2.5">
+                        <span>Zone: {shippingDetails.zone}</span>
+                        <span>Est: {shippingDetails.estimatedDelivery}</span>
+                      </div>
+                    )}
+
                     <div className="border-t border-border pt-4 flex justify-between font-bold text-sm text-primary-text">
                       <span>Grand Total</span>
                       <span className="text-primary">{formatPrice(total)}</span>

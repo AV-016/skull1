@@ -9,10 +9,12 @@ import { sendOrderConfirmationEmail } from '../utils/mail';
 import logger from '../utils/logger';
 import { generateOrderNumber } from '../utils/generateOrderNumber';
 import { razorpay } from '../config/razorpay';
+import { ShippingService } from './shipping.service';
 
 const orderRepository = new OrderRepository();
 const cartRepository = new CartRepository();
 const productRepository = new ProductRepository();
+const shippingService = new ShippingService();
 
 export class OrderService {
   async getOrderById(userId: string, orderId: string, isAdmin: boolean = false): Promise<OrderResponseDTO> {
@@ -61,6 +63,30 @@ export class OrderService {
         return existingOrder;
       }
     }
+
+    // Retrieve shipping address and calculate dynamic shipping charge OUTSIDE database transaction
+    // to avoid holding locks during slow external pincode network API calls
+    const address = await prisma.address.findUnique({
+      where: { id: addressId }
+    });
+    if (!address) {
+      throw new AppError(404, 'Shipping address not found');
+    }
+
+    const preCart = await prisma.cart.findUnique({
+      where: { userId },
+      include: { items: true }
+    });
+    if (!preCart || !preCart.items || preCart.items.length === 0) {
+      throw new AppError(400, 'Your cart is empty');
+    }
+
+    const shippingItems = preCart.items.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity
+    }));
+    const shippingResult = await shippingService.calculateShipping(address.postalCode, shippingItems);
+    const shippingCharge = shippingResult.shipping;
 
     try {
       // We execute all DB operations inside a single interactive transaction to prevent race conditions on stock
@@ -163,28 +189,46 @@ export class OrderService {
           });
         }
 
+        // Fetch dynamic settings (GST, Platform Fees, Volumetric divisor, etc.)
+        const settings = await tx.settings.findUnique({
+          where: { id: 'global' }
+        });
+
         // 2.5 Fetch and apply loyalty discount if any
         const user = await tx.user.findUnique({
           where: { id: userId },
           select: { loyaltyDiscountSet: true, loyaltyDiscountValue: true, email: true, name: true },
         });
 
-        let discountApplied = 0;
+        const orderSubtotal = totalAmount; // original items subtotal
+        let discountAmount = 0;
         if (user && user.loyaltyDiscountSet && user.loyaltyDiscountValue > 0) {
-          discountApplied = totalAmount * (user.loyaltyDiscountValue / 100);
-          totalAmount = Math.max(0, totalAmount - discountApplied);
+          discountAmount = orderSubtotal * (user.loyaltyDiscountValue / 100);
+        }
+        const discountedSubtotal = Math.max(0, orderSubtotal - discountAmount);
+
+        // Dynamic settings-driven GST calculation
+        const isGstEnabled = settings?.isGstEnabled ?? true;
+        const gstRate = settings?.defaultGstRate ?? 18.0;
+        const gstAmount = isGstEnabled ? (discountedSubtotal * (gstRate / 100)) : 0.0;
+
+        // Dynamic settings-driven Platform Fee calculation
+        let platformFee = 0.0;
+        if (settings) {
+          const feeVal = settings.platformFeeValue || 0.0;
+          if (settings.platformFeeType === 'PERCENTAGE') {
+            platformFee = discountedSubtotal * (feeVal / 100);
+          } else {
+            platformFee = feeVal;
+          }
         }
 
-        // 2.7 Fetch and apply COD charge if payment method is COD
-        let codCharge = 0;
-        if (paymentMethod === 'COD') {
-          const settings = await tx.settings.findUnique({
-            where: { id: 'global' },
-            select: { codCharge: true }
-          });
-          codCharge = settings?.codCharge ?? 50.0;
-          totalAmount += codCharge;
-        }
+
+
+        // 2.7 COD handling charge is disabled since shipping charges are active
+        const codCharge = 0.0;
+
+        const finalTotalAmount = discountedSubtotal + gstAmount + platformFee + shippingCharge;
 
         // 3. Create order database entries
         const orderNumber = generateOrderNumber();
@@ -194,11 +238,25 @@ export class OrderService {
             orderNumber,
             userId,
             addressId,
-            totalAmount,
+            subtotal: orderSubtotal,
+            discountAmount,
+            gstAmount,
+            platformFee,
+            shippingCharge,
+            codCharge,
+            totalAmount: finalTotalAmount,
+            shippingZone: shippingResult.zone,
+            shippingActualWeight: shippingResult.actualWeightGrams,
+            shippingVolumetricWeight: shippingResult.volumetricWeightGrams,
+            shippingWeightGrams: shippingResult.totalWeightGrams,
+            shippingEstDays: shippingResult.estimatedDelivery,
+            sellerPincode: shippingResult.sellerPincode,
+            customerPincode: shippingResult.customerPincode,
+            shippingRateId: shippingResult.shippingRateId,
+            shippingRuleVersion: 1, // Default initial rule version
             status: OrderStatus.PENDING,
             paymentStatus: PaymentStatus.PENDING,
             paymentMethod,
-            codCharge,
             idempotencyKey: idempotencyKey || null,
             items: {
               create: items.map((item) => ({

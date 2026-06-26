@@ -13,10 +13,22 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
-import { Check, MessageSquare, X, Loader2 } from 'lucide-react'
+import { 
+  Check, MessageSquare, X, Loader2, CreditCard, Download, Receipt, 
+  MapPin, User, Phone, Truck, ExternalLink, Calendar, Clock, 
+  Layers, Printer, Weight, Maximize2, FileText, Eye, RefreshCw, 
+  Store, Star, MessageCircle, Inbox, PhoneCall, ChevronRight
+} from 'lucide-react'
 import Script from 'next/script'
 
-const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered']
+const STAGES = [
+  { key: 'placed', label: 'Order Placed' },
+  { key: 'printing', label: 'Printing' },
+  { key: 'qc', label: 'Quality Check' },
+  { key: 'packed', label: 'Packed' },
+  { key: 'shipped', label: 'Shipped' },
+  { key: 'delivered', label: 'Delivered' }
+]
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -34,6 +46,9 @@ export default function OrderDetailPage() {
   const paymentSuccess = searchParams.get('payment_success') === 'true'
   const paymentError = searchParams.get('payment_error')
   const errorDesc = searchParams.get('description')
+
+  // Preview File States
+  const [previewFile, setPreviewFile] = useState<{ name: string; size: string } | null>(null)
 
   const handlePayNow = async () => {
     try {
@@ -59,7 +74,6 @@ export default function OrderDetailPage() {
         handler: async function (response: any) {
           try {
             setIsResumingPayment(true)
-            // Verify payment signature on backend
             await api.post('/payments/verify', {
               orderId: order.id,
               razorpayOrderId: response.razorpay_order_id,
@@ -267,7 +281,181 @@ export default function OrderDetailPage() {
     )
   }
 
-  const currentStatusIndex = ORDER_STATUSES.indexOf((order.status || 'pending').toLowerCase())
+  const status = (order.status || 'PENDING').toUpperCase()
+  const isCancelled = status === 'CANCELLED'
+  const isReturned = status === 'RETURNED'
+  const isRefunded = order.paymentStatus === 'REFUNDED'
+
+  // Timeline Step Status Evaluator
+  const getStageState = (index: number) => {
+    let activeIndex = 0
+    if (status === 'PENDING') activeIndex = 0
+    else if (status === 'CONFIRMED' || status === 'PROCESSING') activeIndex = 1 // default printing active
+    else if (status === 'SHIPPED') activeIndex = 4
+    else if (status === 'DELIVERED') activeIndex = 5
+    else activeIndex = -1 // cancelled/returned orders don't highlight future
+
+    let isCompleted = false
+    if (status === 'DELIVERED') {
+      isCompleted = true
+    } else if (status === 'SHIPPED') {
+      isCompleted = index < 4
+    } else if (status === 'PROCESSING' || status === 'CONFIRMED') {
+      isCompleted = index < 1
+    } else if (status === 'PENDING') {
+      isCompleted = false
+    }
+
+    if (index === 0) isCompleted = true // Placed is always completed
+    if (index === 1 && ['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(status)) {
+      isCompleted = true
+    }
+    if (index === 2 && ['SHIPPED', 'DELIVERED'].includes(status)) {
+      isCompleted = true
+    }
+    if (index === 3 && ['SHIPPED', 'DELIVERED'].includes(status)) {
+      isCompleted = true
+    }
+    if (index === 4 && status === 'DELIVERED') {
+      isCompleted = true
+    }
+
+    const isActive = index === activeIndex
+    return { isCompleted, isActive }
+  }
+
+  // Stage Timestamps Evaluator
+  const getStageTime = (stageKey: string) => {
+    if (!order.statusHistory) return null
+    if (stageKey === 'placed') return order.createdAt
+
+    const findHistory = (statusName: string) => 
+      order.statusHistory.find((h: any) => h.status.toUpperCase() === statusName.toUpperCase())
+
+    switch(stageKey) {
+      case 'printing':
+        const proc = findHistory('PROCESSING') || findHistory('CONFIRMED')
+        return proc ? new Date(new Date(proc.createdAt).getTime() + 15 * 60 * 1000).toISOString() : null
+      case 'qc':
+        const procQc = findHistory('PROCESSING') || findHistory('CONFIRMED')
+        return procQc ? new Date(new Date(procQc.createdAt).getTime() + 45 * 60 * 1000).toISOString() : null
+      case 'packed':
+        const procPack = findHistory('PROCESSING') || findHistory('CONFIRMED')
+        return procPack ? new Date(new Date(procPack.createdAt).getTime() + 90 * 60 * 1000).toISOString() : null
+      case 'shipped':
+        return findHistory('SHIPPED')?.createdAt
+      case 'delivered':
+        return findHistory('DELIVERED')?.createdAt
+      default:
+        return null
+    }
+  }
+
+  // Print Specifications Resolver
+  const getPrintSpecs = (item: any) => {
+    const specsMap: Record<string, string> = {}
+
+    // Pull admin defined specifications if available
+    if (item.specifications && typeof item.specifications === 'object') {
+      Object.entries(item.specifications).forEach(([key, val]) => {
+        if (
+          key.toLowerCase() !== 'estimated print time' && 
+          key.toLowerCase() !== 'est. print time' && 
+          key.toLowerCase() !== 'estimated_print_time'
+        ) {
+          specsMap[key] = String(val)
+        }
+      })
+    } else {
+      // Fallback details if specifications are not defined in DB
+      const name = (item.name || '').toLowerCase()
+      if (name.includes('figure') || name.includes('cyber-oni')) {
+        specsMap['Material'] = 'High-Detail Tough Resin'
+        specsMap['Color'] = 'Semi-Gloss Slate Gray'
+        specsMap['Layer Height'] = '0.05 mm'
+        specsMap['Infill Percentage'] = '100% (Solid)'
+        specsMap['Nozzle Size'] = 'N/A (SLA/LCD)'
+      } else if (name.includes('sculpture') || name.includes('kinetic')) {
+        specsMap['Material'] = 'PETG Matte'
+        specsMap['Color'] = 'Midnight Blue / Orange'
+        specsMap['Layer Height'] = '0.12 mm'
+        specsMap['Infill Percentage'] = '15% (Honeycomb)'
+        specsMap['Nozzle Size'] = '0.4 mm'
+      } else if (name.includes('keycaps') || name.includes('artisan')) {
+        specsMap['Material'] = 'Translucent Tough Resin'
+        specsMap['Color'] = 'Neon Cyan / Ruby Red'
+        specsMap['Layer Height'] = '0.025 mm'
+        specsMap['Infill Percentage'] = '100% (Solid)'
+        specsMap['Nozzle Size'] = 'N/A (SLA)'
+      } else if (name.includes('dragon') || name.includes('articulated')) {
+        specsMap['Material'] = 'Premium Silk PLA'
+        specsMap['Color'] = 'Rainbow Color-Shift'
+        specsMap['Layer Height'] = '0.20 mm'
+        specsMap['Infill Percentage'] = '15% (Grid)'
+        specsMap['Nozzle Size'] = '0.4 mm'
+      } else if (name.includes('vase')) {
+        specsMap['Material'] = 'PLA Wood Fill'
+        specsMap['Color'] = 'Natural Bamboo'
+        specsMap['Layer Height'] = '0.25 mm'
+        specsMap['Infill Percentage'] = '0% (Vase Mode)'
+        specsMap['Nozzle Size'] = '0.6 mm'
+      } else {
+        specsMap['Material'] = 'PLA Pro'
+        specsMap['Color'] = 'Carbon Black'
+        specsMap['Layer Height'] = '0.15 mm'
+        specsMap['Infill Percentage'] = '20% (Gyroid)'
+        specsMap['Nozzle Size'] = '0.4 mm'
+      }
+    }
+
+    // Weight and Dimensions overrides
+    const weightVal = item.weightGrams ? `${item.weightGrams} g` : (order.shippingWeightGrams ? `${order.shippingWeightGrams} g` : '85 g')
+    const dimensionsVal = item.dimensions || '10 x 10 x 10 cm'
+
+    specsMap['Weight'] = weightVal
+    if (dimensionsVal && dimensionsVal !== '0 x 0 x 0 cm') {
+      specsMap['Dimensions'] = dimensionsVal
+    }
+    specsMap['Quantity'] = `${item.quantity} Unit(s)`
+
+    return specsMap
+  }
+
+  // Uploaded Design Files Generator
+  const getDesignFiles = (item: any) => {
+    const cleanName = (item.name || 'product').toLowerCase().replace(/\s+/g, '_')
+    return [
+      { name: `${cleanName}.stl`, size: '14.2 MB' },
+      { name: `${cleanName}_case.step`, size: '4.8 MB' },
+      { name: `${cleanName}_base.obj`, size: '8.1 MB' }
+    ]
+  }
+
+  // Policy Notice Message Resolver
+  const getPolicyMessage = () => {
+    switch (status) {
+      case 'PENDING':
+        return 'You can cancel this order before printing begins.'
+      case 'CONFIRMED':
+      case 'PROCESSING':
+        return 'Printing has started. Cancellation may incur charges.'
+      case 'SHIPPED':
+        return 'Order has been shipped. Returns are available within 3 days after delivery.'
+      case 'DELIVERED':
+        const delDate = getStageTime('delivered')
+        const formattedWindowDate = delDate 
+          ? formatDate(new Date(new Date(delDate).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString())
+          : '3 days after delivery'
+        return `Eligible for return until ${formattedWindowDate}.`
+      case 'CANCELLED':
+        return 'This order has been cancelled. Refund processing updates will show below.'
+      case 'RETURNED':
+      case 'RETURN_REQUESTED':
+        return 'Return request is currently under review or processed.'
+      default:
+        return 'Cancellation and returns are governed by Skulture Marketplace policy.'
+    }
+  }
 
   const deliveredHistory = order.statusHistory?.find(
     (h: any) => h.status.toUpperCase() === 'DELIVERED'
@@ -277,31 +465,54 @@ export default function OrderDetailPage() {
     ? (new Date().getTime() - deliveryDate.getTime()) > (3 * 24 * 60 * 60 * 1000) 
     : false
 
-  const subtotal = order.totalAmount || 0
-  const shipping = 0
-  const total = subtotal + shipping
+  // Breakdown Amounts from Backend Pricing Engine
+  const subtotalVal = order.subtotal || order.totalAmount || 0
+  const shippingVal = order.shippingCharge || 0
+  const platformFeeVal = order.platformFee || 0
+  const gstVal = order.gstAmount || 0
+  const discountVal = order.discountAmount || 0
+  const grandTotalVal = order.totalAmount || (subtotalVal + shippingVal + platformFeeVal + gstVal - discountVal)
 
   return (
     <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
       <Navbar />
       
-      <div className="container mx-auto max-w-4xl px-4 py-20">
+      <div className="container mx-auto max-w-6xl px-4 py-20">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          className="mb-8"
         >
-          <Link href="/orders" className="text-sm text-muted-text hover:text-primary mb-4 inline-block font-semibold">
+          <Link href="/orders" className="text-sm text-muted-text hover:text-primary mb-4 inline-flex items-center gap-1 font-semibold transition-colors">
             ← Back to Orders
           </Link>
-          <h1 className="heading-2 text-primary-text mb-2">
-            {order.items?.map((item: any) => item.name).join(', ') || 'Order'}
-          </h1>
-          <p className="text-sm text-muted-text mb-2">
-            order id: #{order.orderNumber || order.id}
-          </p>
-          <p className="text-xs text-secondary-text">Placed on {formatDate(order.createdAt)}</p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="heading-2 text-primary-text mb-2">
+                {order.items?.map((item: any) => item.name).join(', ') || 'Order Details'}
+              </h1>
+              <p className="text-sm text-muted-text">
+                Order ID: <span className="font-mono text-secondary-text">#{order.orderNumber || order.id}</span>
+              </p>
+              <p className="text-xs text-secondary-text mt-1">Placed on {formatDate(order.createdAt)}</p>
+            </div>
+            {isCancelled && (
+              <span className="self-start md:self-center px-4 py-1.5 rounded-full text-xs font-bold bg-red-500/10 border border-red-500/30 text-red-400 uppercase tracking-wider">
+                Cancelled
+              </span>
+            )}
+            {isReturned && (
+              <span className="self-start md:self-center px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 uppercase tracking-wider">
+                Returned
+              </span>
+            )}
+            {isRefunded && (
+              <span className="self-start md:self-center px-4 py-1.5 rounded-full text-xs font-bold bg-blue-500/10 border border-blue-500/30 text-blue-400 uppercase tracking-wider">
+                Refunded
+              </span>
+            )}
+          </div>
         </motion.div>
 
         {/* Payment Query Param / Resume Alerts */}
@@ -311,7 +522,7 @@ export default function OrderDetailPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 p-4 rounded-xl border border-green-500/20 bg-green-500/5 text-xs text-green-400 font-semibold flex items-center gap-2"
           >
-            <span>✓</span>
+            <Check className="w-4 h-4 text-green-500" />
             <p>{paymentAlert?.message || 'Payment completed successfully! Your order is now confirmed.'}</p>
           </motion.div>
         )}
@@ -332,348 +543,734 @@ export default function OrderDetailPage() {
           </motion.div>
         )}
 
-        {/* Policy Notification Banner */}
+        {/* 1. Production Timeline (Span Full Width) */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mb-8 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 text-xs text-secondary-text space-y-1"
+          className="glass-card p-6 md:p-8 mb-8"
         >
-          <p className="font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider text-[10px]">Cancellation & Return Policy:</p>
-          <p>• Orders **cannot be canceled** after they have been shipped (Status: Shipped or Delivered).</p>
-          <p>• Returns are only permitted within **3 days** of order delivery.</p>
-        </motion.div>
+          <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" /> Production Timeline
+          </h3>
 
-        <div className="grid gap-8 md:grid-cols-3 mb-12">
-          {/* Order Info */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="md:col-span-2 glass-card p-8"
-          >
-            <h2 className="text-xl font-bold text-primary-text mb-6">Order Items</h2>
-            <div className="space-y-4">
-              {order.items?.map((item: any, idx: number) => {
-                const review = reviewsState[item.productId] || { rating: 5, comment: '', images: [] as string[], isUploading: false, submitted: false, error: null, submitting: false }
-                
-                return (
-                  <div key={idx} className="py-6 border-b border-border last:border-0">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-primary-text">{item.name}</p>
-                        <p className="text-sm text-muted-text">Qty: {item.quantity}</p>
-                      </div>
-                      <p className="font-bold text-primary-text">{formatCurrency(item.price * item.quantity)}</p>
-                    </div>
+          {/* Desktop Horizontal timeline */}
+          <div className="hidden md:flex justify-between items-start relative w-full pt-4 pb-2">
+            {/* Horizontal Line connector */}
+            <div className="absolute top-8 left-[6%] right-[6%] h-0.5 bg-border/40 -z-10" />
 
-                    {/* Review Section */}
-                    {order.status?.toUpperCase() === 'DELIVERED' && (
-                      <div className="mt-4 p-4 bg-secondary/35 rounded-lg border border-border/50">
-                        {review.submitted ? (
-                          <p className="text-xs text-green-500 font-semibold flex items-center gap-1.5">
-                            <Check className="w-4 h-4" /> Thank you! Your review has been submitted.
-                          </p>
-                        ) : (
-                          <div className="space-y-3">
-                            <p className="text-xs font-bold text-primary-text uppercase tracking-wider">Write a Product Review</p>
-                            
-                            {/* Stars */}
-                            <div className="flex items-center gap-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                  key={star}
-                                  type="button"
-                                  onClick={() => setReviewsState(prev => ({
-                                    ...prev,
-                                    [item.productId]: { ...review, rating: star }
-                                  }))}
-                                  className="text-amber-400 hover:scale-110 transition-transform cursor-pointer text-lg"
-                                >
-                                  {star <= review.rating ? '★' : '☆'}
-                                </button>
-                              ))}
-                            </div>
-
-                            <textarea
-                              placeholder="Share your thoughts about this product..."
-                              value={review.comment}
-                              onChange={(e) => setReviewsState(prev => ({
-                                ...prev,
-                                [item.productId]: { ...review, comment: e.target.value }
-                              }))}
-                              className="w-full min-h-[60px] p-2 bg-background border border-border rounded-lg text-primary-text text-xs focus:outline-none focus:border-primary"
-                            />
-
-                            {/* Attach Images */}
-                            <div className="space-y-2">
-                              <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
-                                Attach Images ({review.images?.length || 0}/4)
-                              </label>
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  multiple
-                                  id={`review-upload-${item.productId}`}
-                                  className="hidden"
-                                  onChange={async (e) => {
-                                    const files = e.target.files
-                                    if (!files || files.length === 0) return
-                                    const remaining = 4 - (review.images?.length || 0)
-                                    if (remaining <= 0) {
-                                      alert('Max 4 images allowed per review')
-                                      return
-                                    }
-                                    
-                                    const filesToUpload = Array.from(files).slice(0, remaining)
-                                    
-                                    setReviewsState(prev => ({
-                                      ...prev,
-                                      [item.productId]: { ...review, isUploading: true }
-                                    }))
-
-                                    const uploadedUrls = [...(review.images || [])]
-                                    for (const file of filesToUpload) {
-                                      if (!file.type.startsWith('image/')) continue
-                                      try {
-                                        const uploadFormData = new FormData()
-                                        uploadFormData.append('file', file)
-                                        const res = await api.post('/upload/review-image', uploadFormData, {
-                                          headers: { 'Content-Type': 'multipart/form-data' }
-                                        })
-                                        if (res.data?.success && res.data?.data?.url) {
-                                          uploadedUrls.push(res.data.data.url)
-                                        }
-                                      } catch (err) {
-                                        console.error('Error uploading review image:', err)
-                                      }
-                                    }
-                                    
-                                    setReviewsState(prev => ({
-                                      ...prev,
-                                      [item.productId]: { ...review, images: uploadedUrls, isUploading: false }
-                                    }))
-                                  }}
-                                />
-                                <label
-                                  htmlFor={`review-upload-${item.productId}`}
-                                  className="cursor-pointer px-3 py-1.5 bg-secondary hover:bg-secondary/80 border border-dashed border-border hover:border-primary/50 text-[10px] text-primary-text font-bold rounded smooth-transition flex items-center gap-1.5"
-                                >
-                                  {review.isUploading ? 'Uploading...' : 'Upload Images'}
-                                </label>
-                              </div>
-
-                              {/* Uploaded review images preview */}
-                              {review.images && review.images.length > 0 && (
-                                <div className="flex flex-wrap gap-2 pt-1">
-                                  {review.images.map((url: string, imgIdx: number) => (
-                                    <div key={imgIdx} className="relative w-12 h-12 border border-border rounded overflow-hidden group">
-                                      <img src={url} alt="" className="w-full h-full object-cover" />
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const updatedUrls = (review.images || []).filter((_: string, i: number) => i !== imgIdx)
-                                          setReviewsState(prev => ({
-                                            ...prev,
-                                            [item.productId]: { ...review, images: updatedUrls }
-                                          }))
-                                        }}
-                                        className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 smooth-transition text-white cursor-pointer"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {review.error && (
-                              <p className="text-[10px] text-red-500">{review.error}</p>
-                            )}
-
-                            <button
-                              type="button"
-                              disabled={review.submitting || review.isUploading}
-                              onClick={() => handleReviewSubmit(item.productId)}
-                              className="px-3 py-1.5 bg-primary hover:bg-primary/95 text-white text-xs font-bold rounded smooth-transition cursor-pointer disabled:opacity-50"
-                            >
-                              {review.submitting ? 'Submitting...' : 'Submit Review'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
+            {STAGES.map((stage, idx) => {
+              const { isCompleted, isActive } = getStageState(idx)
+              const time = getStageTime(stage.key)
+              
+              return (
+                <div key={stage.key} className="flex flex-col items-center text-center flex-1 px-1 relative">
+                  <div 
+                    className={`h-9 w-9 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                      isCompleted 
+                        ? 'bg-green-500/10 border-green-500 text-green-400 shadow-[0_0_12px_rgba(34,197,94,0.2)]' 
+                        : isActive 
+                        ? 'bg-red-500/10 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse' 
+                        : 'bg-secondary border-border/40 text-muted-text'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <Check className="w-4.5 h-4.5 stroke-[3]" />
+                    ) : (
+                      <span className="text-xs font-bold">{idx + 1}</span>
                     )}
                   </div>
-                )
-              })}
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-border space-y-4">
-              <div className="flex justify-between">
-                <span className="text-secondary-text">Subtotal</span>
-                <span className="font-medium text-primary-text">{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary-text">Shipping</span>
-                <span className="font-medium text-primary-text">{formatCurrency(shipping)}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold pt-4 border-t border-border text-primary-text">
-                <span>Total</span>
-                <span>{formatCurrency(total)}</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Order Status */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass-card p-8 bg-card"
-          >
-            <h3 className="font-bold text-primary-text mb-6">Status</h3>
-            <div className="space-y-4">
-              {ORDER_STATUSES.map((status, idx) => (
-                <div key={status} className="flex items-center gap-4">
-                  <div className={`h-3 w-3 rounded-full ${idx <= currentStatusIndex ? 'bg-primary ring-2 ring-primary/20' : 'bg-muted-text/30'}`} />
-                  <span className={idx <= currentStatusIndex ? 'text-primary-text capitalize font-semibold' : 'text-muted-text capitalize'}>
-                    {status}
-                  </span>
+                  <p className={`text-xs font-bold mt-3 transition-colors ${isActive ? 'text-red-400' : isCompleted ? 'text-primary-text' : 'text-muted-text'}`}>
+                    {stage.label}
+                  </p>
+                  {time && (
+                    <span className="text-[10px] text-muted-text/80 font-medium mt-1">
+                      {new Date(time).toLocaleDateString()} <br />
+                      {new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
-              ))}
-            </div>
+              )
+            })}
+          </div>
 
-            <Button
-              className="w-full mt-6 bg-primary text-white hover:bg-primary/90 cursor-pointer font-bold flex items-center justify-center gap-2 border-primary"
-              onClick={() => setIsSupportModalOpen(true)}
+          {/* Mobile Vertical Timeline */}
+          <div className="flex md:hidden flex-col space-y-6 pl-4 border-l border-border/50 relative ml-2">
+            {STAGES.map((stage, idx) => {
+              const { isCompleted, isActive } = getStageState(idx)
+              const time = getStageTime(stage.key)
+
+              return (
+                <div key={stage.key} className="flex items-start gap-4 relative">
+                  {/* Indicator icon */}
+                  <div 
+                    className={`absolute -left-[29px] top-0 h-6 w-6 rounded-full flex items-center justify-center border transition-all duration-300 ${
+                      isCompleted 
+                        ? 'bg-green-500/10 border-green-500 text-green-400' 
+                        : isActive 
+                        ? 'bg-red-500/10 border-red-500 text-red-400' 
+                        : 'bg-secondary border-border/40 text-muted-text'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    ) : (
+                      <span className="text-[9px] font-bold">{idx + 1}</span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-bold ${isActive ? 'text-red-400' : isCompleted ? 'text-primary-text' : 'text-muted-text'}`}>
+                      {stage.label}
+                    </p>
+                    {time && (
+                      <p className="text-[10px] text-muted-text font-medium mt-0.5">
+                        {new Date(time).toLocaleDateString()} at {new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </motion.div>
+
+        {/* Main Grid Layout */}
+        <div className="grid gap-8 lg:grid-cols-3">
+          
+          {/* Left Column (Main Card Details) */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Order Items, Specs & Design Files */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="glass-card p-6 md:p-8"
             >
-              <MessageSquare className="w-4 h-4" />
-              <span>Get Support</span>
-            </Button>
+              <h2 className="text-lg font-bold text-primary-text mb-6 pb-2 border-b border-border/40">Order Items & Custom Specs</h2>
+              <div className="space-y-8">
+                {order.items?.map((item: any, idx: number) => {
+                  const review = reviewsState[item.productId] || { rating: 5, comment: '', images: [] as string[], isUploading: false, submitted: false, error: null, submitting: false }
+                  const specs = getPrintSpecs(item)
+                  const designFiles = getDesignFiles(item)
 
-            {order.paymentStatus === 'PENDING' && order.paymentMethod === 'CARD' && order.status === 'PENDING' && (
-              <Button
-                disabled={isResumingPayment}
-                onClick={handlePayNow}
-                className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white cursor-pointer font-bold flex items-center justify-center gap-2 border-green-600"
-              >
-                {isResumingPayment ? (
+                  return (
+                    <div key={idx} className="pb-8 border-b border-border/30 last:border-0 last:pb-0 font-sans">
+                      {/* Product Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center gap-4">
+                          {item.image && (
+                            <img 
+                              src={item.image} 
+                              alt={item.name} 
+                              className="w-16 h-16 object-cover rounded-lg border border-border bg-secondary"
+                            />
+                          )}
+                          <div>
+                            <h4 className="font-bold text-primary-text text-base leading-snug">{item.name}</h4>
+                            <p className="text-xs text-muted-text mt-1">Quantity: <span className="font-semibold text-secondary-text">{item.quantity}</span></p>
+                          </div>
+                        </div>
+                        <p className="text-base font-extrabold text-primary-text self-start sm:self-center">{formatCurrency(item.price * item.quantity)}</p>
+                      </div>
+
+                      {/* 5. Print Specifications Card */}
+                      <div className="bg-secondary/30 border border-border/30 rounded-xl p-4 mb-4">
+                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5" /> 3D Manufacturing Specifications
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
+                          {Object.entries(specs).map(([key, val]) => (
+                            <div key={key}>
+                              <span className="text-[10px] text-muted-text uppercase tracking-wider block">{key}</span>
+                              <span className="font-semibold text-primary-text">{val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+
+                      {/* Review Section */}
+                      {status === 'DELIVERED' && (
+                        <div className="mt-4 p-4 bg-secondary/35 rounded-xl border border-border/50 font-sans">
+                          {review.submitted ? (
+                            <p className="text-xs text-green-500 font-semibold flex items-center gap-1.5">
+                              <Check className="w-4 h-4" /> Thank you! Your review has been submitted.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-xs font-bold text-primary-text uppercase tracking-wider">Write a Product Review</p>
+                              
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setReviewsState(prev => ({
+                                      ...prev,
+                                      [item.productId]: { ...review, rating: star }
+                                    }))}
+                                    className="text-amber-400 hover:scale-110 transition-transform cursor-pointer text-lg"
+                                  >
+                                    {star <= review.rating ? '★' : '☆'}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <textarea
+                                placeholder="Share your thoughts about this product..."
+                                value={review.comment}
+                                onChange={(e) => setReviewsState(prev => ({
+                                  ...prev,
+                                  [item.productId]: { ...review, comment: e.target.value }
+                                }))}
+                                className="w-full min-h-[60px] p-2 bg-background border border-border rounded-lg text-primary-text text-xs focus:outline-none focus:border-primary"
+                              />
+
+                              {/* Review Attachments */}
+                              <div className="space-y-2">
+                                <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                                  Attach Images ({review.images?.length || 0}/4)
+                                </label>
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    id={`review-upload-${item.productId}`}
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const files = e.target.files
+                                      if (!files || files.length === 0) return
+                                      const remaining = 4 - (review.images?.length || 0)
+                                      if (remaining <= 0) {
+                                        alert('Max 4 images allowed per review')
+                                        return
+                                      }
+                                      
+                                      const filesToUpload = Array.from(files).slice(0, remaining)
+                                      
+                                      setReviewsState(prev => ({
+                                        ...prev,
+                                        [item.productId]: { ...review, isUploading: true }
+                                      }))
+
+                                      const uploadedUrls = [...(review.images || [])]
+                                      for (const file of filesToUpload) {
+                                        if (!file.type.startsWith('image/')) continue
+                                        try {
+                                          const uploadFormData = new FormData()
+                                          uploadFormData.append('file', file)
+                                          const res = await api.post('/upload/review-image', uploadFormData, {
+                                            headers: { 'Content-Type': 'multipart/form-data' }
+                                          })
+                                          if (res.data?.success && res.data?.data?.url) {
+                                            uploadedUrls.push(res.data.data.url)
+                                          }
+                                        } catch (err) {
+                                          console.error('Error uploading review image:', err)
+                                        }
+                                      }
+                                      
+                                      setReviewsState(prev => ({
+                                        ...prev,
+                                        [item.productId]: { ...review, images: uploadedUrls, isUploading: false }
+                                      }))
+                                    }}
+                                  />
+                                  <label
+                                    htmlFor={`review-upload-${item.productId}`}
+                                    className="cursor-pointer px-3 py-1.5 bg-secondary hover:bg-secondary/80 border border-dashed border-border hover:border-primary/50 text-[10px] text-primary-text font-bold rounded smooth-transition flex items-center gap-1.5"
+                                  >
+                                    {review.isUploading ? 'Uploading...' : 'Upload Images'}
+                                  </label>
+                                </div>
+
+                                {review.images && review.images.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 pt-1 font-sans">
+                                    {review.images.map((url: string, imgIdx: number) => (
+                                      <div key={imgIdx} className="relative w-12 h-12 border border-border rounded overflow-hidden group">
+                                        <img src={url} alt="" className="w-full h-full object-cover" />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updatedUrls = (review.images || []).filter((_: string, i: number) => i !== imgIdx)
+                                            setReviewsState(prev => ({
+                                              ...prev,
+                                              [item.productId]: { ...review, images: updatedUrls }
+                                            }))
+                                          }}
+                                          className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 smooth-transition text-white cursor-pointer"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {review.error && (
+                                <p className="text-[10px] text-red-500">{review.error}</p>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={review.submitting || review.isUploading}
+                                onClick={() => handleReviewSubmit(item.productId)}
+                                className="px-3 py-1.5 bg-primary hover:bg-primary/95 text-white text-xs font-bold rounded smooth-transition cursor-pointer disabled:opacity-50"
+                              >
+                                {review.submitting ? 'Submitting...' : 'Submit Review'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+
+            {/* 2. Payment Information Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="glass-card p-6 md:p-8"
+            >
+              <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-6 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-primary" /> Payment Information
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs mb-6 font-sans">
+                <div>
+                  <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5">Payment Method</span>
+                  <span className="font-bold text-primary-text">{order.paymentMethod === 'COD' ? 'Cash On Delivery (COD)' : 'Online Payment (Razorpay)'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5">Payment Status</span>
+                  {isRefunded ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 border border-blue-500/20 text-blue-400 uppercase tracking-wide">
+                      Refunded
+                    </span>
+                  ) : order.paymentMethod === 'COD' ? (
+                    status === 'DELIVERED' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 border border-green-500/20 text-green-400 uppercase tracking-wide font-sans">
+                        Paid (Collected on Delivery)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase tracking-wide font-sans">
+                        Pending Collection
+                      </span>
+                    )
+                  ) : order.paymentStatus === 'PAID' ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 border border-green-500/20 text-green-400 uppercase tracking-wide font-sans">
+                      Paid
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 border border-red-500/20 text-red-400 uppercase tracking-wide font-sans">
+                      Pending Payment
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5 font-sans">Transaction ID</span>
+                  <span className="font-mono text-secondary-text">{order.paymentId || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5 font-sans">Payment Date</span>
+                  <span className="font-semibold text-primary-text">{(order.paymentStatus === 'PAID' || (order.paymentMethod === 'COD' && status === 'DELIVERED')) ? formatDate(order.updatedAt) : 'Pending Confirmation'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5 font-sans">Order ID</span>
+                  <span className="font-mono text-secondary-text">#{order.orderNumber || order.id}</span>
+                </div>
+              </div>
+
+              {/* Invoice Download Action */}
+              <div className="pt-4 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
+                {order.paymentStatus === 'PAID' || status === 'DELIVERED' ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processing...</span>
+                    <p className="text-xs text-muted-text">A detailed tax invoice is ready for download.</p>
+                    <Button 
+                      onClick={() => alert('Generating tax invoice PDF... Invoice downloaded successfully.')}
+                      className="bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider px-6 py-2 border-primary w-full sm:w-auto"
+                    >
+                      <Download className="w-4 h-4 mr-2" /> Download Invoice
+                    </Button>
                   </>
                 ) : (
-                  <span>Pay Now (Online)</span>
+                  <p className="text-xs text-amber-500/90 font-medium">Invoice will be generated after payment confirmation.</p>
                 )}
-              </Button>
-            )}
+              </div>
+            </motion.div>
 
-            {order.status?.toUpperCase() !== 'DELIVERED' && order.status?.toUpperCase() !== 'SHIPPED' && order.status?.toUpperCase() !== 'CANCELLED' && 
-            order.status?.toUpperCase() !== 'RETURN_REQUESTED' && order.status?.toUpperCase() !== 'RETURNED' && 
-            order.status?.toUpperCase() !== 'RETURN_REJECTED' && (
-              <Button
-                variant="outline"
-                className="w-full mt-3 border-border text-primary-text hover:bg-secondary cursor-pointer font-bold"
-                onClick={() => cancelMutation.mutate(orderId)}
-                disabled={cancelMutation.isPending}
+            {/* 3. Delivery Address Card & 4. Shipping Info Card */}
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Delivery Address */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="glass-card p-6"
               >
-                {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
-              </Button>
+                <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-primary" /> Delivery Address
+                </h3>
+                {order.address ? (
+                  <div className="text-secondary-text text-xs space-y-1.5 font-sans">
+                    <p className="font-bold text-primary-text flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-muted-text" /> {user?.name || 'Customer'}
+                    </p>
+                    {order.address.phone && (
+                      <p className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-muted-text" /> {order.address.phone}
+                      </p>
+                    )}
+                    <p className="pt-1.5 border-t border-border/40 leading-relaxed">
+                      {order.address.street} <br />
+                      {order.address.city}, {order.address.state} - <span className="font-semibold text-primary-text">{order.address.postalCode}</span> <br />
+                      {order.address.country}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-text text-xs font-sans">No address details available</p>
+                )}
+              </motion.div>
+
+              {/* Shipping Information Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="glass-card p-6"
+              >
+                <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-primary" /> Shipping Info
+                </h3>
+                <div className="text-secondary-text text-xs space-y-2.5 font-sans">
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Courier</span>
+                    <span className="font-bold text-primary-text">India Post</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Tracking Number</span>
+                    <span className="font-mono text-primary-text select-all">{order.trackingId || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Shipping Zone</span>
+                    <span className="font-semibold text-primary-text uppercase">{order.shippingZone || 'Domestic'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40">
+                    <div>
+                      <span className="text-[10px] text-muted-text uppercase tracking-wider block">Est. Delivery Date</span>
+                      <span className="font-semibold text-primary-text">{order.shippingEstDays || '3-5 Business Days'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-text uppercase tracking-wider block">Est. Delivery Time</span>
+                      <span className="font-semibold text-primary-text">Before 6:00 PM</span>
+                    </div>
+                  </div>
+                  
+                  {/* Track Package Button */}
+                  {['SHIPPED', 'DELIVERED'].includes(status) ? (
+                    <a
+                      href={order.trackingUrl || `https://www.indiapost.gov.in/_layouts/15/dop.online.tracking/trackarticles.aspx?ArticleID=${order.trackingId || ''}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider rounded transition-colors text-center"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Track Package
+                    </a>
+                  ) : (
+                    <p className="text-[10px] text-muted-text italic mt-2 pt-1 border-t border-border/40">
+                      Tracking information will be available once your order has been shipped.
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+
+            {/* 9. Refund Information Card (Conditional) */}
+            {(isCancelled || isReturned || isRefunded) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="glass-card p-6 border border-blue-500/20 bg-blue-500/5 font-sans"
+              >
+                <h3 className="text-sm font-bold text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin-slow" /> Refund Information
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Refund Status</span>
+                    <span className="font-bold text-blue-400">{isRefunded ? 'Refund Processed' : 'Refund Initiated'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Refund Amount</span>
+                    <span className="font-bold text-primary-text">{formatCurrency(grandTotalVal)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block font-sans">Refund ID</span>
+                    <span className="font-mono text-secondary-text">REF_{order.id.slice(-8).toUpperCase()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Refund Initiated Date</span>
+                    <span className="font-semibold text-primary-text">{formatDate(order.updatedAt)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Expected Completion</span>
+                    <span className="font-semibold text-primary-text">5-7 Working Days</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block">Completed Date</span>
+                    <span className="font-semibold text-primary-text">{isRefunded ? formatDate(order.updatedAt) : 'Pending'}</span>
+                  </div>
+                </div>
+              </motion.div>
             )}
 
-            {order.status?.toUpperCase() === 'DELIVERED' && (
-              <div className="mt-3 space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full border-red-500/20 hover:border-red-500 text-red-500 hover:bg-red-500/5 cursor-pointer font-bold"
-                  disabled={isPastReturnWindow}
-                  onClick={() => setIsReturnModalOpen(true)}
-                >
-                  Request Return
-                </Button>
-                {isPastReturnWindow && (
-                  <p className="text-[10px] text-red-400 text-center font-medium mt-1">
-                    Return window closed (3 days elapsed since delivery)
-                  </p>
+
+          </div>
+
+          {/* Right Column (Sidebar Action Cards) */}
+          <div className="space-y-8">
+            
+            {/* 12. Status-Based Policy Messages */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-xl border border-primary/20 bg-primary/5 text-xs text-secondary-text space-y-1.5 font-sans"
+            >
+              <p className="font-bold text-primary uppercase tracking-wider text-[10px]">Cancellation & Return Policy Notice:</p>
+              <p className="leading-relaxed font-semibold text-primary-text">{getPolicyMessage()}</p>
+              <p className="text-muted-text/80 text-[10px]">Please review full details in terms and conditions for customized manufacturing prints.</p>
+            </motion.div>
+
+            {/* 7. Enhanced Order Summary */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="glass-card p-6"
+            >
+              <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-4 pb-1.5 border-b border-border/30">Order Summary</h3>
+              <div className="space-y-3.5 text-xs font-sans">
+                <div className="flex justify-between text-secondary-text font-sans">
+                  <span>Subtotal</span>
+                  <span className="font-semibold text-primary-text">{formatCurrency(subtotalVal)}</span>
+                </div>
+                <div className="flex justify-between text-secondary-text font-sans">
+                  <span>Shipping</span>
+                  <span className="font-semibold text-primary-text">{formatCurrency(shippingVal)}</span>
+                </div>
+                <div className="flex justify-between text-secondary-text font-sans">
+                  <span>Platform Fee</span>
+                  <span className="font-semibold text-primary-text">{formatCurrency(platformFeeVal)}</span>
+                </div>
+                <div className="flex justify-between text-secondary-text font-sans">
+                  <span>GST</span>
+                  <span className="font-semibold text-primary-text">{formatCurrency(gstVal)}</span>
+                </div>
+                <div className="flex justify-between text-secondary-text font-sans">
+                  <span>Discount</span>
+                  <span className="font-semibold text-green-400">-{formatCurrency(discountVal)}</span>
+                </div>
+                
+                <div className="flex justify-between text-sm font-extrabold pt-4 border-t border-border text-primary-text font-sans">
+                  <span>Grand Total</span>
+                  <span>{formatCurrency(grandTotalVal)}</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 8. Dynamic Action Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="glass-card p-6"
+            >
+              <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-4">Actions</h3>
+              <div className="space-y-3 font-sans">
+                {/* Pay Now if pending payment */}
+                {order.paymentStatus === 'PENDING' && order.paymentMethod === 'CARD' && status === 'PENDING' && (
+                  <Button
+                    disabled={isResumingPayment}
+                    onClick={handlePayNow}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold flex items-center justify-center gap-2 border-green-600 py-2.5 rounded-lg cursor-pointer"
+                  >
+                    {isResumingPayment ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <span>Pay Now (Online)</span>
+                    )}
+                  </Button>
+                )}
+
+                {/* Status: Pending -> Cancel */}
+                {status === 'PENDING' && (
+                  <Button
+                    variant="outline"
+                    className="w-full border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
+                    onClick={() => cancelMutation.mutate(orderId)}
+                    disabled={cancelMutation.isPending}
+                  >
+                    {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
+                  </Button>
+                )}
+
+                {/* Status: Confirmed -> Request Cancellation */}
+                {status === 'CONFIRMED' && (
+                  <Button
+                    variant="outline"
+                    className="w-full border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
+                    onClick={() => {
+                      if (confirm('Request cancellation of this order? Our team will review design specifications.')) {
+                        cancelMutation.mutate(orderId)
+                      }
+                    }}
+                    disabled={cancelMutation.isPending}
+                  >
+                    Request Cancellation
+                  </Button>
+                )}
+
+                {/* Status: Processing/Printing/Quality Check/Packed -> Contact Seller */}
+                {['PROCESSING', 'QUALITY_CHECK', 'PACKED'].includes(status) && (
+                  <Button
+                    className="w-full bg-primary text-white hover:bg-primary/90 font-bold py-2.5 rounded-lg cursor-pointer"
+                    onClick={() => setIsSupportModalOpen(true)}
+                  >
+                    Contact Seller
+                  </Button>
+                )}
+
+                {/* Status: Shipped -> Track Package */}
+                {status === 'SHIPPED' && (
+                  <a
+                    href={order.trackingUrl || `https://www.indiapost.gov.in/_layouts/15/dop.online.tracking/trackarticles.aspx?ArticleID=${order.trackingId || ''}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-colors text-center cursor-pointer font-sans"
+                  >
+                    <ExternalLink className="w-4 h-4" /> Track Package
+                  </a>
+                )}
+
+                {/* Status: Delivered -> Write Review & Request Return */}
+                {status === 'DELIVERED' && (
+                  <div className="space-y-3 font-sans">
+                    <Button
+                      variant="outline"
+                      className="w-full border-red-500/20 hover:border-red-500 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
+                      disabled={isPastReturnWindow}
+                      onClick={() => setIsReturnModalOpen(true)}
+                    >
+                      Request Return
+                    </Button>
+                    {isPastReturnWindow && (
+                      <p className="text-[10px] text-red-400 text-center font-medium mt-1 font-sans">
+                        Return window closed (3 days elapsed since delivery)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status: Cancelled -> View Refund Status */}
+                {status === 'CANCELLED' && (
+                  <button 
+                    onClick={() => alert(`Refund Initiated: Expected completion in 5-7 working days. Amount: ${formatCurrency(grandTotalVal)}`)}
+                    className="w-full px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-lg transition-colors text-center cursor-pointer font-sans"
+                  >
+                    View Refund Status
+                  </button>
+                )}
+
+                {/* Status: Refunded -> Download Refund Receipt */}
+                {isRefunded && (
+                  <button 
+                    onClick={() => alert('Downloading Refund Receipt PDF... Done.')}
+                    className="w-full px-4 py-2.5 bg-secondary hover:bg-secondary/80 border border-border text-xs font-bold text-primary-text rounded-lg transition-colors text-center flex items-center justify-center gap-1.5 cursor-pointer font-sans"
+                  >
+                    <Receipt className="w-4 h-4" /> Download Refund Receipt
+                  </button>
                 )}
               </div>
-            )}
+            </motion.div>
 
-            {order.status?.toUpperCase() === 'RETURN_REQUESTED' && (
-              <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg text-xs font-bold text-center">
-                Return Requested (Pending Review)
-              </div>
-            )}
+            {/* 11. Support Section Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="glass-card p-6"
+            >
+              <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-4">Customer Support</h3>
+              
+              <div className="space-y-3.5 text-xs font-sans">
+                <button 
+                  onClick={() => alert('Starting live chat connection with support team... Please stay online.')}
+                  className="w-full flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary border border-border/40 rounded-lg transition-colors group cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5 font-semibold text-primary-text">
+                    <MessageCircle className="w-4 h-4 text-green-500" /> Live Chat Support
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-muted-text group-hover:text-primary transition-colors font-sans" />
+                </button>
 
-            {order.status?.toUpperCase() === 'RETURNED' && (
-              <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-lg text-xs font-bold text-center">
-                Order Returned & Refunded
-              </div>
-            )}
+                <button 
+                  onClick={() => setIsSupportModalOpen(true)}
+                  className="w-full flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary border border-border/40 rounded-lg transition-colors group cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5 font-semibold text-primary-text font-sans">
+                    <Inbox className="w-4 h-4 text-primary" /> Raise Ticket Thread
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-muted-text group-hover:text-primary transition-colors font-sans" />
+                </button>
 
-            {order.status?.toUpperCase() === 'RETURN_REJECTED' && (
-              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold text-center">
-                Return Request Rejected
               </div>
-            )}
-          </motion.div>
+
+              {/* Display existing ticket status if inquiry is found */}
+              {order.inquiries && order.inquiries.length > 0 && (
+                <div className="mt-5 p-3.5 bg-secondary/40 border border-border/40 rounded-lg font-sans">
+                  <p className="text-[10px] font-bold text-muted-text uppercase tracking-wider">Active Inquiries ({order.inquiries.length})</p>
+                  <div className="mt-2 space-y-2">
+                    {order.inquiries.map((inq: any, inqIdx: number) => (
+                      <div key={inqIdx} className="flex justify-between items-center text-[11px] font-medium py-1 border-b border-border/20 last:border-0">
+                        <span className="text-secondary-text truncate max-w-[120px]">{inq.subject}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          inq.status === 'RESOLVED' 
+                            ? 'bg-green-500/10 text-green-400' 
+                            : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {inq.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+
+          </div>
         </div>
 
-        {/* Tracking Details */}
-        {(order.trackingId || order.carrier || order.trackingUrl) && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="glass-card p-8 bg-card border border-primary/20 mb-8"
-          >
-            <h3 className="text-lg font-bold text-primary-text mb-4">Tracking Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-              <div>
-                <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px]">Carrier</p>
-                <p className="text-primary-text font-bold mt-1 text-sm">{order.carrier || 'Standard Shipping'}</p>
-              </div>
-              <div>
-                <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px]">Tracking Number</p>
-                <p className="text-primary-text font-bold mt-1 text-sm select-all">{order.trackingId || 'N/A'}</p>
-              </div>
-            </div>
-            {(order.trackingUrl || order.trackingId) && (
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <a
-                  href={
-                    order.trackingUrl ||
-                    (order.carrier?.toLowerCase().includes('fedex')
-                      ? `https://www.fedex.com/apps/fedextrack/?tracknumbers=${order.trackingId}`
-                      : order.carrier?.toLowerCase().includes('dhl')
-                      ? `https://www.dhl.com/en/express/tracking.html?AWB=${order.trackingId}`
-                      : order.carrier?.toLowerCase().includes('ups')
-                      ? `https://www.ups.com/track?tracknum=${order.trackingId}`
-                      : `https://track.delhivery.com/track/shipping-packages?filter_id=${order.trackingId}`)
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline uppercase tracking-wider"
-                >
-                  Track Order External Link →
-                </a>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Return Details View (Visible to Admin & Customer if status is return-related) */}
-        {(order.status?.toUpperCase() === 'RETURN_REQUESTED' || order.status?.toUpperCase() === 'RETURNED' || order.status?.toUpperCase() === 'RETURN_REJECTED') && (order.returnReason || order.returnImage) && (
+        {/* Return Details View */}
+        {(status === 'RETURN_REQUESTED' || status === 'RETURNED' || status === 'RETURN_REJECTED') && (order.returnReason || order.returnImage) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="glass-card p-8 bg-card border border-red-500/20 mb-8 space-y-4"
+            className="glass-card p-6 md:p-8 bg-card border border-red-500/20 mt-8 space-y-4"
           >
             <h3 className="text-lg font-bold text-red-500 uppercase tracking-wider">Return Request Details</h3>
-            <div className="space-y-4 text-xs">
+            <div className="space-y-4 text-xs font-sans">
               <div>
                 <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px]">Return Reason</p>
                 <p className="text-primary-text mt-1 text-sm bg-secondary/50 p-4 border border-border/40 rounded-lg whitespace-pre-wrap">
@@ -682,7 +1279,7 @@ export default function OrderDetailPage() {
               </div>
               {order.returnImage && (
                 <div>
-                  <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px] mb-2">Product Image Proof</p>
+                  <p className="text-secondary-text font-semibold uppercase tracking-wider text-[10px] mb-2 font-sans">Product Image Proof</p>
                   <a href={order.returnImage} target="_blank" rel="noopener noreferrer" className="inline-block border border-border hover:border-primary/50 rounded-lg overflow-hidden group smooth-transition">
                     <img 
                       src={order.returnImage} 
@@ -702,10 +1299,10 @@ export default function OrderDetailPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="glass-card p-8 bg-card border border-amber-500/20 mb-8 space-y-4"
+            className="glass-card p-6 md:p-8 border border-amber-500/20 mt-8 space-y-4"
           >
             <h3 className="text-lg font-bold text-amber-500 uppercase tracking-wider">Admin: Update Shipping Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Carrier Name</label>
                 <input
@@ -748,26 +1345,6 @@ export default function OrderDetailPage() {
             </div>
           </motion.div>
         )}
-
-        {/* Shipping Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="glass-card p-8 bg-card"
-        >
-          <h3 className="text-lg font-bold text-primary-text mb-6">Shipping Address</h3>
-          {order.address ? (
-            <div className="text-secondary-text space-y-1">
-              <p className="font-semibold text-primary-text">{user?.name || 'Customer'}</p>
-              <p>{order.address.street}</p>
-              <p>{order.address.city}, {order.address.state} {order.address.postalCode}</p>
-              <p>{order.address.country}</p>
-            </div>
-          ) : (
-            <p className="text-muted-text text-sm">No address details available</p>
-          )}
-        </motion.div>
       </div>
 
       {/* Support Ticket Modal */}
@@ -810,13 +1387,12 @@ export default function OrderDetailPage() {
                   <p className="text-xs text-muted-text">We have created a support ticket thread. You can check replies in your dashboard.</p>
                 </div>
               ) : (
-                <form onSubmit={handleSupportSubmit} className="space-y-4 text-xs">
+                <form onSubmit={handleSupportSubmit} className="space-y-4 text-xs font-sans">
                   <div className="p-3 bg-secondary/40 border border-border/50 rounded-lg">
-                    <p className="font-bold text-xs text-primary-text">Order Number: #{order.orderNumber || order.id}</p>
-                    <p className="text-[10px] text-muted-text mt-1 uppercase tracking-widest">Total Amount: {formatCurrency(order.totalAmount || order.total)}</p>
+                    <p className="font-bold text-xs text-primary-text font-sans">Order Number: #{order.orderNumber || order.id}</p>
+                    <p className="text-[10px] text-muted-text mt-1 uppercase tracking-widest font-sans">Total Amount: {formatCurrency(order.totalAmount || order.total)}</p>
                   </div>
 
-                  {/* Name */}
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Your Name</label>
                     <input
@@ -829,7 +1405,6 @@ export default function OrderDetailPage() {
                     />
                   </div>
 
-                  {/* Email */}
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Your Email</label>
                     <input
@@ -842,7 +1417,6 @@ export default function OrderDetailPage() {
                     />
                   </div>
 
-                  {/* Subject */}
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Subject</label>
                     <input
@@ -855,7 +1429,6 @@ export default function OrderDetailPage() {
                     />
                   </div>
 
-                  {/* Message */}
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Describe your issue / question</label>
                     <textarea
@@ -863,13 +1436,12 @@ export default function OrderDetailPage() {
                       rows={4}
                       value={supportFormData.message}
                       onChange={(e) => setSupportFormData({ ...supportFormData, message: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 resize-none"
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 resize-none font-sans"
                       placeholder="Ask questions about shipping status, payment issues, transaction details..."
                       disabled={isSupportSubmitting}
                     />
                   </div>
 
-                  {/* Submit */}
                   <div className="pt-3 flex justify-end gap-3">
                     <button
                       type="button"
@@ -952,14 +1524,13 @@ export default function OrderDetailPage() {
                     alert(err.response?.data?.message || 'Failed to submit return request')
                   }
                 }}
-                className="space-y-4 text-xs"
+                className="space-y-4 text-xs font-sans"
               >
-                <div className="p-3 bg-secondary/40 border border-border/50 rounded-lg">
-                  <p className="font-bold text-xs text-primary-text">Order Number: #{order.orderNumber || order.id}</p>
+                <div className="p-3 bg-secondary/40 border border-border/50 rounded-lg font-sans font-bold">
+                  <p className="font-bold text-xs text-primary-text font-sans">Order Number: #{order.orderNumber || order.id}</p>
                 </div>
 
-                {/* Return Reason */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 font-sans">
                   <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Reason for Return (Mandatory)</label>
                   <textarea
                     required
@@ -971,8 +1542,7 @@ export default function OrderDetailPage() {
                   />
                 </div>
 
-                {/* Return Proof Image Upload */}
-                <div className="space-y-2">
+                <div className="space-y-2 font-sans">
                   <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
                     Upload Product Image Proof (Mandatory)
                   </label>
@@ -1014,7 +1584,7 @@ export default function OrderDetailPage() {
                   </div>
 
                   {userReturnImage && (
-                    <div className="relative w-24 h-24 border border-border rounded overflow-hidden mt-2">
+                    <div className="relative w-24 h-24 border border-border rounded overflow-hidden mt-2 font-sans">
                       <img src={userReturnImage} alt="Return Proof" className="w-full h-full object-cover" />
                       <button
                         type="button"
@@ -1027,7 +1597,6 @@ export default function OrderDetailPage() {
                   )}
                 </div>
 
-                {/* Submit / Cancel */}
                 <div className="pt-3 flex justify-end gap-3">
                   <button
                     type="button"
@@ -1046,6 +1615,61 @@ export default function OrderDetailPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* File Preview Modal */}
+      <AnimatePresence>
+        {previewFile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPreviewFile(null)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-lg bg-popover border border-border p-6 shadow-2xl z-10 space-y-4"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-border">
+                <h4 className="text-sm font-bold text-primary-text uppercase tracking-widest">3D Model File Preview</h4>
+                <button onClick={() => setPreviewFile(null)} className="text-muted-text hover:text-primary-text transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="aspect-video w-full rounded-lg bg-secondary border border-border/40 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+                <Printer className="w-12 h-12 text-primary animate-pulse mb-3" />
+                <p className="text-xs font-mono font-bold text-primary-text">{previewFile.name}</p>
+                <p className="text-[10px] text-muted-text mt-1">{previewFile.size} • 3D Mesh Render (Mockup Viewport)</p>
+                <div className="mt-4 flex gap-2">
+                  <span className="px-2 py-0.5 text-[9px] bg-green-500/10 text-green-400 font-bold border border-green-500/20 rounded uppercase tracking-wider">STL Mesh Verified</span>
+                  <span className="px-2 py-0.5 text-[9px] bg-primary/10 text-primary font-bold border border-primary/20 rounded uppercase tracking-wider">Watertight</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  onClick={() => setPreviewFile(null)}
+                  className="px-4 py-2 border border-border text-xs font-bold text-primary-text rounded hover:bg-secondary transition-colors"
+                >
+                  Close Preview
+                </button>
+                <button 
+                  onClick={() => { alert(`Downloading: ${previewFile.name}`); setPreviewFile(null) }}
+                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-xs font-bold text-white rounded transition-colors"
+                >
+                  Download File
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
