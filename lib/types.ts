@@ -94,6 +94,18 @@ export interface Order {
   returnImage?: string | null
   createdAt: string
   updatedAt: string
+  paymentStatus?: string
+  shippingWeightGrams?: number
+  subtotal?: number
+  shippingCharge?: number
+  platformFee?: number
+  gstAmount?: number
+  discountAmount?: number
+  paymentMethod?: string
+  paymentId?: string
+  shippingZone?: string
+  shippingEstDays?: number
+  inquiries?: any[]
 }
 
 // Address Types
@@ -133,8 +145,9 @@ export interface CustomRequest {
   title: string
   description: string
   files: string[]
-  status: CustomRequestStatus
+  status: CustomRequestStatus | string
   quotation?: Quotation
+  quotations?: any[]
   createdAt: string
   updatedAt: string
 }

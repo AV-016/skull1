@@ -59,6 +59,10 @@ export default function OrderDetailPage() {
         throw new Error('Razorpay SDK is still loading. Please try again in a moment.')
       }
 
+      if (!order) {
+        throw new Error('Order details not loaded yet.')
+      }
+
       const paymentRes = await api.post('/payments/create-order', {
         orderId: order.id
       })
@@ -75,7 +79,7 @@ export default function OrderDetailPage() {
           try {
             setIsResumingPayment(true)
             await api.post('/payments/verify', {
-              orderId: order.id,
+              orderId: order?.id,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
@@ -99,7 +103,7 @@ export default function OrderDetailPage() {
         prefill: {
           name: user?.name || '',
           email: user?.email || '',
-          contact: order.address?.phone || '',
+          contact: order?.address?.phone || '',
         },
         theme: {
           color: '#000000',
@@ -330,7 +334,7 @@ export default function OrderDetailPage() {
     if (stageKey === 'placed') return order.createdAt
 
     const findHistory = (statusName: string) => 
-      order.statusHistory.find((h: any) => h.status.toUpperCase() === statusName.toUpperCase())
+      order.statusHistory?.find((h: any) => h.status.toUpperCase() === statusName.toUpperCase())
 
     switch(stageKey) {
       case 'printing':

@@ -4,6 +4,8 @@ export interface ExtendedProduct extends Product {
   rating: number
   reviewsCount: number
   isNew?: boolean
+  isActive?: boolean
+  isFeatured?: boolean
 }
 
 export const mockProducts: ExtendedProduct[] = [
