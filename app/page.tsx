@@ -21,8 +21,8 @@ export default function HomePage() {
       <EventBannerSection />
 
       <TrendingProductsSection />
-      <ShopByCategorySection />
       <BestSellersSection />
+      <ShopByCategorySection />
       <NewArrivalsSection />
       <CustomOrderBannerSection />
       <CustomerCreationsSection />
