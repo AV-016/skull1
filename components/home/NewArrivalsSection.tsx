@@ -23,8 +23,12 @@ export function NewArrivalsSection() {
   // Filter products that are marked as new or recent
   const defaultNewProducts = mockProducts.filter((p) => p.isNew || p.slug === 'low-poly-wolf-sculpture' || p.slug === 'cyberpunk-artisan-keycaps')
 
-  const products: ExtendedProduct[] = serverProducts.length > 0
-    ? sanitizeProducts(serverProducts)
+  const activeServerProducts = serverProducts.length > 0
+    ? sanitizeProducts(serverProducts).filter((p) => p.isActive && p.image && !p.image.includes('placeholder.jpg'))
+    : []
+
+  const products: ExtendedProduct[] = activeServerProducts.length > 0
+    ? activeServerProducts
     : defaultNewProducts
 
   const scroll = (direction: 'left' | 'right') => {

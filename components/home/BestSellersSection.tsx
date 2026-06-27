@@ -12,7 +12,7 @@ export function BestSellersSection() {
 
   // Fetch products from database
   const { data: serverProducts = [] } = useProducts()
-  const sanitizedServer = sanitizeProducts(serverProducts)
+  const sanitizedServer = sanitizeProducts(serverProducts).filter(p => p.image && !p.image.includes('placeholder.jpg'))
 
   // Filter active featured products from the database
   const featuredDbProducts = sanitizedServer.filter((p) => p.isActive && p.isFeatured)

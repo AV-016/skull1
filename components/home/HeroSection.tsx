@@ -42,7 +42,17 @@ export const HeroSection = () => {
       .then(res => {
         if (res.data?.success && res.data?.data) {
           const sanitized = sanitizeProducts(res.data.data)
-          setProducts(shuffleArray(sanitized))
+          // Filter for products that have a valid image and are active
+          const withImages = sanitized.filter(p => 
+            p.image && 
+            !p.image.includes('placeholder.jpg') && 
+            p.isActive
+          )
+          if (withImages.length > 0) {
+            setProducts(shuffleArray(withImages))
+          } else {
+            setProducts(shuffleArray(sanitized))
+          }
         }
       })
       .catch(err => console.error('Error fetching hero products:', err))

@@ -32,9 +32,17 @@ export const TrendingProductsSection = () => {
   const featuredMockProducts = mockProducts.filter((p) => p.featured)
   
   // Combine or prioritize. Sanitized to remove backpacks / generic factory imagery.
-  const products: ExtendedProduct[] = serverProducts.length > 0 
-    ? sanitizeProducts(serverProducts).filter((p) => p.featured)
-    : featuredMockProducts
+  const activeServerProducts = serverProducts.length > 0
+    ? sanitizeProducts(serverProducts).filter((p) => p.isActive && p.image && !p.image.includes('placeholder.jpg'))
+    : []
+
+  const serverFeatured = activeServerProducts.filter((p) => p.featured)
+  
+  const products: ExtendedProduct[] = serverFeatured.length > 0
+    ? serverFeatured
+    : activeServerProducts.length > 0
+      ? activeServerProducts
+      : featuredMockProducts
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
