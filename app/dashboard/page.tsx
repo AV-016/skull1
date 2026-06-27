@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -140,6 +140,31 @@ export default function DashboardPage() {
   const displayProducts = recommendedProducts
     ?.filter((p: any) => p.isActive && p.stock > 0)
     ?.slice(0, 4) || []
+
+  const carouselRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el) return
+
+    let animationFrameId: number
+    const scrollSpeed = 0.5 // pixels per frame
+
+    const scroll = () => {
+      if (el.scrollWidth - el.clientWidth <= 0) return
+      el.scrollLeft += scrollSpeed
+
+      // Loop smoothly back to start once we scroll past the first set of items
+      if (el.scrollLeft >= (el.scrollWidth / 3)) {
+        el.scrollLeft = 0
+      }
+      animationFrameId = requestAnimationFrame(scroll)
+    }
+
+    animationFrameId = requestAnimationFrame(scroll)
+    return () => cancelAnimationFrame(animationFrameId)
+  }, [displayProducts])
+
   const [loading, setLoading] = useState(false)
   const [showAddresses, setShowAddresses] = useState(false)
   
@@ -895,31 +920,35 @@ export default function DashboardPage() {
       {/* Back to Storefront Homepage CTA Section */}
       <div className="pt-6 pb-2">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl">
-          <div className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-red-600/10 to-transparent p-6 md:p-8 hover:border-red-500/40 transition-all duration-300 flex flex-col lg:flex-row items-center justify-between gap-8 min-h-[160px]">
+          <div className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-red-600/15 via-red-600/5 to-transparent p-8 md:p-10 hover:border-red-500/40 transition-all duration-300 flex flex-col lg:flex-row items-center justify-between gap-8 min-h-[200px] lg:min-h-[240px]">
             
             {/* Left side: Sliding products section */}
             {displayProducts && displayProducts.length > 0 && (
               <div className="w-full lg:w-3/5 overflow-hidden relative">
-                <div className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth py-1">
-                  {displayProducts.map((prod: any) => {
+                <div 
+                  ref={carouselRef}
+                  className="flex gap-6 overflow-x-auto no-scrollbar scroll-smooth py-2"
+                  style={{ scrollbarWidth: 'none' }}
+                >
+                  {[...displayProducts, ...displayProducts, ...displayProducts].map((prod: any, idx: number) => {
                     const primaryImg = prod.images?.find((img: any) => img.isPrimary)?.url || prod.image || '/placeholder.jpg'
                     return (
                       <Link 
                         href={`/products/${prod.slug}`} 
-                        key={prod.id}
-                        className="flex-shrink-0 w-48 p-3 bg-secondary/20 dark:bg-card/25 border border-border/80 hover:border-primary/45 rounded-xl smooth-transition flex items-center gap-3 cursor-pointer shadow-sm hover:scale-102"
+                        key={`${prod.id}-${idx}`}
+                        className="flex-shrink-0 w-60 p-4 bg-secondary/35 dark:bg-card/35 border border-border/80 hover:border-primary/45 rounded-2xl smooth-transition flex items-center gap-4 cursor-pointer shadow-md hover:scale-105"
                       >
-                        <div className="w-12 h-12 rounded border border-border overflow-hidden bg-secondary flex-shrink-0">
+                        <div className="w-16 h-16 rounded-xl border border-border overflow-hidden bg-secondary flex-shrink-0">
                           <img 
                             src={primaryImg} 
                             alt={prod.name} 
                             className="w-full h-full object-cover" 
                           />
                         </div>
-                        <div className="overflow-hidden flex-1 text-xs">
-                          <p className="font-bold text-[11px] text-primary-text truncate leading-tight">{prod.name}</p>
-                          <p className="text-[9px] text-muted-text capitalize mt-0.5">{prod.category?.name || 'Product'}</p>
-                          <p className="text-xs font-black text-primary mt-1">₹{prod.price}</p>
+                        <div className="overflow-hidden flex-1 text-xs text-left">
+                          <p className="font-bold text-xs text-primary-text truncate leading-tight">{prod.name}</p>
+                          <p className="text-[10px] text-muted-text capitalize mt-1 font-semibold">{prod.category?.name || 'Product'}</p>
+                          <p className="text-sm font-black text-primary mt-2">₹{prod.price}</p>
                         </div>
                       </Link>
                     )
@@ -929,20 +958,20 @@ export default function DashboardPage() {
             )}
 
             {/* Right side: CTA Details */}
-            <div className="w-full lg:w-2/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
-              <div className="space-y-1">
-                <h3 className="text-lg font-black text-primary-text uppercase tracking-wider group-hover:text-red-500 transition-colors duration-300">
+            <div className="w-full lg:w-2/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 text-left">
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-primary-text uppercase tracking-wider group-hover:text-red-500 transition-colors duration-300">
                   CONTINUE SHOPPING
                 </h3>
-                <p className="text-xs text-muted-text max-w-sm leading-relaxed">
+                <p className="text-xs sm:text-sm text-muted-text max-w-sm leading-relaxed">
                   Explore our full catalog, custom printing offers, and trending designs.
                 </p>
               </div>
               <Link 
                 href="/"
-                className="flex items-center gap-1.5 px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider rounded transition-all flex-shrink-0 cursor-pointer shadow-md shadow-red-500/10"
+                className="flex items-center gap-2 px-6 py-4 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex-shrink-0 cursor-pointer shadow-md shadow-red-500/20"
               >
-                Shop Storefront <ChevronRight className="w-4 h-4" />
+                Shop Storefront <ChevronRight className="w-5 h-5" />
               </Link>
             </div>
             
