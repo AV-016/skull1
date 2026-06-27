@@ -20,8 +20,11 @@ export function BestSellersSection() {
       return orderA - orderB;
     })
 
-  // Filter active featured products from the database
-  const featuredDbProducts = sanitizedServer.filter((p) => p.isActive && p.isFeatured)
+  // Get products assigned in Best Sellers Manager slots (1 to 10), fallback to isFeatured products if none set
+  let featuredDbProducts = sanitizedServer.filter((p) => p.isActive && p.bestSellerOrder && p.bestSellerOrder > 0)
+  if (featuredDbProducts.length === 0) {
+    featuredDbProducts = sanitizedServer.filter((p) => p.isActive && p.isFeatured)
+  }
 
   // Select the large featured hero product
   const heroProduct = featuredDbProducts[0]
