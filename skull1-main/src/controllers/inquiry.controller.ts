@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { InquiryService } from '../services/inquiry.service';
 import MESSAGES from '../constants/messages';
+import { sendSupportRequestEmail } from '../utils/mail';
 
 const inquiryService = new InquiryService();
 
@@ -103,6 +104,29 @@ export class InquiryController {
         success: true,
         message: 'Message sent successfully',
         data: msg,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async sendSupportEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { subject, message } = req.body;
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      if (!subject || !message) {
+        return res.status(400).json({ success: false, message: 'Subject and message are required' });
+      }
+
+      await sendSupportRequestEmail(user.email, user.name || 'User', subject, message);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Support request sent successfully',
       });
     } catch (error) {
       return next(error);

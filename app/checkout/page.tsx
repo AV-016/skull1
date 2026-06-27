@@ -26,6 +26,40 @@ interface CartItem {
   quantity: number
 }
 
+const parseStreet = (street: string) => {
+  const result = { streetNo: '', locality: '', landmark: '' };
+  if (!street) return result;
+  if (street.includes('Street/House No:') && street.includes('Locality:')) {
+    const parts = street.split('|');
+    parts.forEach(part => {
+      const trimmed = part.trim();
+      if (trimmed.startsWith('Street/House No:')) {
+        result.streetNo = trimmed.replace('Street/House No:', '').trim();
+      } else if (trimmed.startsWith('Locality:')) {
+        result.locality = trimmed.replace('Locality:', '').trim();
+      } else if (trimmed.startsWith('Landmark:')) {
+        result.landmark = trimmed.replace('Landmark:', '').trim();
+      }
+    });
+  } else {
+    result.streetNo = street;
+  }
+  return result;
+};
+
+const parsePhone = (phoneStr: string) => {
+  const result = { phone: '+91', alternatePhone: '' };
+  if (!phoneStr) return result;
+  if (phoneStr.includes('/ Alt:')) {
+    const parts = phoneStr.split('/ Alt:');
+    result.phone = parts[0].trim();
+    result.alternatePhone = parts[1].trim();
+  } else {
+    result.phone = phoneStr;
+  }
+  return result;
+};
+
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -53,10 +87,13 @@ function CheckoutContent() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    address: '',
+    streetNo: '',
+    locality: '',
+    landmark: '',
     city: '',
     postalCode: '',
     phone: '+91',
+    alternatePhone: '',
     cardNumber: '',
     cardExpiry: '',
     cardCvc: '',
@@ -64,12 +101,17 @@ function CheckoutContent() {
 
   const handleSelectSavedAddress = (addr: any) => {
     setSelectedAddressId(addr.id)
+    const parsedStr = parseStreet(addr.street || '')
+    const parsedPh = parsePhone(addr.phone || '')
     setFormData(prev => ({
       ...prev,
-      address: addr.street || '',
+      streetNo: parsedStr.streetNo,
+      locality: parsedStr.locality,
+      landmark: parsedStr.landmark,
       city: addr.city || '',
       postalCode: addr.postalCode || '',
-      phone: addr.phone || '',
+      phone: parsedPh.phone,
+      alternatePhone: parsedPh.alternatePhone,
     }))
   }
 
@@ -77,10 +119,13 @@ function CheckoutContent() {
     setSelectedAddressId('new')
     setFormData(prev => ({
       ...prev,
-      address: '',
+      streetNo: '',
+      locality: '',
+      landmark: '',
       city: '',
       postalCode: '',
       phone: '+91',
+      alternatePhone: '',
     }))
   }
   
@@ -283,7 +328,8 @@ function CheckoutContent() {
               
               setFormData(prev => ({
                 ...prev,
-                address: street,
+                streetNo: '',
+                locality: street,
                 city: city || prev.city,
                 postalCode: postalCode || prev.postalCode
               }))
@@ -303,18 +349,24 @@ function CheckoutContent() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    if (name === 'phone') {
+    if (name === 'phone' || name === 'alternatePhone') {
       let val = value;
-      if (!val.startsWith('+91')) {
-        val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+      if (val) {
+        if (!val.startsWith('+91')) {
+          val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+        }
+        const prefix = '+91';
+        const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+        setFormData(prev => ({
+          ...prev,
+          [name]: prefix + rest
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: name === 'phone' ? '+91' : ''
+        }));
       }
-      const prefix = '+91';
-      const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
-      setFormData(prev => ({
-        ...prev,
-        phone: prefix + rest
-      }));
-      // If the user starts editing shipping address fields, switch selection to 'new'
       setSelectedAddressId('new')
       return;
     }
@@ -322,8 +374,7 @@ function CheckoutContent() {
       ...prev,
       [name]: value
     }))
-    // If the user starts editing shipping address fields, switch selection to 'new'
-    if (['address', 'city', 'postalCode'].includes(name)) {
+    if (['streetNo', 'locality', 'landmark', 'city', 'postalCode'].includes(name)) {
       setSelectedAddressId('new')
     }
   }
@@ -337,6 +388,13 @@ function CheckoutContent() {
     const phoneDigits = formData.phone.replace(/^\+91/, '').replace(/\D/g, '')
     if (phoneDigits.length !== 10) {
       setSubmitError('Phone number must be exactly 10 digits (excluding +91)')
+      setIsSubmitting(false)
+      return
+    }
+
+    const altPhoneDigits = formData.alternatePhone.replace(/^\+91/, '').replace(/\D/g, '')
+    if (formData.alternatePhone && altPhoneDigits.length !== 10) {
+      setSubmitError('Alternate phone number must be exactly 10 digits (excluding +91)')
       setIsSubmitting(false)
       return
     }
@@ -357,13 +415,16 @@ function CheckoutContent() {
       // 2. Resolve address ID
       let addressId = selectedAddressId
       if (selectedAddressId === 'new') {
+        const combinedStreet = `Street/House No: ${formData.streetNo.trim()} | Locality: ${formData.locality.trim()}${formData.landmark.trim() ? ` | Landmark: ${formData.landmark.trim()}` : ''}`
+        const combinedPhone = `${formData.phone.trim()}${formData.alternatePhone.trim() ? ` / Alt: ${formData.alternatePhone.trim()}` : ''}`
+
         const addressRes = await api.post('/addresses', {
-          street: formData.address,
+          street: combinedStreet,
           city: formData.city,
           state: 'N/A',
           postalCode: formData.postalCode,
           country: 'India',
-          phone: formData.phone || undefined,
+          phone: combinedPhone,
           isDefault: false,
           isActive: saveAddressToProfile // If user wants to save to profile, it's active. Otherwise false (temporary/hidden).
         })
@@ -791,52 +852,98 @@ function CheckoutContent() {
                         </div>
                       )}
 
-                      {selectedAddressId === 'new' && (
+                       {selectedAddressId === 'new' && (
                         <>
-                          <div className="sm:col-span-2">
-                            <div className="flex justify-between items-center mb-1">
-                              <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block">Address</label>
-                              <button
-                                type="button"
-                                onClick={handleGeolocation}
-                                disabled={isLocating}
-                                className="flex items-center gap-1.5 text-xs text-primary hover:underline font-semibold cursor-pointer disabled:opacity-50"
-                              >
-                                {isLocating ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 animate-spin" /> Locating...
-                                  </>
-                                ) : (
-                                  <>
-                                    <MapPin className="w-3.5 h-3.5" /> Locate Me
-                                  </>
-                                )}
-                              </button>
+                          <div className="sm:col-span-2 space-y-4">
+                            <div>
+                              <div className="flex justify-between items-center mb-1">
+                                <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block">Street / House No.</label>
+                                <button
+                                  type="button"
+                                  onClick={handleGeolocation}
+                                  disabled={isLocating}
+                                  className="flex items-center gap-1.5 text-xs text-primary hover:underline font-semibold cursor-pointer disabled:opacity-50"
+                                >
+                                  {isLocating ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin" /> Locating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <MapPin className="w-3.5 h-3.5" /> Locate Me
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                name="streetNo"
+                                required
+                                minLength={2}
+                                value={formData.streetNo}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
+                                placeholder="e.g. Flat 102, Building A, Street No 4"
+                              />
                             </div>
-                            <input
-                              type="text"
-                              name="address"
-                              required
-                              minLength={5}
-                              value={formData.address}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
-                              placeholder="123 Street Name"
-                            />
+
+                            <div>
+                              <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Locality / Area</label>
+                              <input
+                                type="text"
+                                name="locality"
+                                required
+                                minLength={3}
+                                value={formData.locality}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
+                                placeholder="e.g. Sector 15, Rohini"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Landmark <span className="text-[10px] text-muted-text font-normal lowercase">(optional)</span></label>
+                              <input
+                                type="text"
+                                name="landmark"
+                                value={formData.landmark}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
+                                placeholder="e.g. Near Hanuman Temple"
+                              />
+                              <span className="text-[10px] text-amber-500 font-bold mt-1.5 block">
+                                ⚠️ Please provide a detailed address with complete house/flat details so your order does not get swapped or misplaced.
+                              </span>
+                            </div>
                           </div>
-                          <div className="sm:col-span-2">
-                            <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Phone Number</label>
-                            <input
-                              type="tel"
-                              name="phone"
-                              required
-                              minLength={10}
-                              value={formData.phone}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
-                              placeholder="e.g. +91 98765 43210"
-                            />
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:col-span-2">
+                            <div>
+                              <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Primary Phone Number</label>
+                              <input
+                                type="tel"
+                                name="phone"
+                                required
+                                minLength={10}
+                                value={formData.phone}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
+                                placeholder="e.g. +91 98765 43210"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Alternate Phone Number <span className="text-[10px] text-muted-text font-normal lowercase">(optional)</span></label>
+                              <input
+                                type="tel"
+                                name="alternatePhone"
+                                value={formData.alternatePhone}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
+                                placeholder="e.g. +91 98765 43210"
+                              />
+                            </div>
                           </div>
+
                           <div>
                             <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">City</label>
                             <input
@@ -862,6 +969,9 @@ function CheckoutContent() {
                               className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
                               placeholder="400001"
                             />
+                            <span className="text-[10px] text-amber-500 font-bold mt-1.5 block">
+                              ℹ️ Please verify your pincode once to ensure correct delivery.
+                            </span>
                           </div>
                           <div className="sm:col-span-2 flex items-center gap-2 pt-2">
                             <input

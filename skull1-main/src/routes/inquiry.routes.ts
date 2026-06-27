@@ -8,6 +8,7 @@ const controller = new InquiryController();
 
 // 1. Public/Protected Inquiry Submission & Thread Routes (/api/inquiries)
 router.post('/', controller.createInquiry);
+router.post('/email', protect, controller.sendSupportEmail);
 router.get('/my', protect, controller.getMyInquiries);
 router.get('/:id', protect, controller.getInquiryById);
 router.post('/:id/messages', protect, controller.createInquiryMessage);

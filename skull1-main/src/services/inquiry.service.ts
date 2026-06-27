@@ -1,10 +1,11 @@
 import { prisma } from '../config/database';
 import { Inquiry, InquiryStatus, Role } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
+import { sendSupportRequestEmail } from '../utils/mail';
 
 export class InquiryService {
   async createInquiry(data: any): Promise<Inquiry> {
-    return prisma.inquiry.create({
+    const inquiry = await prisma.inquiry.create({
       data: {
         name: data.name,
         email: data.email,
@@ -18,6 +19,19 @@ export class InquiryService {
         isReadByAdmin: false,
       },
     });
+
+    try {
+      await sendSupportRequestEmail(
+        data.email,
+        data.name || 'User',
+        data.subject || 'Support Inquiry',
+        `${data.message}${data.productId ? `\n(Product ID: ${data.productId})` : ''}${data.orderId ? `\n(Order ID: ${data.orderId})` : ''}`
+      );
+    } catch (err) {
+      console.error('Failed to send support email notification:', err);
+    }
+
+    return inquiry;
   }
 
   async getInquiries(page: number = 1, limit: number = 10): Promise<{ data: any[]; meta: any }> {

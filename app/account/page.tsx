@@ -44,6 +44,40 @@ interface Address {
 
 type TabType = 'profile' | 'addresses' | 'upi' | 'cards' | 'coupons' | 'reviews' | 'notifications'
 
+const parseStreet = (street: string) => {
+  const result = { streetNo: '', locality: '', landmark: '' };
+  if (!street) return result;
+  if (street.includes('Street/House No:') && street.includes('Locality:')) {
+    const parts = street.split('|');
+    parts.forEach(part => {
+      const trimmed = part.trim();
+      if (trimmed.startsWith('Street/House No:')) {
+        result.streetNo = trimmed.replace('Street/House No:', '').trim();
+      } else if (trimmed.startsWith('Locality:')) {
+        result.locality = trimmed.replace('Locality:', '').trim();
+      } else if (trimmed.startsWith('Landmark:')) {
+        result.landmark = trimmed.replace('Landmark:', '').trim();
+      }
+    });
+  } else {
+    result.streetNo = street;
+  }
+  return result;
+};
+
+const parsePhone = (phoneStr: string) => {
+  const result = { phone: '+91', alternatePhone: '' };
+  if (!phoneStr) return result;
+  if (phoneStr.includes('/ Alt:')) {
+    const parts = phoneStr.split('/ Alt:');
+    result.phone = parts[0].trim();
+    result.alternatePhone = parts[1].trim();
+  } else {
+    result.phone = phoneStr;
+  }
+  return result;
+};
+
 export default function AccountPage() {
   const { user, logout, setUser } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('profile')
@@ -79,12 +113,15 @@ export default function AccountPage() {
   const deleteAccountMutation = useDeleteAccount()
 
   const [addressForm, setAddressForm] = useState({
-    street: '',
+    streetNo: '',
+    locality: '',
+    landmark: '',
     city: '',
     state: 'N/A',
     postalCode: '',
     country: 'India',
     phone: '+91',
+    alternatePhone: '',
     isDefault: false
   })
   const [formError, setFormError] = useState<string | null>(null)
@@ -283,6 +320,27 @@ export default function AccountPage() {
     }
   }
 
+  // Save phone number directly
+  const handleSavePhone = async () => {
+    try {
+      setLoading(true)
+      const phoneDigits = phoneInput.replace(/^\+91/, '').replace(/\D/g, '')
+      if (phoneDigits.length !== 10) {
+        alert('Phone number must be exactly 10 digits (excluding +91)')
+        return
+      }
+      const res = await api.patch('/users/profile', { phone: phoneInput.trim() })
+      if (res.data?.success && res.data?.data) {
+        setUser({ ...user, ...res.data.data })
+        setEditMobile(false)
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update phone number.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Phone OTP Flow
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -373,19 +431,26 @@ export default function AccountPage() {
   // Addresses CRUD
   const handleAddressInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    if (name === 'phone') {
+    if (name === 'phone' || name === 'alternatePhone') {
       setIsAddrPhoneVerified(false)
       setAddrOtpSent(false)
       let val = value;
-      if (!val.startsWith('+91')) {
-        val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+      if (val) {
+        if (!val.startsWith('+91')) {
+          val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+        }
+        const prefix = '+91';
+        const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+        setAddressForm(prev => ({
+          ...prev,
+          [name]: prefix + rest
+        }));
+      } else {
+        setAddressForm(prev => ({
+          ...prev,
+          [name]: name === 'phone' ? '+91' : ''
+        }));
       }
-      const prefix = '+91';
-      const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
-      setAddressForm(prev => ({
-        ...prev,
-        phone: prefix + rest
-      }));
       return;
     }
     setAddressForm(prev => ({
@@ -458,12 +523,15 @@ export default function AccountPage() {
   const openAddForm = () => {
     setEditingAddress(null)
     setAddressForm({
-      street: '',
+      streetNo: '',
+      locality: '',
+      landmark: '',
       city: '',
       state: 'N/A',
       postalCode: '',
       country: 'India',
       phone: '+91',
+      alternatePhone: '',
       isDefault: false
     })
     setIsAddrPhoneVerified(false)
@@ -475,13 +543,18 @@ export default function AccountPage() {
 
   const openEditForm = (addr: Address) => {
     setEditingAddress(addr)
+    const parsedStr = parseStreet(addr.street || '')
+    const parsedPh = parsePhone((addr as any).phone || '')
     setAddressForm({
-      street: addr.street,
+      streetNo: parsedStr.streetNo,
+      locality: parsedStr.locality,
+      landmark: parsedStr.landmark,
       city: addr.city,
       state: addr.state,
       postalCode: addr.postalCode,
       country: addr.country,
-      phone: (addr as any).phone || '',
+      phone: parsedPh.phone,
+      alternatePhone: parsedPh.alternatePhone,
       isDefault: addr.isDefault
     })
     setIsAddrPhoneVerified(true)
@@ -495,8 +568,12 @@ export default function AccountPage() {
     e.preventDefault()
     setFormError(null)
 
-    if (addressForm.street.length < 5) {
-      setFormError('Street address must be at least 5 characters long')
+    if (addressForm.streetNo.length < 2) {
+      setFormError('Street/House number must be at least 2 characters long')
+      return
+    }
+    if (addressForm.locality.length < 3) {
+      setFormError('Locality must be at least 3 characters long')
       return
     }
     if (addressForm.city.length < 2) {
@@ -514,11 +591,30 @@ export default function AccountPage() {
       return
     }
 
+    const altPhoneDigits = addressForm.alternatePhone.replace(/^\+91/, '').replace(/\D/g, '')
+    if (addressForm.alternatePhone && altPhoneDigits.length !== 10) {
+      setFormError('Alternate phone number must be exactly 10 digits (excluding +91)')
+      return
+    }
+
     try {
+      const combinedStreet = `Street/House No: ${addressForm.streetNo.trim()} | Locality: ${addressForm.locality.trim()}${addressForm.landmark.trim() ? ` | Landmark: ${addressForm.landmark.trim()}` : ''}`
+      const combinedPhone = `${addressForm.phone.trim()}${addressForm.alternatePhone.trim() ? ` / Alt: ${addressForm.alternatePhone.trim()}` : ''}`
+
+      const payload = {
+        street: combinedStreet,
+        city: addressForm.city,
+        state: addressForm.state,
+        postalCode: addressForm.postalCode,
+        country: addressForm.country,
+        phone: combinedPhone,
+        isDefault: addressForm.isDefault
+      }
+
       if (editingAddress) {
-        await api.patch(`/addresses/${editingAddress.id}`, addressForm)
+        await api.patch(`/addresses/${editingAddress.id}`, payload)
       } else {
-        await api.post('/addresses', addressForm)
+        await api.post('/addresses', payload)
       }
       setIsFormOpen(false)
       fetchAddresses()
@@ -873,27 +969,15 @@ export default function AccountPage() {
                       placeholder="Mobile Number"
                       className="w-full px-4 py-3 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white disabled:bg-gray-100 dark:disabled:bg-black/20 disabled:text-gray-500 disabled:cursor-not-allowed focus:outline-none focus:border-red-500 text-xs"
                     />
-                    
-                    {user?.isPhoneVerified && !editMobile && (
-                      <span className="flex-shrink-0 flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1.5 rounded font-bold uppercase tracking-wider text-[9px]">
-                        <ShieldCheck className="w-3.5 h-3.5" /> Verified
-                      </span>
-                    )}
-
-                    {!user?.isPhoneVerified && !editMobile && (
-                      <span className="flex-shrink-0 flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded font-bold uppercase tracking-wider text-[9px]">
-                        ⚠️ Unverified
-                      </span>
-                    )}
                   </div>
 
                   {editMobile && (
                     <button
-                      onClick={() => setIsModalOpen(true)}
+                      onClick={handleSavePhone}
                       disabled={phoneInput.replace(/^\+91/, '').replace(/\D/g, '').length !== 10}
                       className="px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold rounded uppercase tracking-wider transition cursor-pointer"
                     >
-                      Verify with OTP
+                      Save
                     </button>
                   )}
                 </div>
@@ -992,7 +1076,7 @@ export default function AccountPage() {
                       
                       <div>
                         <div className="flex justify-between items-center mb-1">
-                          <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block">Street Address</label>
+                          <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block">Street / House No.</label>
                           <button
                             type="button"
                             onClick={handleGeolocation}
@@ -1012,62 +1096,67 @@ export default function AccountPage() {
                         </div>
                         <input
                           type="text"
-                          name="street"
+                          name="streetNo"
                           required
-                          value={addressForm.street}
+                          value={addressForm.streetNo}
                           onChange={handleAddressInputChange}
                           className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
-                          placeholder="e.g. 123 Main Road, Apt 4B"
+                          placeholder="e.g. Flat 102, Building A, Street No 4"
                         />
                       </div>
 
                       <div>
-                        <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Phone Number</label>
-                        <div className="flex gap-2">
+                        <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Locality / Area</label>
+                        <input
+                          type="text"
+                          name="locality"
+                          required
+                          value={addressForm.locality}
+                          onChange={handleAddressInputChange}
+                          className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                          placeholder="e.g. Sector 15, Rohini"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Landmark <span className="text-[8px] text-muted-text font-normal lowercase">(optional)</span></label>
+                        <input
+                          type="text"
+                          name="landmark"
+                          value={addressForm.landmark}
+                          onChange={handleAddressInputChange}
+                          className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                          placeholder="e.g. Near Hanuman Temple"
+                        />
+                        <span className="text-[9px] text-amber-500 font-bold mt-1 block">
+                          ⚠️ Please provide a detailed address with complete house/flat details so your order does not get swapped or misplaced.
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Primary Phone Number</label>
                           <input
                             type="text"
                             name="phone"
                             required
                             value={addressForm.phone}
                             onChange={handleAddressInputChange}
-                            className="flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                            className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
                             placeholder="e.g. +91 98765 43210"
                           />
-                          {!isAddrPhoneVerified && (
-                            <button
-                              type="button"
-                              onClick={handleSendAddrPhoneOtp}
-                              disabled={isSendingAddrOtp || addressForm.phone.replace(/^\+91/, '').replace(/\D/g, '').length !== 10}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold rounded text-xs transition cursor-pointer"
-                            >
-                              {isSendingAddrOtp ? 'Sending...' : 'Verify'}
-                            </button>
-                          )}
-                          {isAddrPhoneVerified && (
-                            <span className="flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1.5 rounded font-bold uppercase tracking-wider text-[9px]">
-                              <ShieldCheck className="w-3.5 h-3.5" /> Verified
-                            </span>
-                          )}
                         </div>
-                        {addrOtpSent && !isAddrPhoneVerified && (
-                          <div className="mt-3 flex gap-2 items-center bg-gray-50 dark:bg-black/30 p-3 rounded border border-border">
-                            <input
-                              type="text"
-                              placeholder="Enter OTP"
-                              value={addrOtpInput}
-                              onChange={(e) => setAddrOtpInput(e.target.value.replace(/\D/g, '').substring(0, 6))}
-                              className="px-3 py-2 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-xs text-black dark:text-white w-32 focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleVerifyAddrPhoneOtp}
-                              disabled={isVerifyingAddrOtp || addrOtpInput.length !== 6}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded text-xs transition cursor-pointer"
-                            >
-                              {isVerifyingAddrOtp ? 'Verifying...' : 'Confirm'}
-                            </button>
-                          </div>
-                        )}
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Alternate Phone Number <span className="text-[8px] text-muted-text font-normal lowercase">(optional)</span></label>
+                          <input
+                            type="text"
+                            name="alternatePhone"
+                            value={addressForm.alternatePhone}
+                            onChange={handleAddressInputChange}
+                            className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                            placeholder="e.g. +91 98765 43210"
+                          />
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -1094,6 +1183,9 @@ export default function AccountPage() {
                             className="w-full px-3 py-2.5 bg-white dark:bg-[#0b0c10] border border-gray-200 dark:border-gray-800 rounded text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
                             placeholder="e.g. 400001"
                           />
+                          <span className="text-[9px] text-amber-500 font-bold mt-1 block">
+                            ℹ️ Please verify your pincode once to ensure correct delivery.
+                          </span>
                         </div>
                       </div>
 

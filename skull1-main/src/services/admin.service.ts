@@ -20,12 +20,13 @@ export class AdminService {
   }
 
   async updateSettings(data: any): Promise<any> {
+    const { supportEmail, ...settingsData } = data;
     return prisma.settings.upsert({
       where: { id: 'global' },
-      update: data,
+      update: settingsData,
       create: {
         id: 'global',
-        ...data,
+        ...settingsData,
       },
     });
   }

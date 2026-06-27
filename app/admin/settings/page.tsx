@@ -29,6 +29,51 @@ export default function AdminSettings() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // Support Email OTP states & handlers
+  const [supportEmail, setSupportEmail] = useState('sanchit7613@gmail.com')
+  const [otpInput, setOtpInput] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false)
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null)
+  const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null)
+
+  const handleSendEmailOtp = async () => {
+    setIsSendingOtp(true)
+    setEmailSuccessMsg(null)
+    setEmailErrorMsg(null)
+    try {
+      await api.post('/admin/settings/send-otp')
+      setOtpSent(true)
+      setEmailSuccessMsg('Verification OTP has been sent to your admin email address.')
+    } catch (err: any) {
+      console.error('Failed to send OTP:', err)
+      setEmailErrorMsg(err.response?.data?.message || 'Failed to send OTP. Please try again.')
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }
+
+  const handleUpdateSupportEmail = async () => {
+    setIsUpdatingEmail(true)
+    setEmailSuccessMsg(null)
+    setEmailErrorMsg(null)
+    try {
+      await api.patch('/admin/settings/support-email', {
+        supportEmail,
+        otp: otpInput
+      })
+      setEmailSuccessMsg('Support email updated successfully!')
+      setOtpSent(false)
+      setOtpInput('')
+    } catch (err: any) {
+      console.error('Failed to update support email:', err)
+      setEmailErrorMsg(err.response?.data?.message || 'Failed to update support email. Please verify the OTP code.')
+    } finally {
+      setIsUpdatingEmail(false)
+    }
+  }
+
   // Shipping rates state
   const [rates, setRates] = useState<ShippingRate[]>([])
   const [isRatesLoading, setIsRatesLoading] = useState(true)
@@ -66,6 +111,7 @@ export default function AdminSettings() {
           setPlatformFeeType(res.data.data.platformFeeType || 'FIXED')
           setPlatformFeeValue(res.data.data.platformFeeValue ?? 0.0)
           setVolumetricDivisor(res.data.data.volumetricDivisor ?? 5000.0)
+          setSupportEmail(res.data.data.supportEmail || 'sanchit7613@gmail.com')
         }
       })
       .catch(err => {
@@ -303,6 +349,99 @@ export default function AdminSettings() {
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Support Email Card */}
+            <div className="glass-card p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">Support Email Settings</h3>
+                <p className="text-white/60 text-xs">Configure the recipient email address for support inquiries. Requires OTP verification via email.</p>
+              </div>
+
+              {emailSuccessMsg && (
+                <div className="p-3.5 bg-green-500/15 border border-green-500/30 text-green-400 rounded-xl text-sm font-semibold">
+                  {emailSuccessMsg}
+                </div>
+              )}
+              {emailErrorMsg && (
+                <div className="p-3.5 bg-red-500/15 border border-red-500/30 text-red-400 rounded-xl text-sm font-semibold">
+                  {emailErrorMsg}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-white/70 uppercase mb-2">Support Destination Email Address</label>
+                  <div className="flex gap-4">
+                    <input
+                      type="email"
+                      value={supportEmail}
+                      onChange={(e) => setSupportEmail(e.target.value)}
+                      placeholder="sanchit7613@gmail.com"
+                      disabled={otpSent}
+                      className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all disabled:opacity-60"
+                    />
+                    {!otpSent && (
+                      <button
+                        onClick={handleSendEmailOtp}
+                        disabled={isSendingOtp || !supportEmail}
+                        className="px-4 py-2 bg-white hover:bg-gray-100 text-black font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSendingOtp ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          'Request OTP'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {otpSent && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4 border-t border-white/5 pt-4"
+                  >
+                    <div>
+                      <label className="block text-xs font-bold text-white/70 uppercase mb-2">Enter Verification OTP</label>
+                      <input
+                        type="text"
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value)}
+                        placeholder="6-digit OTP code"
+                        maxLength={6}
+                        className="w-full sm:w-48 px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleUpdateSupportEmail}
+                        disabled={isUpdatingEmail || otpInput.length < 6}
+                        className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 text-xs"
+                      >
+                        {isUpdatingEmail ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                        Confirm & Change Email
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOtpSent(false)
+                          setOtpInput('')
+                          setEmailErrorMsg(null)
+                          setEmailSuccessMsg(null)
+                        }}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg transition-all text-xs cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </div>
 

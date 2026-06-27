@@ -21,10 +21,12 @@ export class UserService {
       throw new AppError(404, MESSAGES.AUTH.USER_NOT_FOUND);
     }
 
-    const updatedUser = await userRepository.update(userId, {
-      name: data.name,
-      email: data.email, // in production we might verify email change
-    });
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+
+    const updatedUser = await userRepository.update(userId, updateData);
 
     return formatUserProfile(updatedUser);
   }

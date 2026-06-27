@@ -25,6 +25,8 @@ router.use(protect, restrictToAdmin);
 // 1. Settings Endpoints (/api/admin/settings)
 router.get('/settings', controller.getSettings);
 router.patch('/settings', controller.updateSettings);
+router.post('/settings/send-otp', controller.sendSettingsOtp);
+router.patch('/settings/support-email', controller.updateSupportEmail);
 
 // 2. Activity Log Endpoints (/api/admin/activity-logs)
 router.get('/activity-logs', controller.getActivityLogs);

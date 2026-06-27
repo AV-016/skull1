@@ -24,7 +24,8 @@ import {
   MessageSquare,
   Send,
   ArrowLeft,
-  ShieldCheck
+  ShieldCheck,
+  Mail
 } from 'lucide-react'
 
 import { useProducts } from '@/hooks/useProducts'
@@ -78,6 +79,40 @@ const EventCountdown = ({ endDate }: { endDate: string }) => {
   )
 }
 
+const parseStreet = (street: string) => {
+  const result = { streetNo: '', locality: '', landmark: '' };
+  if (!street) return result;
+  if (street.includes('Street/House No:') && street.includes('Locality:')) {
+    const parts = street.split('|');
+    parts.forEach(part => {
+      const trimmed = part.trim();
+      if (trimmed.startsWith('Street/House No:')) {
+        result.streetNo = trimmed.replace('Street/House No:', '').trim();
+      } else if (trimmed.startsWith('Locality:')) {
+        result.locality = trimmed.replace('Locality:', '').trim();
+      } else if (trimmed.startsWith('Landmark:')) {
+        result.landmark = trimmed.replace('Landmark:', '').trim();
+      }
+    });
+  } else {
+    result.streetNo = street;
+  }
+  return result;
+};
+
+const parsePhone = (phoneStr: string) => {
+  const result = { phone: '+91', alternatePhone: '' };
+  if (!phoneStr) return result;
+  if (phoneStr.includes('/ Alt:')) {
+    const parts = phoneStr.split('/ Alt:');
+    result.phone = parts[0].trim();
+    result.alternatePhone = parts[1].trim();
+  } else {
+    result.phone = phoneStr;
+  }
+  return result;
+};
+
 export default function DashboardPage() {
   const { user, setUser } = useAuth()
   const [addresses, setAddresses] = useState<Address[]>([])
@@ -108,78 +143,48 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [showAddresses, setShowAddresses] = useState(false)
   
-  // Support Tickets States
+  // Support via Email States
   const [showSupport, setShowSupport] = useState(false)
-  const [inquiries, setInquiries] = useState<any[]>([])
-  const [loadingInquiries, setLoadingInquiries] = useState(false)
-  const [selectedInquiry, setSelectedInquiry] = useState<any | null>(null)
-  const [replyText, setReplyText] = useState('')
-  const [sendingReply, setSendingReply] = useState(false)
+  const [supportSubject, setSupportSubject] = useState('')
+  const [supportMessage, setSupportMessage] = useState('')
+  const [sendingSupportMail, setSendingSupportMail] = useState(false)
+  const [supportSuccess, setSupportSuccess] = useState(false)
+  const [supportError, setSupportError] = useState<string | null>(null)
 
-  const fetchMyInquiries = useCallback(async () => {
+  const handleSendSupportEmail = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSupportError(null)
+    setSupportSuccess(false)
+    setSendingSupportMail(true)
+
     try {
-      setLoadingInquiries(true)
-      const res = await api.get('/inquiries/my')
-      setInquiries(res.data?.data || [])
-    } catch (err) {
-      console.error('Error fetching inquiries:', err)
+      await api.post('/inquiries/email', {
+        subject: supportSubject,
+        message: supportMessage
+      })
+      setSupportSuccess(true)
+      setSupportSubject('')
+      setSupportMessage('')
+    } catch (err: any) {
+      setSupportError(err.response?.data?.message || 'Failed to send support email. Please try again.')
     } finally {
-      setLoadingInquiries(false)
+      setSendingSupportMail(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
     if (showSupport) {
-      fetchMyInquiries()
       setShowAddresses(false)
+      setSupportSuccess(false)
+      setSupportError(null)
     }
-  }, [showSupport, fetchMyInquiries])
+  }, [showSupport])
 
   useEffect(() => {
     if (showAddresses) {
       setShowSupport(false)
     }
   }, [showAddresses])
-
-  const fetchInquiryDetails = useCallback(async (id: string) => {
-    try {
-      const res = await api.get(`/inquiries/${id}`)
-      if (res.data?.success && res.data?.data) {
-        setSelectedInquiry(res.data.data)
-        window.dispatchEvent(new Event('notifications-updated'))
-      }
-    } catch (err) {
-      console.error('Error fetching inquiry details:', err)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (selectedInquiry?.id) {
-      const interval = setInterval(() => {
-        fetchInquiryDetails(selectedInquiry.id)
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [selectedInquiry?.id, fetchInquiryDetails])
-
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!replyText.trim() || !selectedInquiry) return
-    try {
-      setSendingReply(true)
-      const res = await api.post(`/inquiries/${selectedInquiry.id}/messages`, {
-        message: replyText.trim()
-      })
-      if (res.data?.success) {
-        setReplyText('')
-        await fetchInquiryDetails(selectedInquiry.id)
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to send reply')
-    } finally {
-      setSendingReply(false)
-    }
-  }
 
   const [editingAddress, setEditingAddress] = useState<Address | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -296,12 +301,15 @@ export default function DashboardPage() {
 
   
   const [addressForm, setAddressForm] = useState({
-    street: '',
+    streetNo: '',
+    locality: '',
+    landmark: '',
     city: '',
     state: 'N/A',
     postalCode: '',
     country: 'India',
     phone: '+91',
+    alternatePhone: '',
     isDefault: false
   })
   const [formError, setFormError] = useState<string | null>(null)
@@ -348,19 +356,26 @@ export default function DashboardPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    if (name === 'phone') {
+    if (name === 'phone' || name === 'alternatePhone') {
       setIsAddrPhoneVerified(false)
       setAddrOtpSent(false)
       let val = value;
-      if (!val.startsWith('+91')) {
-        val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+      if (val) {
+        if (!val.startsWith('+91')) {
+          val = '+91' + val.replace(/^\+?91?/, '').replace(/\D/g, '');
+        }
+        const prefix = '+91';
+        const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
+        setAddressForm(prev => ({
+          ...prev,
+          [name]: prefix + rest
+        }));
+      } else {
+        setAddressForm(prev => ({
+          ...prev,
+          [name]: name === 'phone' ? '+91' : ''
+        }));
       }
-      const prefix = '+91';
-      const rest = val.substring(3).replace(/\D/g, '').substring(0, 10);
-      setAddressForm(prev => ({
-        ...prev,
-        phone: prefix + rest
-      }));
       return;
     }
     setAddressForm(prev => ({
@@ -433,12 +448,15 @@ export default function DashboardPage() {
   const openAddForm = () => {
     setEditingAddress(null)
     setAddressForm({
-      street: '',
+      streetNo: '',
+      locality: '',
+      landmark: '',
       city: '',
       state: 'N/A',
       postalCode: '',
       country: 'India',
       phone: '+91',
+      alternatePhone: '',
       isDefault: false
     })
     setIsAddrPhoneVerified(false)
@@ -450,13 +468,18 @@ export default function DashboardPage() {
 
   const openEditForm = (addr: Address) => {
     setEditingAddress(addr)
+    const parsedStr = parseStreet(addr.street || '')
+    const parsedPh = parsePhone((addr as any).phone || '')
     setAddressForm({
-      street: addr.street,
+      streetNo: parsedStr.streetNo,
+      locality: parsedStr.locality,
+      landmark: parsedStr.landmark,
       city: addr.city,
       state: addr.state,
       postalCode: addr.postalCode,
       country: addr.country,
-      phone: (addr as any).phone || '',
+      phone: parsedPh.phone,
+      alternatePhone: parsedPh.alternatePhone,
       isDefault: addr.isDefault
     })
     setIsAddrPhoneVerified(true)
@@ -470,8 +493,12 @@ export default function DashboardPage() {
     e.preventDefault()
     setFormError(null)
 
-    if (addressForm.street.length < 5) {
-      setFormError('Street address must be at least 5 characters long')
+    if (addressForm.streetNo.length < 2) {
+      setFormError('Street/House number must be at least 2 characters long')
+      return
+    }
+    if (addressForm.locality.length < 3) {
+      setFormError('Locality must be at least 3 characters long')
       return
     }
     if (addressForm.city.length < 2) {
@@ -489,11 +516,30 @@ export default function DashboardPage() {
       return
     }
 
+    const altPhoneDigits = addressForm.alternatePhone.replace(/^\+91/, '').replace(/\D/g, '')
+    if (addressForm.alternatePhone && altPhoneDigits.length !== 10) {
+      setFormError('Alternate phone number must be exactly 10 digits (excluding +91)')
+      return
+    }
+
     try {
+      const combinedStreet = `Street/House No: ${addressForm.streetNo.trim()} | Locality: ${addressForm.locality.trim()}${addressForm.landmark.trim() ? ` | Landmark: ${addressForm.landmark.trim()}` : ''}`
+      const combinedPhone = `${addressForm.phone.trim()}${addressForm.alternatePhone.trim() ? ` / Alt: ${addressForm.alternatePhone.trim()}` : ''}`
+
+      const payload = {
+        street: combinedStreet,
+        city: addressForm.city,
+        state: addressForm.state,
+        postalCode: addressForm.postalCode,
+        country: addressForm.country,
+        phone: combinedPhone,
+        isDefault: addressForm.isDefault
+      }
+
       if (editingAddress) {
-        await api.patch(`/addresses/${editingAddress.id}`, addressForm)
+        await api.patch(`/addresses/${editingAddress.id}`, payload)
       } else {
-        await api.post('/addresses', addressForm)
+        await api.post('/addresses', payload)
       }
       setIsFormOpen(false)
       fetchAddresses()
@@ -525,23 +571,7 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-[#fafafa] dark:bg-[#0b0c10] text-[#1f2833] dark:text-[#c5c6c7] font-sans smooth-transition">
       <Navbar />
 
-      {/* Complete Profile Verification Banner */}
-      {user && !user.isPhoneVerified && (
-        <div className="pt-24 bg-amber-500/10 dark:bg-amber-500/5 border-b border-amber-500/20 text-amber-800 dark:text-amber-300">
-          <div className="container mx-auto px-4 md:px-8 max-w-7xl py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs md:text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <span className="text-base">⚠️</span>
-              <span><strong>Complete your profile:</strong> Verify your phone number to unlock all networking features.</span>
-            </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold tracking-wider uppercase transition shadow-md shadow-amber-600/10 cursor-pointer"
-            >
-              Verify Now
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Dynamic Flip Animation CSS */}
       <style>{`
@@ -740,7 +770,7 @@ export default function DashboardPage() {
                             <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest leading-none">Loyalty Stamps</p>
                             <div className="text-xs text-[#4f5d75] space-y-1 text-right mt-2">
                               <p className="font-bold text-gray-800 truncate max-w-[200px]">Name: {user?.name || 'Guest'}</p>
-                              <p className="font-semibold truncate">Mob: {user?.isPhoneVerified ? user.phone : 'Not Verified'}</p>
+                              <p className="font-semibold truncate">Mob: {user?.phone || 'Not Provided'}</p>
                             </div>
                           </div>
                           
@@ -943,14 +973,14 @@ export default function DashboardPage() {
               className="p-6 bg-white dark:bg-[#12131a] border border-[#e0e0e0] dark:border-[#1f2833]/60 rounded-2xl smooth-transition shadow-sm flex flex-col justify-between"
             >
               <div>
-                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">Support DMs</h3>
-                <p className="text-muted-text text-xs leading-relaxed mb-6">Chat directly with admin for help with orders, custom projects, or payments.</p>
+                <h3 className="text-lg font-bold text-primary-text mb-1 smooth-transition">Support via Email</h3>
+                <p className="text-muted-text text-xs leading-relaxed mb-6">Send an email directly to support for help with orders, custom projects, or payments.</p>
               </div>
               <button 
                 onClick={() => setShowSupport(!showSupport)} 
                 className="inline-flex items-center gap-1 text-xs font-bold text-green-500 hover:text-green-600 tracking-wider uppercase mt-auto cursor-pointer bg-transparent border-none p-0 text-left"
               >
-                {showSupport ? 'Hide Tickets' : 'View Tickets'} <ChevronRight className="w-4 h-4" />
+                {showSupport ? 'Hide Support Form' : 'Contact Support'} <ChevronRight className="w-4 h-4" />
               </button>
             </motion.div>
 
@@ -972,7 +1002,7 @@ export default function DashboardPage() {
             </motion.div>
           </motion.div>
 
-          {/* Support Ticket / DMs Panel */}
+          {/* Support via Email Form Panel */}
           <AnimatePresence>
             {showSupport && (
               <motion.div
@@ -984,163 +1014,56 @@ export default function DashboardPage() {
               >
                 <div>
                   <h2 className="text-2xl font-bold text-primary-text flex items-center gap-2">
-                    <MessageSquare className="w-6 h-6 text-red-500" /> Support DMs & Tickets
+                    <Mail className="w-6 h-6 text-red-500" /> Support via Email
                   </h2>
-                  <p className="text-xs text-muted-text mt-0.5">Chat directly with administrators regarding products, orders, and payment assistance</p>
+                  <p className="text-xs text-muted-text mt-0.5">Submit your query below, and our team will get back to you via email.</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-[500px]">
-                  {/* Left Column: Tickets List */}
-                  <div className={`lg:col-span-4 border border-border bg-white dark:bg-[#12131a] rounded-2xl p-4 flex flex-col gap-3 max-h-[550px] overflow-y-auto ${selectedInquiry ? 'hidden lg:flex' : 'flex'}`}>
-                    <h3 className="font-bold text-xs uppercase tracking-wider text-secondary-text mb-1">Your Tickets ({inquiries.length})</h3>
-                    {loadingInquiries && inquiries.length === 0 ? (
-                      <div className="flex items-center gap-2 py-4 justify-center text-xs text-muted-text">
-                        <Loader2 className="w-4 h-4 animate-spin text-red-500" />
-                        <span>Loading tickets...</span>
-                      </div>
-                    ) : inquiries.length === 0 ? (
-                      <div className="text-center py-12 text-xs text-muted-text italic border border-dashed border-border rounded-xl">
-                        No support tickets found.<br />You can start a ticket from any Product or Order details page.
+                <div className="max-w-2xl bg-white dark:bg-[#12131a] border border-border rounded-2xl p-6 shadow-sm">
+                  <form onSubmit={handleSendSupportEmail} className="space-y-4">
+                    {supportSuccess ? (
+                      <div className="p-4 bg-green-500/10 border border-green-500/20 text-green-500 text-sm rounded-xl font-medium">
+                        ✨ Support request submitted successfully! We will get back to you shortly.
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-2">
-                        {inquiries.map((inq) => (
-                          <button
-                            key={inq.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedInquiry(null)
-                              fetchInquiryDetails(inq.id)
-                            }}
-                            className={`w-full text-left p-3.5 border rounded-xl smooth-transition flex flex-col justify-between gap-1.5 cursor-pointer ${
-                              selectedInquiry?.id === inq.id
-                                ? 'border-red-500 bg-red-500/5 dark:bg-red-500/10'
-                                : 'border-border hover:border-red-500/20 bg-secondary/20'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="font-bold text-xs text-primary-text line-clamp-1">{inq.subject}</span>
-                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-wide shrink-0 ${
-                                inq.status === 'PENDING'
-                                  ? 'bg-amber-500/10 text-amber-500'
-                                  : inq.status === 'RESOLVED'
-                                    ? 'bg-green-500/10 text-green-500'
-                                    : 'bg-blue-500/10 text-blue-500'
-                              }`}>
-                                {inq.status}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-muted-text line-clamp-1">{inq.message}</p>
-                            <span className="text-[9px] text-secondary-text mt-1 text-right block">{new Date(inq.updatedAt).toLocaleDateString()}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right Column: Active Chat Thread */}
-                  <div className={`lg:col-span-8 border border-border bg-white dark:bg-[#12131a] rounded-2xl flex flex-col justify-between overflow-hidden max-h-[550px] ${!selectedInquiry ? 'hidden lg:flex items-center justify-center p-8' : 'flex'}`}>
-                    {selectedInquiry ? (
                       <>
-                        {/* Chat Header */}
-                        <div className="p-4 border-b border-border bg-secondary/20 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedInquiry(null)}
-                              className="lg:hidden p-1.5 hover:bg-secondary rounded-lg text-muted-text cursor-pointer"
-                            >
-                              <ArrowLeft className="w-5 h-5" />
-                            </button>
-                            <div>
-                              <h4 className="font-bold text-sm text-primary-text">{selectedInquiry.subject}</h4>
-                              <div className="flex items-center gap-3 mt-1 text-[9px] text-muted-text uppercase font-bold tracking-wider">
-                                <span>Status: {selectedInquiry.status}</span>
-                                {selectedInquiry.product && (
-                                  <span className="text-red-500">Product: {selectedInquiry.product.name}</span>
-                                )}
-                                {selectedInquiry.order && (
-                                  <span className="text-blue-500">Order: #{selectedInquiry.order.orderNumber}</span>
-                                )}
-                              </div>
-                            </div>
+                        {supportError && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-medium">
+                            {supportError}
                           </div>
-                        </div>
-
-                        {/* Messages Thread list */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-secondary/5 min-h-[300px]">
-                          {/* Initial inquiry message */}
-                          <div className="flex items-start gap-2.5 max-w-[85%]">
-                            <div className="w-7 h-7 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center text-[10px] font-black shrink-0">
-                              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                            </div>
-                            <div className="p-3 bg-white dark:bg-[#1b1c24] border border-border/80 rounded-2xl rounded-tl-none space-y-1">
-                              <p className="text-xs text-primary-text leading-relaxed whitespace-pre-wrap">{selectedInquiry.message}</p>
-                              <span className="text-[8px] text-muted-text block text-right">{new Date(selectedInquiry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                          </div>
-
-                          {/* Nested message replies */}
-                          {selectedInquiry.messages?.map((msg: any) => {
-                            const isAdmin = msg.senderRole === 'ADMIN'
-                            return (
-                              <div
-                                key={msg.id}
-                                className={`flex items-start gap-2.5 max-w-[85%] ${isAdmin ? 'ml-auto flex-row-reverse' : ''}`}
-                              >
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                                  isAdmin 
-                                    ? 'bg-primary/10 text-primary border border-primary/20' 
-                                    : 'bg-red-500/10 text-red-500'
-                                }`}>
-                                  {isAdmin ? 'A' : (user?.name ? user.name.charAt(0).toUpperCase() : 'U')}
-                                </div>
-                                <div className={`p-3 rounded-2xl space-y-1 border ${
-                                  isAdmin 
-                                    ? 'bg-primary text-white border-primary rounded-tr-none' 
-                                    : 'bg-white dark:bg-[#1b1c24] border-border/80 text-primary-text rounded-tl-none'
-                                }`}>
-                                  <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-                                  <span className={`text-[8px] block text-right ${isAdmin ? 'text-white/70' : 'text-muted-text'}`}>
-                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        {/* Chat input form */}
-                        <form onSubmit={handleSendReply} className="p-3 border-t border-border bg-secondary/10 flex gap-2 items-center">
+                        )}
+                        <div>
+                          <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Subject</label>
                           <input
                             type="text"
-                            placeholder="Type a message..."
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            disabled={sendingReply}
-                            className="flex-1 px-4 py-2 bg-white dark:bg-[#0b0c10] border border-border rounded-xl text-xs text-primary-text focus:outline-none focus:border-red-500/50"
+                            required
+                            placeholder="e.g. Issue with Order #12345"
+                            value={supportSubject}
+                            onChange={(e) => setSupportSubject(e.target.value)}
+                            className="w-full px-4 py-2 bg-[#fafafa] dark:bg-[#0b0c10] border border-border focus:border-red-500 rounded-lg text-primary-text focus:outline-none text-xs transition-all"
                           />
-                          <button
-                            type="submit"
-                            disabled={sendingReply || !replyText.trim()}
-                            className="p-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl cursor-pointer disabled:opacity-50 smooth-transition"
-                          >
-                            {sendingReply ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Send className="w-4 h-4" />
-                            )}
-                          </button>
-                        </form>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block mb-1">Message</label>
+                          <textarea
+                            required
+                            rows={5}
+                            placeholder="Describe your issue in detail..."
+                            value={supportMessage}
+                            onChange={(e) => setSupportMessage(e.target.value)}
+                            className="w-full px-4 py-2 bg-[#fafafa] dark:bg-[#0b0c10] border border-border focus:border-red-500 rounded-lg text-primary-text focus:outline-none text-xs transition-all resize-none"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={sendingSupportMail}
+                          className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition cursor-pointer disabled:bg-gray-300"
+                        >
+                          {sendingSupportMail ? 'Sending...' : 'Send Support Request'}
+                        </button>
                       </>
-                    ) : (
-                      <div className="text-center p-8 space-y-2 text-muted-text">
-                        <MessageSquare className="w-8 h-8 mx-auto opacity-30 text-red-500" />
-                        <h4 className="font-bold text-xs uppercase tracking-wider text-secondary-text">No Conversation Selected</h4>
-                        <p className="text-[11px]">Select a ticket from the left list to open the direct messaging thread.</p>
-                      </div>
                     )}
-                  </div>
+                  </form>
                 </div>
               </motion.div>
             )}
@@ -1200,65 +1123,70 @@ export default function DashboardPage() {
                       )}
                       
                       <div>
-                        <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Street Address</label>
+                        <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Street / House No.</label>
                         <input
                           type="text"
-                          name="street"
+                          name="streetNo"
                           required
-                          value={addressForm.street}
+                          value={addressForm.streetNo}
                           onChange={handleInputChange}
                           className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
-                          placeholder="e.g. 123 Main Road, Apt 4B"
+                          placeholder="e.g. Flat 102, Building A, Street No 4"
                         />
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Phone Number</label>
-                        <div className="flex gap-2">
+                        <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Locality / Area</label>
+                        <input
+                          type="text"
+                          name="locality"
+                          required
+                          value={addressForm.locality}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
+                          placeholder="e.g. Sector 15, Rohini"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Landmark <span className="text-[8px] text-muted-text font-normal lowercase">(optional)</span></label>
+                        <input
+                          type="text"
+                          name="landmark"
+                          value={addressForm.landmark}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
+                          placeholder="e.g. Near Hanuman Temple"
+                        />
+                        <span className="text-[9px] text-amber-500 font-bold mt-1 block">
+                          ⚠️ Please provide a detailed address with complete house/flat details so your order does not get swapped or misplaced.
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Primary Phone Number</label>
                           <input
                             type="tel"
                             name="phone"
                             required
                             value={addressForm.phone}
                             onChange={handleInputChange}
-                            className="flex-1 px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
+                            className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
                             placeholder="e.g. +91 98765 43210"
                           />
-                          {!isAddrPhoneVerified && (
-                            <button
-                              type="button"
-                              onClick={handleSendAddrPhoneOtp}
-                              disabled={isSendingAddrOtp || addressForm.phone.replace(/^\+91/, '').replace(/\D/g, '').length !== 10}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold rounded-lg text-xs transition cursor-pointer"
-                            >
-                              {isSendingAddrOtp ? 'Sending...' : 'Verify'}
-                            </button>
-                          )}
-                          {isAddrPhoneVerified && (
-                            <span className="flex items-center gap-1 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-[9px]">
-                              <ShieldCheck className="w-3.5 h-3.5" /> Verified
-                            </span>
-                          )}
                         </div>
-                        {addrOtpSent && !isAddrPhoneVerified && (
-                          <div className="mt-3 flex gap-2 items-center bg-gray-50 dark:bg-black/30 p-3 rounded-lg border border-border">
-                            <input
-                              type="text"
-                              placeholder="Enter OTP"
-                              value={addrOtpInput}
-                              onChange={(e) => setAddrOtpInput(e.target.value.replace(/\D/g, '').substring(0, 6))}
-                              className="px-3 py-2 bg-secondary/50 border border-border rounded-lg text-xs text-primary-text w-32 focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleVerifyAddrPhoneOtp}
-                              disabled={isVerifyingAddrOtp || addrOtpInput.length !== 6}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded-lg text-xs transition cursor-pointer"
-                            >
-                              {isVerifyingAddrOtp ? 'Verifying...' : 'Confirm'}
-                            </button>
-                          </div>
-                        )}
+                        <div>
+                          <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Alternate Phone Number <span className="text-[8px] text-muted-text font-normal lowercase">(optional)</span></label>
+                          <input
+                            type="tel"
+                            name="alternatePhone"
+                            value={addressForm.alternatePhone}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
+                            placeholder="e.g. +91 98765 43210"
+                          />
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -1275,7 +1203,7 @@ export default function DashboardPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Postal Code</label>
+                          <label className="text-[10px] font-bold text-secondary-text uppercase tracking-wide block mb-1">Postal Code (Pincode)</label>
                           <input
                             type="text"
                             name="postalCode"
@@ -1285,6 +1213,9 @@ export default function DashboardPage() {
                             className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-primary-text focus:outline-none focus:border-red-500/50 text-xs smooth-transition"
                             placeholder="e.g. 400001"
                           />
+                          <span className="text-[9px] text-amber-500 font-bold mt-1 block">
+                            ℹ️ Please verify your pincode once to ensure correct delivery.
+                          </span>
                         </div>
                       </div>
 

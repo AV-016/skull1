@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { env } from '../config/env';
 import logger from './logger';
+import { prisma } from '../config/database';
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY as string) : null;
 
@@ -258,6 +259,91 @@ export async function sendPasswordResetOtpEmail(to: string, name: string, otp: s
       console.log(`\n==================================================`);
       console.log(`[PASSWORD RESET OTP CODE FALLBACK] for ${to} (due to error: ${err.message}):`);
       console.log(`Code: ${otp}`);
+      console.log(`==================================================\n`);
+    } else {
+      throw err;
+    }
+  }
+}
+
+export async function sendSupportRequestEmail(
+  userEmail: string,
+  userName: string,
+  subject: string,
+  message: string
+): Promise<void> {
+  const emailSubject = `New Support Request: ${subject}`;
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+      <h2 style="color: #333333; text-align: center; border-bottom: 2px solid #ff4444; padding-bottom: 10px;">Support Request</h2>
+      <p style="font-size: 14px; color: #555555;"><strong>From User:</strong> ${userName} (${userEmail})</p>
+      <p style="font-size: 14px; color: #555555;"><strong>Subject:</strong> ${subject}</p>
+      <hr style="border: none; border-top: 1px solid #eeeeee; margin: 20px 0;" />
+      <p style="font-size: 14px; color: #333333; font-weight: bold;">Message:</p>
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; font-size: 14px; color: #333333; white-space: pre-wrap; line-height: 1.5; border: 1px solid #eeeeee;">
+        ${message}
+      </div>
+    </div>
+  `;
+
+  const globalSettings = await prisma.settings.findUnique({
+    where: { id: 'global' }
+  });
+  const toEmail = globalSettings?.supportEmail || 'sanchit7613@gmail.com';
+  const fromAddress = env.EMAIL_FROM_NOREPLY;
+
+  try {
+    if (transporter) {
+      const from = env.SMTP_FROM_EMAIL || env.SMTP_USER || fromAddress;
+      await transporter.sendMail({
+        from,
+        to: toEmail,
+        replyTo: userEmail,
+        subject: emailSubject,
+        html: htmlContent,
+      });
+      logger.info(`Support email successfully sent via SMTP to ${toEmail} from ${from}.`);
+      return;
+    }
+
+    if (resend) {
+      const { data, error } = await resend.emails.send({
+        from: fromAddress,
+        to: [toEmail],
+        replyTo: userEmail,
+        subject: emailSubject,
+        html: htmlContent,
+      });
+
+      if (error) {
+        logger.error(`Resend API returned error for support email:`, error);
+        throw new Error(error.message);
+      }
+
+      logger.info(`Support email successfully sent via Resend to ${toEmail}.`, { emailId: data?.id });
+      return;
+    }
+
+    // Mock Fallback
+    if (env.NODE_ENV === 'development') {
+      logger.warn(`[MAIL MOCK] Neither SMTP nor Resend API key is configured. Support request details:`);
+      console.log(`\n==================================================`);
+      console.log(`[SUPPORT EMAIL MOCK] to ${toEmail}:`);
+      console.log(`From: ${userName} (${userEmail})`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Message: ${message}`);
+      console.log(`==================================================\n`);
+    } else {
+      logger.warn(`[MAIL MOCK] Support request email suppressed in production.`);
+    }
+  } catch (err: any) {
+    logger.error(`Failed to send support email:`, err);
+    if (env.NODE_ENV === 'development') {
+      console.log(`\n==================================================`);
+      console.log(`[SUPPORT EMAIL FALLBACK] (due to error: ${err.message}):`);
+      console.log(`From: ${userName} (${userEmail})`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Message: ${message}`);
       console.log(`==================================================\n`);
     } else {
       throw err;
