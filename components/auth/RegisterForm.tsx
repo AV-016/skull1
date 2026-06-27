@@ -116,7 +116,7 @@ export const RegisterForm = () => {
         </label>
         <input
           type="text"
-          placeholder="John Doe"
+          placeholder="Aarav Sharma"
           {...register('name')}
           className="w-full px-4 py-2.5 bg-secondary border border-border rounded-xl text-primary-text placeholder-muted-text focus:outline-none focus:border-primary/50 smooth-transition text-sm"
           disabled={isPending}

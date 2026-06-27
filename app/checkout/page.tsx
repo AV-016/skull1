@@ -778,7 +778,7 @@ function CheckoutContent() {
                           value={formData.fullName}
                           onChange={handleInputChange}
                           className="w-full px-4 py-2 bg-secondary border border-border focus:border-primary rounded-lg text-primary-text focus:outline-none text-sm transition-all"
-                          placeholder="John Doe"
+                          placeholder="Aarav Sharma"
                         />
                       </div>
                       <div className="sm:col-span-2">
