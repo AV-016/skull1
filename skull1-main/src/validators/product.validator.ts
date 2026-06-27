@@ -10,6 +10,7 @@ export const createProductSchema = z.object({
     categoryId: z.string().min(1, 'Category is required'),
     tags: z.array(z.string()).optional(),
     images: z.array(z.string()).optional(),
+    bestSellerOrder: z.number().int().min(0).max(10).optional(),
     variants: z.array(z.object({
       id: z.string().optional(),
       name: z.string().min(1, 'Variant name is required'),
@@ -31,6 +32,7 @@ export const updateProductSchema = z.object({
     categoryId: z.string().optional(),
     isActive: z.boolean().optional(),
     isFeatured: z.boolean().optional(),
+    bestSellerOrder: z.number().int().min(0).max(10).optional(),
     tags: z.array(z.string()).optional(),
     images: z.array(z.string()).optional(),
     variants: z.array(z.object({

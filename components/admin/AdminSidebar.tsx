@@ -29,6 +29,7 @@ export function AdminSidebar() {
 
   const menuItems = [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { label: 'Best Sellers', href: '/admin/best-sellers', icon: Award },
     { label: 'Products', href: '/admin/products', icon: Package },
     { label: 'Categories', href: '/admin/categories', icon: Tag },
     { label: 'Events & Offers', href: '/admin/events', icon: Calendar },

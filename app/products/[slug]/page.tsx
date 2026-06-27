@@ -568,6 +568,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                           {sanitizedProduct.eventPromo.discountPercentage}% OFF — Under {sanitizedProduct.eventPromo.eventTitle}
                         </span>
                       )}
+                      {sanitizedProduct.bestSellerOrder && sanitizedProduct.bestSellerOrder > 0 ? (
+                        <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1.5 flex items-center gap-1.5 shadow-sm">
+                          🔥 #{sanitizedProduct.bestSellerOrder} Best Seller
+                        </span>
+                      ) : null}
                     </div>
 
                     {/* Stock Info */}
