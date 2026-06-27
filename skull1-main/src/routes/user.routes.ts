@@ -9,6 +9,7 @@ router.use(protect); // All user routes require authentication
 
 router.get('/profile', controller.getProfile);
 router.patch('/profile', controller.updateProfile);
+router.post('/profile/password', controller.changePassword);
 router.delete('/profile', controller.deleteProfile);
 
 router.get('/dashboard', controller.getDashboard);

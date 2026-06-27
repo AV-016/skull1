@@ -97,6 +97,53 @@ export default function AccountPage() {
   const [editEmail, setEditEmail] = useState(false)
   const [editMobile, setEditMobile] = useState(false)
 
+  // Change Password States
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [editPassword, setEditPassword] = useState(false)
+  const [passError, setPassError] = useState<string | null>(null)
+  const [passSuccess, setPassSuccess] = useState<string | null>(null)
+  const [updatingPassword, setUpdatingPassword] = useState(false)
+
+  const handleSavePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPassError(null)
+    setPassSuccess(null)
+
+    const hasUppercase = /[A-Z]/.test(newPassword)
+    const hasNumber = /[0-9]/.test(newPassword)
+    const hasSpecial = /[^A-Za-z0-9]/.test(newPassword)
+    const isMinLength = newPassword.length >= 8
+
+    if (!hasUppercase || !hasNumber || !hasSpecial || !isMinLength) {
+      setPassError('Password must be at least 8 characters long and contain at least one uppercase letter (A-Z), one number (0-9), and one special character (symbol).')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPassError('New passwords do not match')
+      return
+    }
+
+    setUpdatingPassword(true)
+    try {
+      await api.post('/users/profile/password', {
+        currentPassword,
+        newPassword
+      })
+      setPassSuccess('Password updated successfully!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setEditPassword(false)
+    } catch (err: any) {
+      setPassError(err.response?.data?.message || 'Failed to update password. Please try again.')
+    } finally {
+      setUpdatingPassword(false)
+    }
+  }
+
   // Phone Verification States
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [phoneInput, setPhoneInput] = useState('')
@@ -979,6 +1026,87 @@ export default function AccountPage() {
                     >
                       Save
                     </button>
+                  )}
+                </div>
+
+                {/* Change Password */}
+                <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-4">
+                    <h3 className="text-base font-bold text-black dark:text-white">Security & Password</h3>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setEditPassword(!editPassword)
+                        setPassError(null)
+                        setPassSuccess(null)
+                        setCurrentPassword('')
+                        setNewPassword('')
+                        setConfirmPassword('')
+                      }} 
+                      className="text-red-500 font-bold hover:underline cursor-pointer"
+                    >
+                      {editPassword ? 'Cancel' : 'Change Password'}
+                    </button>
+                  </div>
+
+                  {passSuccess && (
+                    <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-500 text-xs rounded font-medium max-w-xl">
+                      {passSuccess}
+                    </div>
+                  )}
+
+                  {passError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded font-medium max-w-xl leading-relaxed">
+                      {passError}
+                    </div>
+                  )}
+
+                  {editPassword && (
+                    <form onSubmit={handleSavePassword} className="space-y-4 max-w-xl">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Current Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full px-4 py-2.5 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full px-4 py-2.5 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                        />
+                        <span className="text-[10px] text-amber-500 font-bold mt-1 block">
+                          ⚠️ Password must be at least 8 characters, with 1 uppercase letter, 1 number, and 1 special symbol.
+                        </span>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Confirm New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full px-4 py-2.5 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={updatingPassword}
+                        className="px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold rounded uppercase tracking-wider transition cursor-pointer text-xs"
+                      >
+                        {updatingPassword ? 'Updating...' : 'Update Password'}
+                      </button>
+                    </form>
                   )}
                 </div>
 
