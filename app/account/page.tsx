@@ -26,7 +26,9 @@ import {
   Star, 
   Bell, 
   Lock,
-  LogOut
+  LogOut,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { useVerifyPhoneOtp, useDeleteAccount } from '@/hooks/useAuth'
 import { auth } from '@/lib/firebase'
@@ -105,6 +107,9 @@ export default function AccountPage() {
   const [passError, setPassError] = useState<string | null>(null)
   const [passSuccess, setPassSuccess] = useState<string | null>(null)
   const [updatingPassword, setUpdatingPassword] = useState(false)
+  const [showCurrentPass, setShowCurrentPass] = useState(false)
+  const [showNewPass, setShowNewPass] = useState(false)
+  const [showConfirmPass, setShowConfirmPass] = useState(false)
 
   const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1065,39 +1070,66 @@ export default function AccountPage() {
                     <form onSubmit={handleSavePassword} className="space-y-4 max-w-xl">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Current Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full px-4 py-2.5 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showCurrentPass ? "text" : "password"}
+                            required
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full px-4 py-2.5 pr-10 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPass(!showCurrentPass)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition cursor-pointer"
+                          >
+                            {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">New Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full px-4 py-2.5 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showNewPass ? "text" : "password"}
+                            required
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full px-4 py-2.5 pr-10 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPass(!showNewPass)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition cursor-pointer"
+                          >
+                            {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                         <span className="text-[10px] text-amber-500 font-bold mt-1 block">
                           ⚠️ Password must be at least 8 characters, with 1 uppercase letter, 1 number, and 1 special symbol.
                         </span>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Confirm New Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full px-4 py-2.5 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showConfirmPass ? "text" : "password"}
+                            required
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full px-4 py-2.5 pr-10 border border-[#e0e0e0] dark:border-gray-800 rounded bg-gray-50/50 dark:bg-[#0b0c10] text-black dark:text-white focus:outline-none focus:border-red-500 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPass(!showConfirmPass)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition cursor-pointer"
+                          >
+                            {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="submit"
