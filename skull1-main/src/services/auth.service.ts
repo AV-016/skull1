@@ -22,7 +22,45 @@ export class AuthService {
     const email = String(data.email || '').trim().toLowerCase();
     const existingUser = await userRepository.findByEmail(email);
     if (existingUser) {
-      throw new AppError(400, MESSAGES.AUTH.USER_EXISTS);
+      if (existingUser.isVerified) {
+        throw new AppError(400, MESSAGES.AUTH.USER_EXISTS);
+      }
+      
+      // If user exists but is not verified, allow updating registration details and re-sending OTP
+      const hashedPassword = await hashPassword(data.password);
+      const updatedUser = await userRepository.update(existingUser.id, {
+        password: hashedPassword,
+        name: data.name,
+      });
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      await prisma.emailOTP.deleteMany({
+        where: { email: updatedUser.email },
+      });
+      await prisma.emailOTP.create({
+        data: {
+          email: updatedUser.email,
+          otp,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+
+      let emailSent = true;
+      try {
+        await sendOtpEmail(updatedUser.email, updatedUser.name || 'User', otp);
+      } catch (emailErr: any) {
+        logger.error(`Failed to send verification email during re-registration to ${updatedUser.email}:`, emailErr);
+        emailSent = false;
+      }
+
+      const token = generateToken({
+        userId: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        tokenVersion: updatedUser.tokenVersion,
+      });
+
+      return formatAuthResponse(updatedUser, token, emailSent);
     }
 
     const hashedPassword = await hashPassword(data.password);

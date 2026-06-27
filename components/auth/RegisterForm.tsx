@@ -10,12 +10,18 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ShieldAlert } from 'lucide-react'
 
+const strongPassword = z.string()
+  .min(8, 'Password must be at least 8 characters long')
+  .refine((val) => /[A-Z]/.test(val), { message: 'Must contain at least one uppercase letter (A-Z)' })
+  .refine((val) => /[0-9]/.test(val), { message: 'Must contain at least one number (0-9)' })
+  .refine((val) => /[^A-Za-z0-9]/.test(val), { message: 'Must contain at least one special character/symbol' })
+
 // Local registration validation schema including client-only validation fields
 const registerFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
+  password: strongPassword,
+  confirmPassword: z.string(),
   agreeTerms: z.boolean().refine((val) => val === true, {
     message: 'You must agree to the Terms & Privacy Policy',
   }),
@@ -101,11 +107,22 @@ export const RegisterForm = () => {
     >
       {/* Error Message */}
       {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-          <p className="text-red-500 text-xs leading-relaxed font-medium">
-            {(error as any)?.response?.data?.message || 'Registration failed. Please try again.'}
-          </p>
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex flex-col gap-2">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="text-red-500 text-xs leading-relaxed font-bold">
+              {(error as any)?.response?.data?.message || 'Registration failed. Please try again.'}
+            </p>
+          </div>
+          {(error as any)?.response?.data?.errors && (
+            <ul className="list-disc list-inside pl-8 text-red-500 text-[11px] space-y-1 font-semibold leading-relaxed">
+              {Object.entries((error as any).response.data.errors).map(([field, msgs]: any) => (
+                <li key={field}>
+                  {msgs.join(', ')}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
