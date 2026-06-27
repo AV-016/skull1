@@ -41,6 +41,7 @@ export default function AdminProducts() {
     variants: [] as any[],
     isActive: true,
     isFeatured: false,
+    bestSellerOrder: 0,
     specifications: [] as { key: string; value: string }[]
   })
 
@@ -143,6 +144,7 @@ export default function AdminProducts() {
       variants: [],
       isActive: true,
       isFeatured: false,
+      bestSellerOrder: 0,
       specifications: [
         { key: 'Material', value: '' },
         { key: 'Dimensions', value: '' },
@@ -191,6 +193,7 @@ export default function AdminProducts() {
       variants: variantsList,
       isActive: product.isActive ?? true,
       isFeatured: product.isFeatured ?? false,
+      bestSellerOrder: product.bestSellerOrder ?? 0,
       specifications: specsList
     })
     setIsModalOpen(true)
@@ -220,6 +223,7 @@ export default function AdminProducts() {
       categoryId: formData.categoryId,
       isActive: formData.isActive,
       isFeatured: formData.isFeatured,
+      bestSellerOrder: Number(formData.bestSellerOrder),
       images: formData.images,
       specifications: Object.keys(specsObj).length > 0 ? specsObj : null,
       variants: formData.variants.map((v: any) => ({
@@ -960,6 +964,22 @@ export default function AdminProducts() {
                     />
                     <span>Feature on Home</span>
                   </label>
+                </div>
+
+                {/* Best Seller Order */}
+                <div className="space-y-1.5 pt-2">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Best Seller Priority (1 to 10)</label>
+                  <select
+                    value={formData.bestSellerOrder}
+                    onChange={(e) => setFormData({ ...formData, bestSellerOrder: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                  >
+                    <option value={0}>Unset / None</option>
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <option key={i + 1} value={i + 1}>Priority {i + 1} {i === 0 ? '(Highest)' : ''}</option>
+                    ))}
+                  </select>
+                  <p className="text-[9px] text-muted-text">Controls the exact position (1 to 10) in the storefront Best Sellers grid.</p>
                 </div>
 
                 {/* Submit button */}

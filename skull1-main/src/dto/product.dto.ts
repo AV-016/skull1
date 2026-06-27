@@ -10,6 +10,7 @@ export interface ProductResponseDTO {
   stock: number;
   isActive: boolean;
   isFeatured: boolean;
+  bestSellerOrder: number;
   category: {
     id: string;
     name: string;
@@ -93,6 +94,7 @@ export const formatProductResponse = (product: ProductWithDetails): ProductRespo
     stock: product.stock,
     isActive: product.isActive,
     isFeatured: product.isFeatured,
+    bestSellerOrder: product.bestSellerOrder,
     category: {
       id: product.category.id,
       name: product.category.name,

@@ -75,6 +75,7 @@ model Product {
   stock          Int            @default(0)
   isActive       Boolean        @default(true)
   isFeatured     Boolean        @default(false)
+  bestSellerOrder Int           @default(0)
   categoryId     String
   specifications Json?
   weightGrams    Float          @default(0.0)

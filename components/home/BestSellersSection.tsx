@@ -12,7 +12,13 @@ export function BestSellersSection() {
 
   // Fetch products from database
   const { data: serverProducts = [] } = useProducts()
-  const sanitizedServer = sanitizeProducts(serverProducts).filter(p => p.image && !p.image.includes('placeholder.jpg'))
+  const sanitizedServer = sanitizeProducts(serverProducts)
+    .filter(p => p.image && !p.image.includes('placeholder.jpg'))
+    .sort((a, b) => {
+      const orderA = a.bestSellerOrder && a.bestSellerOrder > 0 ? a.bestSellerOrder : 9999;
+      const orderB = b.bestSellerOrder && b.bestSellerOrder > 0 ? b.bestSellerOrder : 9999;
+      return orderA - orderB;
+    })
 
   // Filter active featured products from the database
   const featuredDbProducts = sanitizedServer.filter((p) => p.isActive && p.isFeatured)

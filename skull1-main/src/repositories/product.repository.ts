@@ -180,7 +180,7 @@ export class ProductRepository {
   }
 
   async create(data: CreateProductInput): Promise<Product> {
-    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [], variants = [], specifications = null } = data;
+    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [], variants = [], specifications = null, bestSellerOrder = 0 } = data;
     
     // Generate slug from name
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -194,6 +194,7 @@ export class ProductRepository {
         compareAtPrice,
         stock,
         categoryId,
+        bestSellerOrder,
         specifications: specifications || undefined,
         tags: {
           connect: tags.map((id) => ({ id })),

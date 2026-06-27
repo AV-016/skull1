@@ -31,4 +31,5 @@ export interface CreateProductInput {
   images?: string[]; // Image URLs
   variants?: CreateProductVariantInput[];
   specifications?: Record<string, string> | null;
+  bestSellerOrder?: number;
 }
