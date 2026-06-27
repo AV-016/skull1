@@ -15,7 +15,7 @@ export const apiLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour window
-  max: isDev ? 1000 : 10, // Greatly increase login attempts limit for development (1000 requests)
+  max: isDev ? 1000 : 5, // Greatly increase login attempts limit for development (1000 requests)
   standardHeaders: true,
   legacyHeaders: false,
   message: {
