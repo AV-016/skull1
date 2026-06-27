@@ -892,6 +892,64 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Back to Storefront Homepage CTA Section */}
+      <div className="pt-6 pb-2">
+        <div className="container mx-auto px-4 md:px-8 max-w-7xl">
+          <div className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-red-600/10 to-transparent p-6 md:p-8 hover:border-red-500/40 transition-all duration-300 flex flex-col lg:flex-row items-center justify-between gap-8 min-h-[160px]">
+            
+            {/* Left side: Sliding products section */}
+            {displayProducts && displayProducts.length > 0 && (
+              <div className="w-full lg:w-3/5 overflow-hidden relative">
+                <div className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth py-1">
+                  {displayProducts.map((prod: any) => {
+                    const primaryImg = prod.images?.find((img: any) => img.isPrimary)?.url || prod.image || '/placeholder.jpg'
+                    return (
+                      <Link 
+                        href={`/products/${prod.slug}`} 
+                        key={prod.id}
+                        className="flex-shrink-0 w-48 p-3 bg-secondary/20 dark:bg-card/25 border border-border/80 hover:border-primary/45 rounded-xl smooth-transition flex items-center gap-3 cursor-pointer shadow-sm hover:scale-102"
+                      >
+                        <div className="w-12 h-12 rounded border border-border overflow-hidden bg-secondary flex-shrink-0">
+                          <img 
+                            src={primaryImg} 
+                            alt={prod.name} 
+                            className="w-full h-full object-cover" 
+                          />
+                        </div>
+                        <div className="overflow-hidden flex-1 text-xs">
+                          <p className="font-bold text-[11px] text-primary-text truncate leading-tight">{prod.name}</p>
+                          <p className="text-[9px] text-muted-text capitalize mt-0.5">{prod.category?.name || 'Product'}</p>
+                          <p className="text-xs font-black text-primary mt-1">₹{prod.price}</p>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Right side: CTA Details */}
+            <div className="w-full lg:w-2/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-primary-text uppercase tracking-wider group-hover:text-red-500 transition-colors duration-300">
+                  CONTINUE SHOPPING
+                </h3>
+                <p className="text-xs text-muted-text max-w-sm leading-relaxed">
+                  Explore our full catalog, custom printing offers, and trending designs.
+                </p>
+              </div>
+              <Link 
+                href="/"
+                className="flex items-center gap-1.5 px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider rounded transition-all flex-shrink-0 cursor-pointer shadow-md shadow-red-500/10"
+              >
+                Shop Storefront <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+
       <div className="py-12 md:py-16">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl space-y-12">
           
