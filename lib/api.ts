@@ -14,10 +14,13 @@ const api: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor - Add authorization token
+// Request interceptor - Add authorization token and dynamic baseURL for local/mobile network testing
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+      config.baseURL = `http://${hostname}:5000/api`
+      
       const token = localStorage.getItem('authToken')
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
