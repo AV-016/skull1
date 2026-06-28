@@ -1087,6 +1087,19 @@ export default function OrderDetailPage() {
                   <span>Grand Total</span>
                   <span>{formatCurrency(grandTotalVal)}</span>
                 </div>
+
+                {order.orderNumber?.startsWith('CR-') && (
+                  <>
+                    <div className="flex justify-between text-secondary-text font-sans pt-2 border-t border-border/20">
+                      <span>20% Advance Paid (Online)</span>
+                      <span className="font-semibold text-green-500">-{formatCurrency(grandTotalVal * 0.20)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold text-amber-500 font-sans">
+                      <span>Remaining Balance</span>
+                      <span>{formatCurrency(grandTotalVal * 0.80)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
 

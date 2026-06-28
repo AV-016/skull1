@@ -195,6 +195,11 @@ export default function AdminOrders() {
                     <td className="px-6 py-4 text-muted-text">{formatDate(order.createdAt)}</td>
                     <td className="px-6 py-4 font-bold text-primary-text">
                       {formatCurrency(order.totalAmount || order.total)}
+                      {order.orderNumber?.startsWith('CR-') && (
+                        <div className="text-[9px] text-amber-500 font-medium mt-0.5">
+                          20% Adv: {formatCurrency(order.totalAmount * 0.20)} Paid
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 font-medium">
                       <div className="flex flex-col gap-1">

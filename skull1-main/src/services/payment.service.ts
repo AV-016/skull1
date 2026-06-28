@@ -63,8 +63,11 @@ export class PaymentService {
         }
 
         // 3. Create a new Razorpay order
+        const isCustomOrder = order.orderNumber.startsWith('CR-');
+        const payAmount = isCustomOrder ? Math.round(order.totalAmount * 0.20) : order.totalAmount;
+
         const options = {
-          amount: Math.round(order.totalAmount * 100), // Razorpay expects amount in paise (cents)
+          amount: Math.round(payAmount * 100), // Razorpay expects amount in paise (cents)
           currency: 'INR',
           receipt: order.orderNumber,
         };
@@ -76,7 +79,7 @@ export class PaymentService {
           data: {
             orderId: order.id,
             razorpayOrderId: rzpOrder.id,
-            amount: order.totalAmount,
+            amount: payAmount,
             status: 'created',
           },
         });
@@ -202,7 +205,7 @@ export class PaymentService {
 
           await tx.customRequest.update({
             where: { id: customRequestId },
-            data: { status: 'ACCEPTED' }
+            data: { status: 'COMPLETED' }
           });
           
           logger.info(`Custom Request #${customRequestId} automatically ACCEPTED following 20% advance payment verification for Order ID: ${orderId}`);

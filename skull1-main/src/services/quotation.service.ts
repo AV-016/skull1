@@ -193,10 +193,10 @@ export class QuotationService {
 
       const product = await tx.product.create({
         data: {
-          name: `${projectTitle} (20% Advance)`,
+          name: projectTitle,
           slug: `custom-project-${customRequest.id}-${Date.now()}`,
           description: customRequest.description,
-          price: advanceAmount,
+          price: quotation.price,
           categoryId: category.id,
           stock: 1,
           isActive: false,
@@ -229,7 +229,7 @@ export class QuotationService {
           orderNumber,
           userId: customRequest.userId,
           addressId: address.id,
-          totalAmount: advanceAmount,
+          totalAmount: quotation.price,
           status: OrderStatus.PENDING,
           paymentStatus: PaymentStatus.PENDING,
           paymentMethod: 'CARD', // Force online card payment
@@ -237,7 +237,7 @@ export class QuotationService {
             create: {
               productId: product.id,
               quantity: 1,
-              price: advanceAmount,
+              price: quotation.price,
             },
           },
         },
