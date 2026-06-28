@@ -1,7 +1,7 @@
 import { QuotationRepository } from '../repositories/quotation.repository';
 import { CustomRequestRepository } from '../repositories/customRequest.repository';
 import { AppError } from '../middlewares/error.middleware';
-import { QuotationStatus, CustomRequestStatus, InquiryStatus, Role } from '@prisma/client';
+import { QuotationStatus, CustomRequestStatus, InquiryStatus, Role, OrderStatus, PaymentStatus } from '@prisma/client';
 import { prisma } from '../config/database';
 
 const quotationRepository = new QuotationRepository();
