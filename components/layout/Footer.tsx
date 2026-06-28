@@ -100,9 +100,7 @@ export const Footer = () => {
               <span className="text-[10px] text-muted-text/80 uppercase tracking-widest font-black block">Created by Team Orion</span>
             </div>
             <div className="flex gap-6">
-              <a href="#twitter" className="text-secondary-text hover:text-primary smooth-transition text-sm">Twitter</a>
-              <a href="#instagram" className="text-secondary-text hover:text-primary smooth-transition text-sm">Instagram</a>
-              <a href="#github" className="text-secondary-text hover:text-primary smooth-transition text-sm">GitHub</a>
+              <a href="https://www.instagram.com/skulture.ag/" target="_blank" rel="noopener noreferrer" className="text-secondary-text hover:text-primary smooth-transition text-sm">Instagram</a>
             </div>
           </div>
         </div>
