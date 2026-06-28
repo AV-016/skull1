@@ -52,8 +52,15 @@ export const ReviewSchema = z.object({
 
 // Custom Request Schema
 export const CustomRequestSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters'),
-  description: z.string().min(20, 'Description must be at least 20 characters'),
+  title: z.string()
+    .min(5, 'Title must be at least 5 characters')
+    .max(50, 'Title must be at most 50 characters'),
+  description: z.string()
+    .min(20, 'Description must be at least 20 characters')
+    .refine(
+      (val) => val.trim().split(/\s+/).filter(Boolean).length <= 1000,
+      { message: 'Description must be at most 1000 words' }
+    ),
   phone: z.string().regex(/^\+91\d{10}$/, 'Phone number must be exactly 10 digits (excluding +91)'),
 })
 

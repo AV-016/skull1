@@ -97,6 +97,7 @@ export const FileUploadDropzone = ({
       )
       if (!isSupported) {
         console.warn(`File ${file.name} is not supported`)
+        alert(`File "${file.name}" is not supported. Please upload formats like STL, OBJ, STEP, PNG, or JPG. ZIP/compressed files are not allowed.`)
         continue
       }
 

@@ -283,6 +283,7 @@ export default function CustomRequestPage() {
                       type="text"
                       placeholder="e.g., Custom Bracket Design"
                       {...register('title')}
+                      maxLength={50}
                       className="w-full px-4 py-3 bg-secondary border border-border rounded-lg text-primary-text placeholder-muted-text focus:outline-none focus:border-primary/40 smooth-transition"
                       disabled={isSubmitting}
                     />
@@ -328,8 +329,8 @@ export default function CustomRequestPage() {
                     {errors.description && (
                       <p className="text-red-400 text-sm mt-1">{(errors.description as any)?.message}</p>
                     )}
-                    <p className="text-secondary-text text-xs mt-2">
-                      {description?.length || 0} characters
+                    <p className="text-secondary-text text-xs mt-2 font-medium">
+                      {description ? description.trim().split(/\s+/).filter(Boolean).length : 0} / 1000 words
                     </p>
                   </div>
                 </div>
