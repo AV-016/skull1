@@ -298,7 +298,7 @@ export function NewArrivalsSection() {
                     </span>
                   </div>
 
-                  <p className="text-secondary-text text-sm leading-relaxed mb-6">
+                  <p className="text-secondary-text text-sm leading-relaxed mb-6 whitespace-pre-line">
                     {selectedProduct.description}
                   </p>
 

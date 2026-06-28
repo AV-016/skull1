@@ -162,7 +162,7 @@ export function BestSellersSection() {
                   </div>
                 </div>
 
-                <p className="text-secondary-text text-sm mt-4 leading-relaxed">
+                <p className="text-secondary-text text-sm mt-4 leading-relaxed whitespace-pre-line">
                   {heroProduct.description}
                 </p>
 
