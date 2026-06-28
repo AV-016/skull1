@@ -36,23 +36,34 @@ export class PaymentService {
           throw new AppError(403, 'Forbidden checkout order access');
         }
 
-        if (order.paymentStatus === 'PAID') {
+        const isCustomOrder = order.orderNumber.startsWith('CR-');
+        if (order.paymentStatus === 'PAID' && !isCustomOrder) {
           throw new AppError(400, 'Order is already paid');
         }
 
-        // 2. Check for an existing payment record
+        // 2. Calculate paid amounts and check payment status
+        const successfulPayments = await tx.payment.findMany({
+          where: {
+            orderId: order.id,
+            status: 'success',
+          },
+        });
+
+        const totalPaid = successfulPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        if (totalPaid >= order.totalAmount) {
+          throw new AppError(400, 'Order is already fully paid');
+        }
+
+        // Check for an existing pending payment record
         const existingPayment = await tx.payment.findFirst({
           where: {
             orderId: order.id,
-            status: { in: ['created', 'success'] },
+            status: 'created',
           },
         });
 
         if (existingPayment) {
-          if (existingPayment.status === 'success') {
-            throw new AppError(400, 'Order is already paid');
-          }
-          // Reuse the existing Razorpay order
           return {
             keyId: env.RAZORPAY_KEY_ID,
             amount: Math.round(existingPayment.amount * 100),
@@ -63,8 +74,15 @@ export class PaymentService {
         }
 
         // 3. Create a new Razorpay order
-        const isCustomOrder = order.orderNumber.startsWith('CR-');
-        const payAmount = isCustomOrder ? Math.round(order.totalAmount * 0.20) : order.totalAmount;
+        isCustomOrder;
+        let payAmount = order.totalAmount;
+        if (isCustomOrder) {
+          if (successfulPayments.length === 0) {
+            payAmount = Math.round(order.totalAmount * 0.20);
+          } else {
+            payAmount = Math.round(order.totalAmount - totalPaid);
+          }
+        }
 
         const options = {
           amount: Math.round(payAmount * 100), // Razorpay expects amount in paise (cents)
@@ -129,7 +147,7 @@ export class PaymentService {
     }
 
     if (order.paymentStatus !== PaymentStatus.PAID) {
-      // Mark payment as successful, update order payment status
+      // Retrieve total paid including current verified payment (which is set to success now)
       await paymentRepository.updateStatus(
         razorpayOrderId,
         'success',
@@ -137,9 +155,27 @@ export class PaymentService {
         razorpaySignature
       );
 
-      await orderRepository.updatePaymentStatus(orderId, PaymentStatus.PAID, razorpayPaymentId);
-      await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED, 'Payment received, order confirmed.');
-      logger.info(`Payment successful (user checkout verified) - Order ID: ${orderId}, Number: ${order.orderNumber}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
+      const allPayments = await prisma.payment.findMany({
+        where: { orderId, status: 'success' }
+      });
+      let totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+      const isCustom = order.orderNumber.startsWith('CR-');
+      if (isCustom && order.status !== OrderStatus.PENDING) {
+        const hasAdvance = allPayments.some(p => p.amount === Math.round(order.totalAmount * 0.20));
+        if (!hasAdvance) {
+          totalPaid += Math.round(order.totalAmount * 0.20);
+        }
+      }
+      const isFullyPaid = totalPaid >= order.totalAmount;
+      const nextPaymentStatus = isFullyPaid ? PaymentStatus.PAID : PaymentStatus.PENDING;
+
+      await orderRepository.updatePaymentStatus(orderId, nextPaymentStatus, razorpayPaymentId);
+      
+      if (order.status === OrderStatus.PENDING) {
+        await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED, 'Advance payment received, order confirmed.');
+      }
+      
+      logger.info(`Payment successful (user checkout verified) - Order ID: ${orderId}, Number: ${order.orderNumber}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}, fullyPaid: ${isFullyPaid}`);
 
       // Handle custom request quotation acceptance automatically
       try {
@@ -276,13 +312,27 @@ export class PaymentService {
           return;
         }
 
-        // Update the order details
+        // Update the order details based on total payment sum
+        const allPayments = await tx.payment.findMany({
+          where: { orderId: payment.orderId, status: 'success' }
+        });
+        let totalPaid = allPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
+        const isCustom = payment.order.orderNumber.startsWith('CR-');
+        if (isCustom && payment.order.status !== OrderStatus.PENDING) {
+          const hasAdvance = allPayments.some((p: any) => p.amount === Math.round(payment.order.totalAmount * 0.20));
+          if (!hasAdvance) {
+            totalPaid += Math.round(payment.order.totalAmount * 0.20);
+          }
+        }
+        const isFullyPaid = totalPaid >= payment.order.totalAmount;
+        const nextPaymentStatus = isFullyPaid ? PaymentStatus.PAID : PaymentStatus.PENDING;
+
         await tx.order.update({
           where: { id: payment.orderId },
           data: {
-            paymentStatus: PaymentStatus.PAID,
+            paymentStatus: nextPaymentStatus,
             paymentId: razorpayPaymentId,
-            status: OrderStatus.CONFIRMED
+            status: payment.order.status === OrderStatus.PENDING ? OrderStatus.CONFIRMED : payment.order.status
           }
         });
 
@@ -292,8 +342,8 @@ export class PaymentService {
         await tx.orderStatusHistory.create({
           data: {
             orderId: payment.orderId,
-            status: OrderStatus.CONFIRMED,
-            notes: 'Payment confirmed via webhook.'
+            status: payment.order.status === OrderStatus.PENDING ? OrderStatus.CONFIRMED : payment.order.status,
+            notes: isFullyPaid ? 'Full payment confirmed via webhook.' : 'Advance payment confirmed via webhook.'
           }
         });
 

@@ -355,56 +355,58 @@ export default function AdminCustomRequests() {
               </div>
 
               {/* Send Quotation Form */}
-              <form onSubmit={handleCreateQuotation} className="pt-4 border-t border-white/10 space-y-4">
-                <h4 className="text-xs font-bold text-muted uppercase tracking-wider">Send Price Quotation</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] text-muted font-bold uppercase tracking-wider mb-2">Price Amount (INR)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-3 text-muted">₹</span>
+              {['PENDING', 'REVIEWED'].includes(selectedRequest.status) && (
+                <form onSubmit={handleCreateQuotation} className="pt-4 border-t border-white/10 space-y-4">
+                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider">Send Price Quotation</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-muted font-bold uppercase tracking-wider mb-2">Price Amount (INR)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-3 text-muted">₹</span>
+                        <input
+                          type="number"
+                          required
+                          placeholder="e.g. 1500"
+                          value={quotePrice}
+                          onChange={(e) => setQuotePrice(e.target.value)}
+                          className="w-full pl-8 pr-4 py-2.5 bg-white/5 border border-white/10 focus:border-primary/50 focus:outline-none rounded text-sm text-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-muted font-bold uppercase tracking-wider mb-2">Validity Period (Days)</label>
                       <input
                         type="number"
                         required
-                        placeholder="e.g. 1500"
-                        value={quotePrice}
-                        onChange={(e) => setQuotePrice(e.target.value)}
-                        className="w-full pl-8 pr-4 py-2.5 bg-white/5 border border-white/10 focus:border-primary/50 focus:outline-none rounded text-sm text-white"
+                        placeholder="7"
+                        value={quoteValidity}
+                        onChange={(e) => setQuoteValidity(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-white/5 border border-white/10 focus:border-primary/50 focus:outline-none rounded text-sm text-white"
                       />
                     </div>
                   </div>
+
                   <div>
-                    <label className="block text-[10px] text-muted font-bold uppercase tracking-wider mb-2">Validity Period (Days)</label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="7"
-                      value={quoteValidity}
-                      onChange={(e) => setQuoteValidity(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 focus:border-primary/50 focus:outline-none rounded text-sm text-white"
+                    <label className="block text-[10px] text-muted font-bold uppercase tracking-wider mb-2">Quotation Notes (Optional)</label>
+                    <textarea
+                      placeholder="Provide details about print resolution, material specs, or estimated delivery..."
+                      rows={3}
+                      value={quoteNotes}
+                      onChange={(e) => setQuoteNotes(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 focus:border-primary/50 focus:outline-none rounded text-sm text-white resize-none"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-[10px] text-muted font-bold uppercase tracking-wider mb-2">Quotation Notes (Optional)</label>
-                  <textarea
-                    placeholder="Provide details about print resolution, material specs, or estimated delivery..."
-                    rows={3}
-                    value={quoteNotes}
-                    onChange={(e) => setQuoteNotes(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 focus:border-primary/50 focus:outline-none rounded text-sm text-white resize-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submittingQuote}
-                  className="w-full flex items-center justify-center gap-1.5 py-3 bg-primary hover:bg-primary/95 text-white font-black uppercase text-xs tracking-wider rounded cursor-pointer transition shadow-lg disabled:opacity-50"
-                >
-                  {submittingQuote && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Submit Quotation
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={submittingQuote}
+                    className="w-full flex items-center justify-center gap-1.5 py-3 bg-primary hover:bg-primary/95 text-white font-black uppercase text-xs tracking-wider rounded cursor-pointer transition shadow-lg disabled:opacity-50"
+                  >
+                    {submittingQuote && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Submit Quotation
+                  </button>
+                </form>
+              )}
 
             </motion.div>
           </div>

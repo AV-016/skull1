@@ -55,6 +55,7 @@ export interface OrderResponseDTO {
   customerPincode?: string | null;
   shippingRateId?: string | null;
   shippingRuleVersion?: number;
+  payments?: any[];
   user?: {
     id: string;
     name: string | null;
@@ -66,6 +67,7 @@ export type OrderWithDetails = Order & {
   address: Address;
   items: (OrderItem & { product: Product & { images: ProductImage[] } })[];
   statusHistory: OrderStatusHistory[];
+  payments?: any[];
   user?: User | null;
 };
 
@@ -128,6 +130,7 @@ export const formatOrderResponse = (order: OrderWithDetails): OrderResponseDTO =
       notes: history.notes,
       createdAt: history.createdAt,
     })),
+    payments: order.payments || [],
     user: order.user ? {
       id: order.user.id,
       name: order.user.name,

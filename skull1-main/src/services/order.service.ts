@@ -344,9 +344,10 @@ export class OrderService {
       throw new AppError(400, 'Cannot cancel order that is already being processed or shipped');
     }
 
-    // If the payment status is PAID and payment method was CARD, trigger Razorpay refund
+    // If the payment status is PAID and payment method was CARD, trigger Razorpay refund (bypass for custom orders)
     let targetPaymentStatus = order.paymentStatus;
-    if (order.paymentStatus === PaymentStatus.PAID && order.paymentMethod === 'CARD' && order.paymentId) {
+    const isCustomOrder = order.orderNumber.startsWith('CR-');
+    if (order.paymentStatus === PaymentStatus.PAID && order.paymentMethod === 'CARD' && order.paymentId && !isCustomOrder) {
       try {
         await razorpay.payments.refund(order.paymentId, {
           amount: Math.round(order.totalAmount * 100),
@@ -375,9 +376,11 @@ export class OrderService {
         data: {
           orderId,
           status: OrderStatus.CANCELLED,
-          notes: order.paymentStatus === PaymentStatus.PAID && order.paymentMethod === 'CARD'
-            ? 'Cancelled by customer. Refund processed successfully via Razorpay.'
-            : 'Cancelled by customer.',
+          notes: isCustomOrder 
+            ? 'Cancelled by customer. Custom order advance payment is non-refundable.'
+            : (order.paymentStatus === PaymentStatus.PAID && order.paymentMethod === 'CARD'
+                ? 'Cancelled by customer. Refund processed successfully via Razorpay.'
+                : 'Cancelled by customer.'),
         },
       });
 
@@ -522,16 +525,39 @@ export class OrderService {
       throw new AppError(400, 'Order is already refunded');
     }
 
-    if (order.paymentMethod === 'CARD' && order.paymentId) {
+    if (order.paymentMethod === 'CARD') {
       try {
-        await razorpay.payments.refund(order.paymentId, {
-          amount: Math.round(order.totalAmount * 100),
-          notes: {
-            reason: 'Order refunded by Admin'
-          }
+        // Find all successful payments in database
+        const dbPayments = await prisma.payment.findMany({
+          where: { orderId: order.id, status: 'success' }
         });
+
+        if (dbPayments.length > 0) {
+          // Refund each transaction individually
+          for (const payment of dbPayments) {
+            if (payment.razorpayPaymentId) {
+              await razorpay.payments.refund(payment.razorpayPaymentId, {
+                amount: Math.round(payment.amount * 100),
+                notes: {
+                  reason: 'Order refunded by Admin'
+                }
+              });
+            }
+          }
+        } else if (order.paymentId) {
+          // Fallback for legacy orders (only 20% advance was captured for custom orders)
+          const isCustom = order.orderNumber.startsWith('CR-');
+          const refundAmt = isCustom ? Math.round(order.totalAmount * 0.20) : order.totalAmount;
+
+          await razorpay.payments.refund(order.paymentId, {
+            amount: Math.round(refundAmt * 100),
+            notes: {
+              reason: 'Order refunded by Admin'
+            }
+          });
+        }
       } catch (rzpErr: any) {
-        logger.error(`Failed to trigger refund on Razorpay for payment ${order.paymentId}:`, rzpErr);
+        logger.error(`Failed to trigger refund on Razorpay for order ${order.orderNumber}:`, rzpErr);
         throw new AppError(400, `Failed to refund on Razorpay: ${rzpErr.description || rzpErr.message || 'Unknown Razorpay error'}`);
       }
     }

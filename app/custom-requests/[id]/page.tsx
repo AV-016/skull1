@@ -202,6 +202,20 @@ export default function CustomRequestDetailPage({
                   This custom project request has been cancelled.
                 </div>
               )}
+              {request.status === 'COMPLETED' && (
+                <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 text-sm font-sans flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <p className="font-bold text-white">Your Custom Order is Confirmed!</p>
+                    <p className="text-secondary-text text-xs mt-1">The 20% advance payment has been verified. You can track production and shipping directly in your Orders list.</p>
+                  </div>
+                  <Link
+                    href="/orders"
+                    className="px-4 py-2 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider rounded smooth-transition whitespace-nowrap cursor-pointer"
+                  >
+                    View Orders
+                  </Link>
+                </div>
+              )}
 
               {/* Description */}
               <div>

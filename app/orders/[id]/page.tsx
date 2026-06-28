@@ -437,6 +437,12 @@ export default function OrderDetailPage() {
 
   // Policy Notice Message Resolver
   const getPolicyMessage = () => {
+    if (order.orderNumber?.startsWith('CR-')) {
+      if (status === 'CANCELLED') {
+        return 'This custom order has been cancelled. Custom order advance payments are non-refundable.'
+      }
+      return 'For custom orders, only the advance payment is collected to begin printing. If you request cancellation, the advance payment will NOT be refunded.'
+    }
     switch (status) {
       case 'PENDING':
         return 'You can cancel this order before printing begins.'
@@ -476,6 +482,17 @@ export default function OrderDetailPage() {
   const gstVal = order.gstAmount || 0
   const discountVal = order.discountAmount || 0
   const grandTotalVal = order.totalAmount || (subtotalVal + shippingVal + platformFeeVal + gstVal - discountVal)
+
+  const successfulPayments = (order as any)?.payments?.filter((p: any) => p.status === 'success') || []
+  let totalPaid = successfulPayments.reduce((sum: number, p: any) => sum + p.amount, 0)
+  if (order.orderNumber?.startsWith('CR-') && order.status !== 'PENDING') {
+    const hasAdvance = successfulPayments.some((p: any) => p.amount === grandTotalVal * 0.20)
+    if (!hasAdvance) {
+      totalPaid += grandTotalVal * 0.20
+    }
+  }
+  const isFullyPaid = totalPaid >= grandTotalVal
+  const remainingPayable = grandTotalVal - totalPaid
 
   return (
     <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
@@ -543,6 +560,24 @@ export default function OrderDetailPage() {
                (paymentError === 'cancelled' 
                  ? 'Payment was cancelled. Please complete payment now to process your order.' 
                  : `Payment failed: ${decodeURIComponent(errorDesc || 'Please try again.')}`)}
+            </p>
+          </motion.div>
+        )}
+
+        {order.orderNumber?.startsWith('CR-') && !isFullyPaid && status !== 'CANCELLED' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-5 rounded-xl border border-red-500/30 bg-red-500/5 text-xs text-red-400 space-y-2 font-sans"
+          >
+            <p className="font-bold uppercase tracking-wider text-sm flex items-center gap-1.5 text-red-500">
+              <span>⚠️</span> Payment Alert: Action Required
+            </p>
+            <p className="leading-relaxed text-secondary-text">
+              For custom orders, Cash on Delivery (COD) is NOT acceptable. You must pay the remaining balance of <strong className="text-white font-bold">{formatCurrency(remainingPayable)}</strong> online.
+            </p>
+            <p className="text-xs text-amber-400 font-bold flex items-center gap-1">
+              <span>*</span> SHIPPING PROCESS WILL REMAIN ON HOLD UNTIL THE REMAINING BALANCE IS PAID IN FULL.
             </p>
           </motion.div>
         )}
@@ -869,12 +904,12 @@ export default function OrderDetailPage() {
                         Pending Collection
                       </span>
                     )
-                  ) : order.paymentStatus === 'PAID' ? (
+                  ) : (order.paymentStatus === 'PAID' && (!order.orderNumber?.startsWith('CR-') || isFullyPaid)) ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 border border-green-500/20 text-green-400 uppercase tracking-wide font-sans">
                       Paid
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 border border-red-500/20 text-red-400 uppercase tracking-wide font-sans">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase tracking-wide font-sans">
                       Pending Payment
                     </span>
                   )}
@@ -1088,7 +1123,7 @@ export default function OrderDetailPage() {
                   <span>{formatCurrency(grandTotalVal)}</span>
                 </div>
 
-                {order.orderNumber?.startsWith('CR-') && (
+                {order.orderNumber?.startsWith('CR-') && !isFullyPaid && (
                   <>
                     <div className="flex justify-between text-secondary-text font-sans pt-2 border-t border-border/20">
                       <span>20% Advance Paid (Online)</span>
@@ -1096,7 +1131,7 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="flex justify-between text-sm font-bold text-amber-500 font-sans">
                       <span>Remaining Balance</span>
-                      <span>{formatCurrency(grandTotalVal * 0.80)}</span>
+                      <span>{formatCurrency(remainingPayable)}</span>
                     </div>
                   </>
                 )}
@@ -1113,7 +1148,7 @@ export default function OrderDetailPage() {
               <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-4">Actions</h3>
               <div className="space-y-3 font-sans">
                 {/* Pay Now if pending payment */}
-                {order.paymentStatus === 'PENDING' && order.paymentMethod === 'CARD' && status === 'PENDING' && (
+                {order.paymentStatus === 'PENDING' && order.paymentMethod === 'CARD' && status === 'PENDING' && !order.orderNumber?.startsWith('CR-') && (
                   <Button
                     disabled={isResumingPayment}
                     onClick={handlePayNow}
@@ -1126,6 +1161,24 @@ export default function OrderDetailPage() {
                       </>
                     ) : (
                       <span>Pay Now (Online)</span>
+                    )}
+                  </Button>
+                )}
+
+                {/* Pay Remaining Balance for Custom Requests if not fully paid */}
+                {order.orderNumber?.startsWith('CR-') && !isFullyPaid && status !== 'CANCELLED' && (
+                  <Button
+                    disabled={isResumingPayment}
+                    onClick={handlePayNow}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold flex items-center justify-center gap-2 border-green-600 py-2.5 rounded-lg cursor-pointer"
+                  >
+                    {isResumingPayment ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <span>Pay Remaining Balance ({formatCurrency(remainingPayable)})</span>
                     )}
                   </Button>
                 )}

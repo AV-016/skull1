@@ -66,13 +66,52 @@ export default function AdminOrders() {
     return matchesSearch && matchesStatus
   }) || []
 
-  const handleStatusChange = (id: string, status: string) => {
-    updateStatusMutation.mutate(
-      { id, status, notes: `Status updated by Admin to ${status}` },
-      {
-        onSuccess: () => refetch()
+  const handleStatusChange = async (id: string, status: string) => {
+    let trackingId = ''
+    let carrier = ''
+    let trackingUrl = ''
+
+    if (status.toUpperCase() === 'SHIPPED') {
+      const trackingInput = prompt('Enter Tracking ID (required for SHIPPED status):')
+      if (trackingInput === null) return // User cancelled
+      if (!trackingInput.trim()) {
+        alert('Tracking ID is required to mark order as SHIPPED.')
+        return
       }
-    )
+      trackingId = trackingInput.trim()
+      
+      const carrierInput = prompt('Enter Carrier (e.g. India Post, Blue Dart) [Optional, default: India Post]:')
+      carrier = (carrierInput && carrierInput.trim()) || 'India Post'
+      
+      const urlInput = prompt('Enter Tracking URL [Optional]:')
+      trackingUrl = (urlInput && urlInput.trim()) || ''
+    }
+
+    try {
+      setActionLoadingId(id)
+      
+      // Update status
+      await updateStatusMutation.mutateAsync({
+        id,
+        status,
+        notes: `Status updated by Admin to ${status}`
+      })
+
+      // If status is SHIPPED, update shipping details
+      if (status.toUpperCase() === 'SHIPPED') {
+        await api.patch(`/admin/orders/${id}/shipping`, {
+          trackingId,
+          carrier,
+          trackingUrl: trackingUrl || undefined
+        })
+      }
+      
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Failed to update order status')
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   const getStatusStyle = (status: string) => {

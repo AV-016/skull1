@@ -6,6 +6,7 @@ import { generateOrderNumber } from '../utils/generateOrderNumber';
 const orderInclude = {
   address: true,
   user: true,
+  payments: true,
   items: {
     include: {
       product: {
