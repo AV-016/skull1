@@ -322,6 +322,7 @@ export default function CustomRequestPage() {
                     <textarea
                       placeholder="Tell us about your project, requirements, materials, finish, and any other specifications..."
                       {...register('description')}
+                      maxLength={1000}
                       rows={6}
                       className="w-full px-4 py-3 bg-secondary border border-border rounded-lg text-primary-text placeholder-muted-text focus:outline-none focus:border-primary/40 smooth-transition resize-none"
                       disabled={isSubmitting}
@@ -330,7 +331,7 @@ export default function CustomRequestPage() {
                       <p className="text-red-400 text-sm mt-1">{(errors.description as any)?.message}</p>
                     )}
                     <p className="text-secondary-text text-xs mt-2 font-medium">
-                      {description ? description.trim().split(/\s+/).filter(Boolean).length : 0} / 1000 words
+                      {description?.length || 0} / 1000 characters
                     </p>
                   </div>
                 </div>
