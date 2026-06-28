@@ -253,8 +253,8 @@ export const Navbar = () => {
             SKULTURE
           </Link>
 
-          {/* Search Bar Wrapper */}
-          <div className="relative flex-1 max-w-lg mx-6">
+          {/* Search Bar Wrapper (hidden on mobile, visible on desktop) */}
+          <div className="relative flex-1 max-w-lg mx-6 hidden md:block">
             <div className="flex items-center bg-secondary/85 backdrop-blur-md border border-border focus-within:border-primary/50 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300">
               <Search className="w-5 h-5 text-muted-text ml-4 transition-colors duration-300" />
               <input

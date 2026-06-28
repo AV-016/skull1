@@ -1,9 +1,10 @@
-import { X, User, ChevronRight, LogOut, LogIn } from 'lucide-react';
+import { X, User, ChevronRight, LogOut, LogIn, Search } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useCategories } from '@/hooks/useProducts';
+import { useRouter } from 'next/navigation';
 
 type SidebarProps = {
   isOpen: boolean;
@@ -13,6 +14,16 @@ type SidebarProps = {
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, logout } = useAuth();
   const { data: categories = [] } = useCategories();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      onClose();
+    }
+  };
 
   // Prevent scroll when sidebar is open
   useEffect(() => {
@@ -36,12 +47,12 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 cursor-pointer"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] cursor-pointer"
           />
 
           {/* Sidebar Drawer Container */}
           <motion.aside
-            className="fixed inset-y-0 left-0 w-full max-w-[340px] bg-background text-primary-text shadow-2xl z-50 flex flex-col"
+            className="fixed inset-y-0 left-0 w-full max-w-[340px] bg-background text-primary-text shadow-2xl z-[100] flex flex-col"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
@@ -80,6 +91,26 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             {/* 2. Scrollable Navigation Content Area */}
             <div className="flex-1 overflow-y-auto py-2 divide-y divide-border/40 text-sm">
               
+              {/* MOBILE SEARCH BAR */}
+              <div className="px-6 py-4">
+                <form onSubmit={handleSearchSubmit} className="flex items-center bg-secondary border border-border focus-within:border-primary/50 rounded-xl overflow-hidden shadow-md">
+                  <Search className="w-4.5 h-4.5 text-muted-text ml-4" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full py-2 px-3 bg-transparent text-primary-text placeholder-muted-text text-xs focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="mr-1.5 px-3 py-1 bg-primary hover:bg-primary/95 text-white text-[10px] font-bold rounded-lg transition-colors"
+                  >
+                    Go
+                  </button>
+                </form>
+              </div>
+
               {/* SECTION: Trending */}
               <div className="py-4">
                 <h3 className="px-6 pb-2 text-[11px] font-bold text-muted-text uppercase tracking-wider">

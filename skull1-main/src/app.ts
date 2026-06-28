@@ -36,7 +36,7 @@ app.use(helmet({
   contentSecurityPolicy: false // Disable CSP for local testing page resource loads
 }));
 app.use(cors({
-  origin: env.FRONTEND_URL,
+  origin: true,
   credentials: true
 }));
 app.use(morgan('dev'));
