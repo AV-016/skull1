@@ -138,6 +138,15 @@ export class PaymentService {
       await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED, 'Payment received, order confirmed.');
       logger.info(`Payment successful (user checkout verified) - Order ID: ${orderId}, Number: ${order.orderNumber}, Razorpay Order: ${razorpayOrderId}, Payment ID: ${razorpayPaymentId}`);
 
+      // Handle custom request quotation acceptance automatically
+      try {
+        await prisma.$transaction(async (tx) => {
+          await this.handleCustomRequestOrderPayment(tx, orderId, order.orderNumber);
+        });
+      } catch (err) {
+        logger.error(`Error in handleCustomRequestOrderPayment for Order ID: ${orderId}:`, err);
+      }
+
       // Send order confirmation email
       const email = order.user?.email;
       const name = order.user?.name;
@@ -152,6 +161,54 @@ export class PaymentService {
     }
 
     return true;
+  }
+
+  async handleCustomRequestOrderPayment(tx: any, orderId: string, orderNumber: string) {
+    if (!orderNumber.startsWith('CR-')) return;
+    
+    // Find the order items and get the customRequest ID from the product slug
+    const orderItems = await tx.orderItem.findMany({
+      where: { orderId },
+      include: { product: true }
+    });
+
+    if (orderItems && orderItems.length > 0) {
+      const productSlug = orderItems[0].product.slug;
+      const parts = productSlug.split('-');
+      if (parts.length >= 3 && productSlug.startsWith('custom-project-')) {
+        const customRequestId = parts[2];
+        
+        const customRequest = await tx.customRequest.findUnique({
+          where: { id: customRequestId },
+          include: { quotations: true }
+        });
+
+        if (customRequest) {
+          const pendingQuotation = customRequest.quotations.find((q: any) => q.status === 'PENDING');
+          if (pendingQuotation) {
+            await tx.quotation.update({
+              where: { id: pendingQuotation.id },
+              data: { status: 'ACCEPTED' }
+            });
+
+            await tx.quotation.updateMany({
+              where: {
+                customRequestId,
+                id: { not: pendingQuotation.id }
+              },
+              data: { status: 'REJECTED' }
+            });
+          }
+
+          await tx.customRequest.update({
+            where: { id: customRequestId },
+            data: { status: 'ACCEPTED' }
+          });
+          
+          logger.info(`Custom Request #${customRequestId} automatically ACCEPTED following 20% advance payment verification for Order ID: ${orderId}`);
+        }
+      }
+    }
   }
 
   async handleWebhook(rawBody: string, signature: string): Promise<void> {
@@ -225,6 +282,9 @@ export class PaymentService {
             status: OrderStatus.CONFIRMED
           }
         });
+
+        // Handle custom request quotation acceptance automatically
+        await this.handleCustomRequestOrderPayment(tx, payment.orderId, payment.order.orderNumber);
 
         await tx.orderStatusHistory.create({
           data: {

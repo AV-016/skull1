@@ -11,6 +11,7 @@ const controller = new QuotationController();
 // 1. Customer Quotation Controls (/api/quotations)
 router.get('/:id', protect, controller.getQuotationById);
 router.post('/:id/accept', protect, controller.acceptQuotation);
+router.post('/:id/accept-and-pay', protect, controller.acceptQuotationAndCreateOrder);
 router.post('/:id/reject', protect, controller.rejectQuotation);
 
 // 2. Admin Quotation Controls (Mounted at /api/admin/quotations)

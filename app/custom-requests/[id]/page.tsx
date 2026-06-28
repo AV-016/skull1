@@ -8,8 +8,12 @@ import { CustomRequestStatusTimeline } from '@/components/custom-requests/Custom
 import { QuotationCard } from '@/components/custom-requests/QuotationCard'
 import { formatDate } from '@/lib/utils'
 import { CustomRequestStatus, Quotation } from '@/lib/types'
+import { api } from '@/lib/api'
+import { queryKeys } from '@/lib/queryKeys'
+import Script from 'next/script'
 
-import { use } from 'react'
+import { useAuth } from '@/context/AuthContext'
+import { use, useState } from 'react'
 import { useCustomRequestDetail, useAcceptQuotation, useRejectQuotation } from '@/hooks/useCustomRequests'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -28,6 +32,8 @@ export default function CustomRequestDetailPage({
   const { id } = use(params)
   const queryClient = useQueryClient()
   const { data: request, isLoading, error } = useCustomRequestDetail(id)
+  const { user } = useAuth()
+  const [isPaying, setIsPaying] = useState(false)
   
   const acceptMutation = useAcceptQuotation()
   const rejectMutation = useRejectQuotation()
@@ -73,12 +79,72 @@ export default function CustomRequestDetailPage({
 
   const handleAccept = async () => {
     if (!quotation) return
+    
+    const advanceAmount = quotation.amount * 0.20
+    const confirmPayment = window.confirm(
+      `Accepting this quote requires a 20% advance payment of ₹${advanceAmount.toFixed(2)} online. COD is not available for custom orders.\n\nDo you want to proceed to payment?`
+    )
+    if (!confirmPayment) return
+
     try {
-      await acceptMutation.mutateAsync(quotation.id)
-      queryClient.invalidateQueries({ queryKey: ['customRequests'] })
-    } catch (err) {
-      console.error(err)
-      alert('Failed to accept quotation')
+      setIsPaying(true)
+      
+      // 1. Accept quotation & create the pending advance order in the database
+      const acceptRes = await api.post(`/quotations/${quotation.id}/accept-and-pay`)
+      const order = acceptRes.data.data
+      
+      // 2. Create the Razorpay Order
+      const rzpOrderRes = await api.post('/payments/create-order', { orderId: order.id })
+      const rzpOrder = rzpOrderRes.data.data
+
+      // 3. Open Razorpay Modal
+      const options = {
+        key: rzpOrder.keyId,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        name: 'Skulture Custom Project',
+        description: `20% Advance for Project Order #${rzpOrder.orderNumber}`,
+        order_id: rzpOrder.razorpayOrderId,
+        handler: async function (response: any) {
+          try {
+            await api.post('/payments/verify', {
+              orderId: order.id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            })
+            
+            alert('Advance payment successful! Your project status has been updated to Accepted.')
+            queryClient.invalidateQueries({ queryKey: ['customRequests'] })
+            queryClient.invalidateQueries({ queryKey: queryKeys.customRequests() })
+          } catch (verifyErr: any) {
+            console.error('Payment verification failed:', verifyErr)
+            alert('Payment verification failed. Please contact support.')
+          } finally {
+            setIsPaying(false)
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+        },
+        theme: {
+          color: '#14B8A6',
+        },
+        modal: {
+          ondismiss: function () {
+            setIsPaying(false)
+            alert('Payment cancelled.')
+          }
+        }
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.open()
+    } catch (err: any) {
+      console.error('Failed to initiate quotation payment:', err)
+      alert(err.response?.data?.message || 'Failed to process payment')
+      setIsPaying(false)
     }
   }
 
@@ -187,7 +253,7 @@ export default function CustomRequestDetailPage({
               >
                 <QuotationCard
                   quotation={quotation}
-                  isLoading={acceptMutation.isPending || rejectMutation.isPending}
+                  isLoading={acceptMutation.isPending || rejectMutation.isPending || isPaying}
                   onAccept={handleAccept}
                   onReject={handleReject}
                 />
@@ -198,6 +264,7 @@ export default function CustomRequestDetailPage({
       </div>
 
       <Footer />
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
     </main>
   )
 }

@@ -146,6 +146,110 @@ export class QuotationService {
     return quotationRepository.update(id, data);
   }
 
+  async acceptQuotationAndCreateOrder(userId: string, id: string): Promise<any> {
+    const quotation = await this.getQuotationById(userId, id);
+
+    if (quotation.status !== QuotationStatus.PENDING) {
+      throw new AppError(400, 'Quotation is already processed');
+    }
+
+    if (new Date() > quotation.expiresAt) {
+      throw new AppError(400, 'Quotation has expired');
+    }
+
+    const customRequest = await prisma.customRequest.findUnique({
+      where: { id: quotation.customRequestId },
+      include: { user: true }
+    });
+
+    if (!customRequest) {
+      throw new AppError(404, 'Custom request not found');
+    }
+
+    const advanceAmount = Math.round(quotation.price * 0.20); // 20% advance
+
+    const getRequestTitle = (req: any) => {
+      if (!req.requirements) return 'Custom Project Request';
+      const titleMatch = req.requirements.match(/Project Title:\s*(.*)/);
+      if (titleMatch && titleMatch[1]) return titleMatch[1].trim();
+      return 'Custom Project Request';
+    };
+
+    const projectTitle = getRequestTitle(customRequest);
+
+    return prisma.$transaction(async (tx) => {
+      let category = await tx.category.findUnique({
+        where: { slug: 'custom-orders' },
+      });
+      if (!category) {
+        category = await tx.category.create({
+          data: {
+            name: 'Custom Orders',
+            slug: 'custom-orders',
+            description: 'Custom print designs and orders',
+          },
+        });
+      }
+
+      const product = await tx.product.create({
+        data: {
+          name: `${projectTitle} (20% Advance)`,
+          slug: `custom-project-${customRequest.id}-${Date.now()}`,
+          description: customRequest.description,
+          price: advanceAmount,
+          categoryId: category.id,
+          stock: 1,
+          isActive: false,
+        },
+      });
+
+      let address = await tx.address.findFirst({
+        where: { userId: customRequest.userId, isActive: true },
+        orderBy: { isDefault: 'desc' },
+      });
+
+      if (!address) {
+        address = await tx.address.create({
+          data: {
+            userId: customRequest.userId,
+            street: 'Custom Order Shipping',
+            city: 'Custom City',
+            state: 'Custom State',
+            postalCode: '000000',
+            country: 'Custom Country',
+            phone: '0000000000',
+            isDefault: true,
+          },
+        });
+      }
+
+      const orderNumber = `CR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: customRequest.userId,
+          addressId: address.id,
+          totalAmount: advanceAmount,
+          status: OrderStatus.PENDING,
+          paymentStatus: PaymentStatus.PENDING,
+          paymentMethod: 'CARD', // Force online card payment
+          items: {
+            create: {
+              productId: product.id,
+              quantity: 1,
+              price: advanceAmount,
+            },
+          },
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      return order;
+    });
+  }
+
   async deleteQuotation(id: string): Promise<void> {
     const quotation = await quotationRepository.findById(id);
     if (!quotation) {

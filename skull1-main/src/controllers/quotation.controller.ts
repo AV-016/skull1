@@ -33,6 +33,20 @@ export class QuotationController {
     }
   }
 
+  async acceptQuotationAndCreateOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id;
+      const order = await quotationService.acceptQuotationAndCreateOrder(userId, req.params.id);
+      res.status(200).json({
+        success: true,
+        message: 'Order created for quotation 20% advance',
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async rejectQuotation(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
