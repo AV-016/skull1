@@ -24,6 +24,7 @@ export default function AdminSettings() {
   const [platformFeeType, setPlatformFeeType] = useState('FIXED')
   const [platformFeeValue, setPlatformFeeValue] = useState(0.0)
   const [volumetricDivisor, setVolumetricDivisor] = useState(5000.0)
+  const [returnAddress, setReturnAddress] = useState('123 Maker Street, Print City, Filament State, 12345')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -112,6 +113,7 @@ export default function AdminSettings() {
           setPlatformFeeValue(res.data.data.platformFeeValue ?? 0.0)
           setVolumetricDivisor(res.data.data.volumetricDivisor ?? 5000.0)
           setSupportEmail(res.data.data.supportEmail || 'sanchit7613@gmail.com')
+          setReturnAddress(res.data.data.returnAddress || '123 Maker Street, Print City, Filament State, 12345')
         }
       })
       .catch(err => {
@@ -137,7 +139,8 @@ export default function AdminSettings() {
         defaultGstRate: Number(defaultGstRate),
         platformFeeType,
         platformFeeValue: Number(platformFeeValue),
-        volumetricDivisor: Number(volumetricDivisor)
+        volumetricDivisor: Number(volumetricDivisor),
+        returnAddress
       })
       setSuccessMsg('Settings updated successfully!')
       setTimeout(() => setSuccessMsg(null), 3000)
@@ -251,6 +254,16 @@ export default function AdminSettings() {
                       className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
                     />
                   </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-xs font-bold text-white/70 uppercase mb-2">Default Return Address (For Customer Returns)</label>
+                  <textarea
+                    rows={2}
+                    value={returnAddress}
+                    onChange={(e) => setReturnAddress(e.target.value)}
+                    placeholder="123 Maker Street, Print City, Filament State, 12345"
+                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all resize-none"
+                  />
                 </div>
               </div>
 

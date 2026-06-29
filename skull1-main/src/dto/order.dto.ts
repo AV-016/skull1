@@ -40,6 +40,10 @@ export interface OrderResponseDTO {
   trackingUrl?: string | null;
   returnReason?: string | null;
   returnImage?: string | null;
+  returnTrackingId?: string | null;
+  returnCarrier?: string | null;
+  returnTrackingUrl?: string | null;
+  returnUpiId?: string | null;
   codCharge: number;
   shippingCharge: number;
   subtotal: number;
@@ -86,6 +90,10 @@ export const formatOrderResponse = (order: OrderWithDetails): OrderResponseDTO =
     trackingUrl: order.trackingUrl,
     returnReason: order.returnReason,
     returnImage: order.returnImage,
+    returnTrackingId: order.returnTrackingId,
+    returnCarrier: order.returnCarrier,
+    returnTrackingUrl: order.returnTrackingUrl,
+    returnUpiId: order.returnUpiId,
     codCharge: order.codCharge,
     shippingCharge: order.shippingCharge,
     subtotal: order.subtotal,

@@ -482,7 +482,11 @@ export const Navbar = () => {
                       
                       {/* Section: Rewards */}
                       <div className="text-[9px] font-black text-muted-text uppercase tracking-widest px-3 py-1.5 mt-2">Rewards & Benefits</div>
-                      <div className="flex items-center justify-between px-3 py-2 text-[11px] font-bold text-secondary-text hover:text-primary hover:bg-secondary smooth-transition uppercase tracking-wider cursor-pointer">
+                      <Link
+                        href="/dashboard"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center justify-between px-3 py-2 text-[11px] font-bold text-secondary-text hover:text-primary hover:bg-secondary smooth-transition uppercase tracking-wider cursor-pointer"
+                      >
                         <div className="flex items-center gap-2.5">
                           <Gift className="w-4 h-4 text-muted-text" />
                           <span>Loyalty Stamps</span>
@@ -490,7 +494,7 @@ export const Navbar = () => {
                         <span className="text-[9px] bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded font-black">
                           {user.loyaltyStamps || 0}/8
                         </span>
-                      </div>
+                      </Link>
                       <Link
                         href="/rewards"
                         onClick={() => setIsProfileOpen(false)}

@@ -132,7 +132,10 @@ export const useAdminOrders = (filters?: Record<string, any>) => {
     queryKey: ['admin', 'orders', filters],
     queryFn: async () => {
       const response = await api.get<{ data: Order[] }>('/admin/orders', { params: filters })
-      return response.data.data || []
+      return {
+        orders: response.data.data || [],
+        meta: (response.data as any).meta || { total: 0, page: 1, limit: 10, totalPages: 1 }
+      }
     },
     staleTime: 30 * 1000,
   })
@@ -227,3 +230,18 @@ export const useAdminMonitoringStats = () => {
     refetchInterval: 30 * 1000, // Poll every 30 seconds for real-time monitoring
   })
 }
+
+export const useAdminActivityLogs = (page = 1, limit = 10) => {
+  return useQuery({
+    queryKey: ['admin', 'activity-logs', page, limit],
+    queryFn: async () => {
+      const response = await api.get<{ data: any }>('/admin/activity-logs', {
+        params: { page, limit },
+      })
+      return response.data.data
+    },
+    refetchInterval: 10 * 1000, // Poll every 10 seconds for real-time new activity notifications
+    staleTime: 5 * 1000,
+  })
+}
+

@@ -1,15 +1,38 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { AdminLayout } from '@/components/admin/AdminLayout'
-import { useAdminDashboardStats, useAdminOrders, useAdminMonitoringStats } from '@/hooks/useAdmin'
+import { useAdminDashboardStats, useAdminOrders, useAdminMonitoringStats, useAdminActivityLogs } from '@/hooks/useAdmin'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Loader2, TrendingUp, ShoppingBag, Users, HelpCircle, Activity, Server, AlertTriangle, ShieldCheck, Database, Mail, CreditCard, AlertCircle } from 'lucide-react'
+import { Loader2, TrendingUp, ShoppingBag, Users, HelpCircle, Activity, Server, AlertTriangle, ShieldCheck, Database, Mail, CreditCard, AlertCircle, Star } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 export default function AdminDashboard() {
   const { data: stats, isLoading: isStatsLoading, error: statsError } = useAdminDashboardStats()
-  const { data: orders, isLoading: isOrdersLoading } = useAdminOrders({ limit: 5 })
+  const { data: ordersData, isLoading: isOrdersLoading } = useAdminOrders({ limit: 50 })
   const { data: healthStats, isLoading: isHealthLoading } = useAdminMonitoringStats()
+  const { data: activityData } = useAdminActivityLogs(1, 5)
+
+  const logs = activityData || []
+  
+  const orders = ordersData?.orders || []
+  const returnStatuses = ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNED', 'RETURN_REJECTED']
+  const normalOrders = orders.filter((o: any) => !returnStatuses.includes(o.status)).slice(0, 5)
+  const returnOrders = orders.filter((o: any) => returnStatuses.includes(o.status)).slice(0, 5)
+  const [toastMessage, setToastMessage] = useState<{ action: string; details: string } | null>(null)
+  const [lastActivityId, setLastActivityId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (logs.length > 0) {
+      const latestLog = logs[0]
+      if (lastActivityId && latestLog.id !== lastActivityId) {
+        setToastMessage({ action: latestLog.action, details: latestLog.details || '' })
+        const timer = setTimeout(() => setToastMessage(null), 5000)
+        return () => clearTimeout(timer)
+      }
+      setLastActivityId(latestLog.id)
+    }
+  }, [logs, lastActivityId])
 
   if (isStatsLoading || isOrdersLoading) {
     return (
@@ -113,46 +136,170 @@ export default function AdminDashboard() {
 
         {/* Monitoring & Recent Orders Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Orders Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="lg:col-span-2 glass-card p-6 border border-border bg-card/25"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-primary-text">Recent Orders</h2>
-              <a href="/admin/orders" className="text-xs font-bold text-primary hover:underline uppercase tracking-wider">
-                View All Orders →
-              </a>
-            </div>
-            
-            <div className="space-y-4">
-              {orders && orders.length > 0 ? (
-                orders.slice(0, 5).map((order) => (
-                  <div 
-                    key={order.id} 
-                    className="flex items-center justify-between py-3 border-b border-border/40 last:border-0 last:pb-0"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-semibold text-sm text-primary-text">Order #{order.orderNumber || order.id.slice(-6).toUpperCase()}</p>
-                      <p className="text-xs text-muted-text">
-                        Placed on {formatDate(order.createdAt)}
-                      </p>
+          {/* Left Stack (Recent Orders & Notifications Center) */}
+          <div className="lg:col-span-2 space-y-8 flex flex-col">
+            {/* Recent Orders Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="glass-card p-6 border border-border bg-card/25 flex-1"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-primary-text">Recent Orders</h2>
+                <a href="/admin/orders" className="text-xs font-bold text-primary hover:underline uppercase tracking-wider">
+                  View All Orders →
+                </a>
+              </div>
+              
+              <div className="space-y-4">
+                {normalOrders && normalOrders.length > 0 ? (
+                  normalOrders.map((order) => (
+                    <div 
+                      key={order.id} 
+                      className="flex items-center justify-between py-3 border-b border-border/40 last:border-0 last:pb-0"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-semibold text-sm text-primary-text">Order #{order.orderNumber || order.id.slice(-6).toUpperCase()}</p>
+                        <p className="text-xs text-muted-text">
+                          Placed on {formatDate(order.createdAt)}
+                        </p>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <p className="font-bold text-sm text-primary-text">{formatCurrency(order.totalAmount || order.total)}</p>
+                        <span className="text-[10px] px-2 py-0.5 bg-secondary border border-border rounded capitalize font-semibold text-secondary-text">
+                          {order.status.toLowerCase()}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right space-y-1">
-                      <p className="font-bold text-sm text-primary-text">{formatCurrency(order.totalAmount || order.total)}</p>
-                      <span className="text-[10px] px-2 py-0.5 bg-secondary border border-border rounded capitalize font-semibold text-secondary-text">
-                        {order.status.toLowerCase()}
-                      </span>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-text py-4 text-center">No recent orders placed yet.</p>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Special Section: Returned Products & Return Requests */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.31 }}
+              className="glass-card p-6 border border-red-500/20 bg-red-950/5 flex-1"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-red-400 flex items-center gap-2">
+                  <span>🔄</span> Returned Products & Return Requests
+                </h2>
+                <a href="/admin/orders" className="text-xs font-bold text-red-400 hover:underline uppercase tracking-wider">
+                  Manage Returns →
+                </a>
+              </div>
+              
+              <div className="space-y-4">
+                {returnOrders && returnOrders.length > 0 ? (
+                  returnOrders.map((order) => (
+                    <div 
+                      key={order.id} 
+                      className="flex items-center justify-between py-3 border-b border-border/40 last:border-0 last:pb-0 hover:bg-secondary/20 px-2 rounded-lg smooth-transition cursor-pointer"
+                      onClick={() => window.location.href = `/orders/${order.id}`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm text-primary-text">Order #{order.orderNumber || order.id.slice(-6).toUpperCase()}</p>
+                          <span className="text-[9px] uppercase font-bold text-muted-text bg-secondary border border-border px-1.5 py-0.5 rounded">
+                            {order.paymentMethod}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-text">
+                          Customer: {order.user?.email || 'Guest'}
+                        </p>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <p className="font-bold text-sm text-primary-text">{formatCurrency(order.totalAmount || order.total)}</p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider ${
+                          order.status === 'RETURN_REQUESTED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                          order.status === 'RETURN_APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          order.status === 'RETURNED' ? 'bg-green-500/15 text-green-400 border border-green-500/30' :
+                          'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                          {order.status.replace(/_/g, ' ').toLowerCase()}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-text py-4 text-center">No orders placed yet.</p>
-              )}
-            </div>
-          </motion.div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-text py-6 text-center italic">No returned products or requests at the moment.</p>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Notification Center & Reminders Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.32 }}
+              className="glass-card p-6 border border-border bg-card/25"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-primary-text flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary animate-pulse" /> Notification Center
+                </h2>
+                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                  Live Activity Feed
+                </span>
+              </div>
+
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin divide-y divide-border/40">
+                {logs && logs.length > 0 ? (
+                  logs.map((log: any) => {
+                    let iconColor = 'text-blue-400 bg-blue-500/5 border-blue-500/10'
+                    let IconComponent = Activity
+                    const actionType = log.action.toUpperCase()
+
+                    if (actionType.includes('ORDER')) {
+                      iconColor = 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10'
+                      IconComponent = ShoppingBag
+                    } else if (actionType.includes('LOGIN') || actionType.includes('REGISTER')) {
+                      iconColor = 'text-blue-400 bg-blue-500/5 border-blue-500/10'
+                      IconComponent = Users
+                    } else if (actionType.includes('CUSTOM')) {
+                      iconColor = 'text-amber-400 bg-amber-500/5 border-amber-500/10'
+                      IconComponent = HelpCircle
+                    } else if (actionType.includes('INQUIRY')) {
+                      iconColor = 'text-purple-400 bg-purple-500/5 border-purple-500/10'
+                      IconComponent = Mail
+                    } else if (actionType.includes('REVIEW')) {
+                      iconColor = 'text-teal-400 bg-teal-500/5 border-teal-500/10'
+                      IconComponent = Star
+                    }
+
+                    return (
+                      <div key={log.id} className="flex gap-4 pt-3.5 first:pt-0 border-t border-border/20 first:border-t-0 items-start">
+                        <div className={`p-2 rounded-xl border ${iconColor} mt-0.5`}>
+                          <IconComponent className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-primary-text block mb-0.5">
+                              {log.action.replace(/_/g, ' ')}
+                            </span>
+                            <span className="text-[9px] text-muted-text">
+                              {formatDate(log.createdAt)} at {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-secondary-text leading-relaxed font-semibold">
+                            {log.details}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-xs text-muted-text py-8 text-center italic">No new activities or reminders found.</p>
+                )}
+              </div>
+            </motion.div>
+          </div>
 
           {/* System Health status Panel */}
           <motion.div
@@ -266,6 +413,43 @@ export default function AdminDashboard() {
           </motion.div>
         </div>
       </motion.div>
+
+      {/* Activity Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-6 right-6 z-[9999] max-w-sm w-full bg-[#23272B] border-2 border-primary/40 rounded-2xl p-4 shadow-2xl flex items-start gap-3.5 backdrop-blur-md"
+          >
+            <div className="p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary">
+              <Activity className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-start">
+                <p className="text-xs font-black uppercase tracking-wider text-primary-text">
+                  New Admin Activity
+                </p>
+                <button
+                  onClick={() => setToastMessage(null)}
+                  className="text-muted-text hover:text-primary-text text-[10px] uppercase font-bold ml-2 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <p className="text-[11px] font-bold text-secondary-text mt-1 uppercase tracking-wide">
+                {toastMessage.action.replace(/_/g, ' ')}
+              </p>
+              {toastMessage.details && (
+                <p className="text-[10px] text-muted-text mt-0.5 line-clamp-2 leading-relaxed bg-[#1A1D1F] p-1.5 rounded font-mono">
+                  {toastMessage.details}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AdminLayout>
   )
 }

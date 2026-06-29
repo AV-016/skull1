@@ -31,6 +31,15 @@ export class InquiryService {
       console.error('Failed to send support email notification:', err);
     }
 
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: data.userId || null,
+        action: 'INQUIRY_CREATE',
+        details: `Customer inquiry submitted by ${data.name} (${data.email}) — Subject: ${data.subject}`,
+      },
+    }).catch(err => console.error('Error logging INQUIRY_CREATE activity:', err));
+
     return inquiry;
   }
 

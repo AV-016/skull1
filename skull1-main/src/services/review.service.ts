@@ -2,6 +2,7 @@ import { ReviewRepository } from '../repositories/review.repository';
 import { ProductRepository } from '../repositories/product.repository';
 import { ReviewResponseDTO, formatReviewResponse } from '../dto/review.dto';
 import { AppError } from '../middlewares/error.middleware';
+import { prisma } from '../config/database';
 
 const reviewRepository = new ReviewRepository();
 const productRepository = new ProductRepository();
@@ -35,6 +36,16 @@ export class ReviewService {
     });
 
     const fullReview = await reviewRepository.findById(review.id);
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: 'REVIEW_CREATE',
+        details: `Submitted a ${data.rating}-star review for product ${product.name}`,
+      },
+    }).catch(err => console.error('Error logging REVIEW_CREATE activity:', err));
+
     return formatReviewResponse(fullReview!);
   }
 

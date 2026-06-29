@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { OrderService } from '../services/order.service';
 import MESSAGES from '../constants/messages';
 import { Role } from '@prisma/client';
+import { validateUpiVpa } from '../utils/razorpayVerify';
+import { AppError } from '../middlewares/error.middleware';
 
 const orderService = new OrderService();
 
@@ -72,12 +74,46 @@ export class OrderController {
     try {
       const userId = req.user!.id;
       const orderId = req.params.id;
-      const { reason, image } = req.body;
-      const order = await orderService.requestReturn(userId, orderId, { reason, image });
+      const { reason, image, upiId } = req.body;
+      const order = await orderService.requestReturn(userId, orderId, { reason, image, upiId });
       res.status(200).json({
         success: true,
         message: 'Return requested successfully',
         data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async submitReturnTracking(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id;
+      const orderId = req.params.id;
+      const { carrier, trackingId, trackingUrl } = req.body;
+      const order = await orderService.submitReturnTracking(userId, orderId, { carrier, trackingId, trackingUrl });
+      res.status(200).json({
+        success: true,
+        message: 'Return tracking submitted successfully',
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async validateUpi(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { upiId } = req.body;
+      if (!upiId) {
+        throw new AppError(400, 'UPI ID is required');
+      }
+
+      const result = await validateUpiVpa(upiId);
+      res.status(200).json({
+        success: true,
+        message: result.success ? 'UPI ID is valid' : 'UPI ID is invalid',
+        data: result,
       });
     } catch (error) {
       next(error);

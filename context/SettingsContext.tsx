@@ -43,7 +43,7 @@ const ACCENT_COLORS = {
 
 export const SettingsProvider = ({ children }: { children: React.ReactNode }) => {
   const [appearance, setAppearance] = useState<AppearanceMode>('dark')
-  const [accent, setAccent] = useState<ColorAccent>('teal')
+  const [accent, setAccent] = useState<ColorAccent>('red')
   const [reducedMotion, setReducedMotion] = useState<boolean>(false)
   const [compactLayout, setCompactLayout] = useState<boolean>(false)
   const [currency, setCurrency] = useState<CurrencyMode>('INR')

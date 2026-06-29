@@ -315,6 +315,15 @@ export class OrderService {
 
       logger.info(`Order placed successfully: Order #${order.orderNumber} (ID: ${order.id}) by User (ID: ${userId}), Total: ₹${order.totalAmount}, Method: ${paymentMethod}`);
 
+      // Log activity
+      await prisma.activityLog.create({
+        data: {
+          userId,
+          action: 'ORDER_CREATE',
+          details: `Placed Order #${order.orderNumber} via ${paymentMethod} for total amount of ₹${order.totalAmount}`,
+        },
+      }).catch((err) => logger.error('Error logging ORDER_CREATE activity:', err));
+
       return order;
     } catch (error: any) {
       if (idempotencyKey) {
@@ -412,7 +421,60 @@ export class OrderService {
       throw new AppError(404, 'Order not found');
     }
 
-    await orderRepository.updateStatus(orderId, status, notes);
+    let targetPaymentStatus = order.paymentStatus;
+    if (status === OrderStatus.RETURNED && order.paymentStatus === PaymentStatus.PAID) {
+      if (order.paymentMethod === 'CARD') {
+        try {
+          const dbPayments = await prisma.payment.findMany({
+            where: { orderId: order.id, status: 'success' }
+          });
+          if (dbPayments.length > 0) {
+            for (const payment of dbPayments) {
+              if (payment.razorpayPaymentId) {
+                await razorpay.payments.refund(payment.razorpayPaymentId, {
+                  amount: Math.round(payment.amount * 100),
+                  notes: { reason: 'Order returned by customer' }
+                });
+              }
+            }
+          } else if (order.paymentId) {
+            await razorpay.payments.refund(order.paymentId, {
+              amount: Math.round(order.totalAmount * 100),
+              notes: { reason: 'Order returned by customer' }
+            });
+          }
+          targetPaymentStatus = PaymentStatus.REFUNDED;
+        } catch (rzpErr: any) {
+          logger.error(`Failed to trigger refund on Razorpay for returned order ${order.orderNumber}:`, rzpErr);
+          throw new AppError(400, `Failed to refund on Razorpay: ${rzpErr.description || rzpErr.message || 'Unknown Razorpay error'}`);
+        }
+      } else if (order.paymentMethod === 'COD') {
+        targetPaymentStatus = PaymentStatus.REFUNDED;
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status,
+          paymentStatus: targetPaymentStatus,
+        },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status,
+          notes: notes || (status === OrderStatus.RETURNED 
+            ? (order.paymentMethod === 'COD' 
+              ? `Return completed. COD refund to UPI: ${order.returnUpiId || 'N/A'} marked as completed.` 
+              : 'Return completed. Refund processed automatically via Razorpay.') 
+            : `Order status updated to ${status}`),
+        },
+      });
+    });
+
     const refreshed = await orderRepository.findById(orderId);
     return formatOrderResponse(refreshed!);
   }
@@ -431,8 +493,8 @@ export class OrderService {
     return formatOrderResponse(refreshed!);
   }
 
-  async requestReturn(userId: string, orderId: string, data: { reason: string; image: string }): Promise<OrderResponseDTO> {
-    const { reason, image } = data;
+  async requestReturn(userId: string, orderId: string, data: { reason: string; image: string; upiId?: string }): Promise<OrderResponseDTO> {
+    const { reason, image, upiId } = data;
     if (!reason || reason.trim() === '') {
       throw new AppError(400, 'Return reason is required');
     }
@@ -453,6 +515,10 @@ export class OrderService {
       throw new AppError(400, 'Only delivered orders can be returned');
     }
 
+    if (order.paymentMethod === 'COD' && (!upiId || upiId.trim() === '')) {
+      throw new AppError(400, 'UPI ID is required for Cash on Delivery refunds');
+    }
+
     // Check 3 days window
     const deliveredHistory = order.statusHistory.find((h) => h.status === OrderStatus.DELIVERED);
     if (deliveredHistory) {
@@ -463,7 +529,7 @@ export class OrderService {
       }
     }
 
-    await orderRepository.saveReturnRequest(orderId, reason, image);
+    await orderRepository.saveReturnRequest(orderId, reason, image, upiId);
     const refreshed = await orderRepository.findById(orderId);
     return formatOrderResponse(refreshed!);
   }
@@ -595,6 +661,45 @@ export class OrderService {
       }
 
       return ord;
+    });
+
+    const refreshed = await orderRepository.findById(orderId);
+    return formatOrderResponse(refreshed!);
+  }
+
+  async submitReturnTracking(
+    userId: string,
+    orderId: string,
+    data: { carrier: string; trackingId: string; trackingUrl?: string }
+  ): Promise<OrderResponseDTO> {
+    const order = await orderRepository.findById(orderId);
+    if (!order) {
+      throw new AppError(404, 'Order not found');
+    }
+
+    if (order.userId !== userId) {
+      throw new AppError(403, 'Forbidden access to this order');
+    }
+
+    if (order.status !== OrderStatus.RETURN_APPROVED) {
+      throw new AppError(400, 'Tracking details can only be submitted for approved returns');
+    }
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        returnCarrier: data.carrier,
+        returnTrackingId: data.trackingId,
+        returnTrackingUrl: data.trackingUrl || null,
+      },
+    });
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId,
+        status: OrderStatus.RETURN_APPROVED,
+        notes: `Customer provided return shipping details: ${data.carrier} - ${data.trackingId}`,
+      },
     });
 
     const refreshed = await orderRepository.findById(orderId);

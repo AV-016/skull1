@@ -125,7 +125,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                     Bestsellers
                   </Link>
                   <Link
-                    href="/products?filter=new"
+                    href="/#new-arrivals"
                     onClick={onClose}
                     className="px-6 py-2.5 hover:bg-secondary/60 text-secondary-text hover:text-primary transition-colors font-medium"
                   >
@@ -134,38 +134,6 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 </div>
               </div>
 
-              {/* SECTION: Digital Content & Devices */}
-              <div className="py-4">
-                <h3 className="px-6 pb-2 text-[11px] font-bold text-muted-text uppercase tracking-wider">
-                  Featured Collections
-                </h3>
-                <div className="flex flex-col">
-                  <Link
-                    href="/products?category=Anime+Figures"
-                    onClick={onClose}
-                    className="px-6 py-2.5 hover:bg-secondary/60 text-secondary-text hover:text-primary transition-colors font-medium flex justify-between items-center"
-                  >
-                    <span>Anime Figures</span>
-                    <ChevronRight className="w-4 h-4 text-muted-text/60" />
-                  </Link>
-                  <Link
-                    href="/products?category=Keychains"
-                    onClick={onClose}
-                    className="px-6 py-2.5 hover:bg-secondary/60 text-secondary-text hover:text-primary transition-colors font-medium flex justify-between items-center"
-                  >
-                    <span>Keychains</span>
-                    <ChevronRight className="w-4 h-4 text-muted-text/60" />
-                  </Link>
-                  <Link
-                    href="/products?category=Desk+Accessories"
-                    onClick={onClose}
-                    className="px-6 py-2.5 hover:bg-secondary/60 text-secondary-text hover:text-primary transition-colors font-medium flex justify-between items-center"
-                  >
-                    <span>Desk Accessories</span>
-                    <ChevronRight className="w-4 h-4 text-muted-text/60" />
-                  </Link>
-                </div>
-              </div>
 
               {/* SECTION: Shop by Category (Dynamic from DB) */}
               <div className="py-4">
@@ -204,14 +172,14 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                     Custom Order
                   </Link>
                   <Link
-                    href="#creations"
+                    href="/#creations"
                     onClick={onClose}
                     className="px-6 py-2.5 hover:bg-secondary/60 text-secondary-text hover:text-primary transition-colors font-medium"
                   >
                     Creations
                   </Link>
                   <Link
-                    href="#faq"
+                    href="/faq"
                     onClick={onClose}
                     className="px-6 py-2.5 hover:bg-secondary/60 text-secondary-text hover:text-primary transition-colors font-medium"
                   >

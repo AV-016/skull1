@@ -95,9 +95,15 @@ export function BestSellersSection() {
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-3">Popular Choice</h2>
           <h3 className="heading-2 text-primary-text mb-4">The Best Sellers</h3>
-          <p className="text-secondary-text text-base">
+          <p className="text-secondary-text text-base mb-6">
             Explore our most popular customer favorites, engineered to perfection.
           </p>
+          <Link
+            href="/products?filter=bestsellers"
+            className="inline-flex items-center justify-center px-6 py-3 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl transition-all duration-300 text-xs uppercase tracking-wider cursor-pointer shadow-lg"
+          >
+            Shop All Best Sellers
+          </Link>
         </div>
 
         {/* Apple-Style Grid Layout */}

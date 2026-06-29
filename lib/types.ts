@@ -93,6 +93,10 @@ export interface Order {
   statusHistory?: any[]
   returnReason?: string | null
   returnImage?: string | null
+  returnTrackingId?: string | null
+  returnCarrier?: string | null
+  returnTrackingUrl?: string | null
+  returnUpiId?: string | null
   createdAt: string
   updatedAt: string
   paymentStatus?: string
@@ -107,6 +111,7 @@ export interface Order {
   shippingZone?: string
   shippingEstDays?: number
   inquiries?: any[]
+  user?: any
 }
 
 // Address Types

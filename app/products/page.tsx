@@ -12,24 +12,41 @@ import { useSearchParams } from 'next/navigation'
 function ProductsContent() {
   const searchParams = useSearchParams()
   const urlCategory = searchParams.get('category')
+  const urlFilter = searchParams.get('filter')
+  const urlSearch = searchParams.get('search') || searchParams.get('q')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  const { data: serverCategories = [] } = useCategories()
 
   // Sync category from URL query parameter
   useEffect(() => {
     if (urlCategory) {
-      setSelectedCategory(urlCategory)
+      const matched = serverCategories.find(
+        (cat: any) =>
+          cat.slug.toLowerCase() === urlCategory.toLowerCase() ||
+          cat.name.toLowerCase() === urlCategory.toLowerCase() ||
+          cat.slug.toLowerCase() === urlCategory.toLowerCase().replace(/\+/g, '-').replace(/\s+/g, '-')
+      )
+      setSelectedCategory(matched ? matched.slug : urlCategory)
     } else {
       setSelectedCategory(null)
     }
-  }, [urlCategory])
+  }, [urlCategory, serverCategories])
+
+  useEffect(() => {
+    if (urlSearch) {
+      setSearchQuery(urlSearch)
+    } else {
+      setSearchQuery('')
+    }
+  }, [urlSearch])
 
   const { data: products = [], isLoading, error } = useProducts({
-    category: selectedCategory,
-    search: searchQuery,
+    category: selectedCategory || undefined,
+    search: searchQuery || undefined,
+    sort: urlFilter || undefined,
   })
-
-  const { data: serverCategories = [] } = useCategories()
 
   const sanitizedProducts = sanitizeProducts(products)
 

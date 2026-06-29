@@ -133,7 +133,14 @@ export class ProductRepository {
     if (categoryId) {
       whereClause.categoryId = categoryId;
     } else if (category) {
-      whereClause.category = { slug: category };
+      const formattedSlug = category.toLowerCase().replace(/\+/g, '-').replace(/\s+/g, '-');
+      whereClause.category = {
+        OR: [
+          { slug: { equals: category, mode: 'insensitive' } },
+          { name: { equals: category, mode: 'insensitive' } },
+          { slug: { equals: formattedSlug, mode: 'insensitive' } }
+        ]
+      };
     }
 
     if (tagId) {
@@ -160,6 +167,10 @@ export class ProductRepository {
       orderBy = { price: 'asc' };
     } else if (sort === 'price_desc') {
       orderBy = { price: 'desc' };
+    } else if (sort === 'bestsellers') {
+      orderBy = { bestSellerOrder: 'desc' };
+    } else if (sort === 'newest' || sort === 'new') {
+      orderBy = { createdAt: 'desc' };
     }
 
     const [products, total] = await Promise.all([

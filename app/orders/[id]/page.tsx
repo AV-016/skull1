@@ -1,6 +1,6 @@
 'use client'
 
-import { useOrderDetail, useCancelOrder, useReturnOrder } from '@/hooks/useOrders'
+import { useOrderDetail, useCancelOrder, useReturnOrder, useSubmitReturnTracking } from '@/hooks/useOrders'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -37,7 +37,16 @@ export default function OrderDetailPage() {
   const { data: order, isLoading, error, refetch } = useOrderDetail(orderId)
   const cancelMutation = useCancelOrder()
   const returnMutation = useReturnOrder()
+  const returnTrackingMutation = useSubmitReturnTracking()
   const { user, isAdmin } = useAuth()
+
+  // Return Tracking Details Input States
+  const [returnCarrierInput, setReturnCarrierInput] = useState('')
+  const [returnTrackingIdInput, setReturnTrackingIdInput] = useState('')
+  const [returnTrackingUrlInput, setReturnTrackingUrlInput] = useState('')
+  const [returnUpiId, setReturnUpiId] = useState('')
+  const [isVerifyingUpi, setIsVerifyingUpi] = useState(false)
+  const [upiVerificationResult, setUpiVerificationResult] = useState<{ success: boolean; customerName?: string; error?: string } | null>(null)
   
   // Payment States
   const [isResumingPayment, setIsResumingPayment] = useState(false)
@@ -49,6 +58,18 @@ export default function OrderDetailPage() {
 
   // Preview File States
   const [previewFile, setPreviewFile] = useState<{ name: string; size: string } | null>(null)
+  
+  const [globalSettings, setGlobalSettings] = useState<any>(null)
+
+  useEffect(() => {
+    api.get('/settings')
+      .then(res => {
+        if (res.data?.success && res.data?.data) {
+          setGlobalSettings(res.data.data)
+        }
+      })
+      .catch(err => console.error('Failed to fetch settings:', err))
+  }, [])
 
   const handlePayNow = async () => {
     try {
@@ -152,6 +173,30 @@ export default function OrderDetailPage() {
   const [userReturnReason, setUserReturnReason] = useState('')
   const [userReturnImage, setUserReturnImage] = useState('')
   const [isReturnUploading, setIsReturnUploading] = useState(false)
+
+  const handleVerifyUpi = async () => {
+    if (!returnUpiId.trim()) {
+      alert('Please enter a UPI ID to verify')
+      return
+    }
+    setIsVerifyingUpi(true)
+    setUpiVerificationResult(null)
+    try {
+      const res = await api.post('/orders/validate-upi', { upiId: returnUpiId.trim() })
+      if (res.data?.success && res.data?.data) {
+        setUpiVerificationResult(res.data.data)
+      } else {
+        setUpiVerificationResult({ success: false, error: 'Failed to validate' })
+      }
+    } catch (err: any) {
+      setUpiVerificationResult({
+        success: false,
+        error: err.response?.data?.message || err.message || 'Validation request failed'
+      })
+    } finally {
+      setIsVerifyingUpi(false)
+    }
+  }
 
   // Support Modal States
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false)
@@ -353,6 +398,54 @@ export default function OrderDetailPage() {
       default:
         return null
     }
+  }
+
+  const isReturnFlow = ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNED', 'RETURN_REJECTED'].includes(status)
+  
+  const RETURN_STAGES = [
+    { key: 'return_requested', label: 'Return Request' },
+    { key: 'return_confirmed', label: 'Return Confirmed' },
+    { key: 'return_instructions', label: 'Follow Instructions for Return' }
+  ]
+  
+  const currentStages = isReturnFlow ? RETURN_STAGES : STAGES
+
+  const getReturnStageState = (index: number) => {
+    let isCompleted = false
+    let isActive = false
+    let isRejected = false
+
+    if (status === 'RETURN_REQUESTED') {
+      if (index === 0) isCompleted = true
+      if (index === 1) isActive = true
+    } else if (status === 'RETURN_APPROVED') {
+      if (index === 0 || index === 1) isCompleted = true
+      if (index === 2) isActive = true
+    } else if (status === 'RETURNED') {
+      if (index === 0 || index === 1 || index === 2) isCompleted = true
+    } else if (status === 'RETURN_REJECTED') {
+      if (index === 0) isCompleted = true
+      if (index === 1) isRejected = true
+    }
+
+    return { isCompleted, isActive, isRejected }
+  }
+
+  const getReturnStageTime = (stageKey: string) => {
+    if (!order.statusHistory) return null
+    const findHistory = (statusName: string) => 
+      order.statusHistory?.find((h: any) => h.status.toUpperCase() === statusName.toUpperCase())
+
+    if (stageKey === 'return_requested') {
+      return findHistory('RETURN_REQUESTED')?.createdAt || null
+    }
+    if (stageKey === 'return_confirmed') {
+      return findHistory('RETURN_APPROVED')?.createdAt || findHistory('RETURNED')?.createdAt || null
+    }
+    if (stageKey === 'return_instructions') {
+      return findHistory('RETURNED')?.createdAt || null
+    }
+    return null
   }
 
   // Print Specifications Resolver
@@ -582,7 +675,7 @@ export default function OrderDetailPage() {
           </motion.div>
         )}
 
-        {/* 1. Production Timeline (Span Full Width) */}
+        {/* 1. Production / Return Timeline (Span Full Width) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -590,7 +683,7 @@ export default function OrderDetailPage() {
           className="glass-card p-6 md:p-8 mb-8"
         >
           <h3 className="text-sm font-bold text-primary-text uppercase tracking-widest mb-6 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-primary" /> Production Timeline
+            <Clock className="w-4 h-4 text-primary" /> {isReturnFlow ? 'Return Timeline' : 'Production Timeline'}
           </h3>
 
           {/* Desktop Horizontal timeline */}
@@ -598,28 +691,36 @@ export default function OrderDetailPage() {
             {/* Horizontal Line connector */}
             <div className="absolute top-8 left-[6%] right-[6%] h-0.5 bg-border/40 -z-10" />
 
-            {STAGES.map((stage, idx) => {
-              const { isCompleted, isActive } = getStageState(idx)
-              const time = getStageTime(stage.key)
+            {currentStages.map((stage, idx) => {
+              const { isCompleted, isActive, isRejected } = isReturnFlow 
+                ? getReturnStageState(idx) 
+                : { ...getStageState(idx), isRejected: false }
+              const time = isReturnFlow 
+                ? getReturnStageTime(stage.key) 
+                : getStageTime(stage.key)
               
               return (
                 <div key={stage.key} className="flex flex-col items-center text-center flex-1 px-1 relative">
                   <div 
                     className={`h-9 w-9 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                      isCompleted 
+                      isRejected 
+                        ? 'bg-red-500/10 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+                      : isCompleted 
                         ? 'bg-green-500/10 border-green-500 text-green-400 shadow-[0_0_12px_rgba(34,197,94,0.2)]' 
                         : isActive 
                         ? 'bg-red-500/10 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse' 
                         : 'bg-secondary border-border/40 text-muted-text'
                     }`}
                   >
-                    {isCompleted ? (
+                    {isRejected ? (
+                      <X className="w-4.5 h-4.5 stroke-[3]" />
+                    ) : isCompleted ? (
                       <Check className="w-4.5 h-4.5 stroke-[3]" />
                     ) : (
                       <span className="text-xs font-bold">{idx + 1}</span>
                     )}
                   </div>
-                  <p className={`text-xs font-bold mt-3 transition-colors ${isActive ? 'text-red-400' : isCompleted ? 'text-primary-text' : 'text-muted-text'}`}>
+                  <p className={`text-xs font-bold mt-3 transition-colors ${isRejected ? 'text-red-400' : isActive ? 'text-red-400' : isCompleted ? 'text-primary-text' : 'text-muted-text'}`}>
                     {stage.label}
                   </p>
                   {time && (
@@ -635,23 +736,31 @@ export default function OrderDetailPage() {
 
           {/* Mobile Vertical Timeline */}
           <div className="flex md:hidden flex-col space-y-6 pl-4 border-l border-border/50 relative ml-2">
-            {STAGES.map((stage, idx) => {
-              const { isCompleted, isActive } = getStageState(idx)
-              const time = getStageTime(stage.key)
+            {currentStages.map((stage, idx) => {
+              const { isCompleted, isActive, isRejected } = isReturnFlow 
+                ? getReturnStageState(idx) 
+                : { ...getStageState(idx), isRejected: false }
+              const time = isReturnFlow 
+                ? getReturnStageTime(stage.key) 
+                : getStageTime(stage.key)
 
               return (
                 <div key={stage.key} className="flex items-start gap-4 relative">
                   {/* Indicator icon */}
                   <div 
                     className={`absolute -left-[29px] top-0 h-6 w-6 rounded-full flex items-center justify-center border transition-all duration-300 ${
-                      isCompleted 
+                      isRejected 
+                        ? 'bg-red-500/10 border-red-500 text-red-400'
+                      : isCompleted 
                         ? 'bg-green-500/10 border-green-500 text-green-400' 
                         : isActive 
                         ? 'bg-red-500/10 border-red-500 text-red-400' 
                         : 'bg-secondary border-border/40 text-muted-text'
                     }`}
                   >
-                    {isCompleted ? (
+                    {isRejected ? (
+                      <X className="w-3 h-3 stroke-[3]" />
+                    ) : isCompleted ? (
                       <Check className="w-3 h-3 stroke-[3]" />
                     ) : (
                       <span className="text-[9px] font-bold">{idx + 1}</span>
@@ -659,7 +768,7 @@ export default function OrderDetailPage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-bold ${isActive ? 'text-red-400' : isCompleted ? 'text-primary-text' : 'text-muted-text'}`}>
+                    <p className={`text-xs font-bold ${isRejected ? 'text-red-400' : isActive ? 'text-red-400' : isCompleted ? 'text-primary-text' : 'text-muted-text'}`}>
                       {stage.label}
                     </p>
                     {time && (
@@ -672,6 +781,164 @@ export default function OrderDetailPage() {
               )
             })}
           </div>
+
+          {/* Return Instructions Boxes */}
+          {isReturnFlow && (
+            <div className="mt-8 border-t border-border/40 pt-6">
+              {status === 'RETURN_REQUESTED' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20"
+                >
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1.5">
+                    <span>⏳</span> Return Request Under Review
+                  </h4>
+                  <p className="text-xs text-secondary-text leading-relaxed font-sans">
+                    Your return request is currently being reviewed by our administration team. Once accepted, the return shipping address and tracking submission section will be shown here.
+                  </p>
+                  {order.returnUpiId && (
+                    <p className="text-[10px] text-muted-text mt-2 font-bold font-sans">
+                      Provided Refund UPI ID: {order.returnUpiId}
+                    </p>
+                  )}
+                </motion.div>
+              )}
+              {status === 'RETURN_APPROVED' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-5 rounded-2xl bg-green-500/5 border border-green-500/20"
+                >
+                  <h4 className="text-xs font-black uppercase tracking-wider text-green-400 mb-2 flex items-center gap-1.5">
+                    <Check className="w-4 h-4 text-green-400" /> Return Request Approved
+                  </h4>
+                  <p className="text-xs text-secondary-text leading-relaxed font-sans mb-4">
+                    Please pack your item securely and ship it to our default return address listed below. After shipping, submit the tracking details so we can track the product.
+                  </p>
+                  <div className="p-4 bg-secondary/80 border border-border rounded-xl font-mono mb-5">
+                    <span className="text-[9px] font-bold text-muted-text uppercase tracking-widest block mb-1">Return Destination Address</span>
+                    <p className="text-xs font-bold text-primary-text leading-relaxed select-all">
+                      {globalSettings?.returnAddress || '123 Maker Street, Print City, Filament State, 12345'}
+                    </p>
+                  </div>
+
+                  {order.returnTrackingId ? (
+                    <div className="p-4 bg-secondary/40 border border-border rounded-xl font-sans">
+                      <span className="text-[10px] font-bold text-muted-text uppercase tracking-wider block mb-1">Return Shipping Tracking Submitted</span>
+                      <p className="text-xs text-primary-text font-bold leading-normal">
+                        Carrier: {order.returnCarrier} <br />
+                        Tracking ID: {order.returnTrackingId}
+                      </p>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        if (!returnCarrierInput.trim() || !returnTrackingIdInput.trim()) {
+                          alert('Please provide return carrier and tracking number.')
+                          return
+                        }
+                        try {
+                          await (returnTrackingMutation.mutateAsync as any)({
+                            orderId,
+                            carrier: returnCarrierInput,
+                            trackingId: returnTrackingIdInput,
+                            trackingUrl: returnTrackingUrlInput || undefined
+                          })
+                          alert('Return tracking details submitted successfully.')
+                          refetch()
+                        } catch (err: any) {
+                          alert(err.response?.data?.message || 'Failed to submit tracking details.')
+                        }
+                      }}
+                      className="p-5 bg-secondary/40 border border-border/50 rounded-xl space-y-4 font-sans text-xs"
+                    >
+                      <h5 className="font-bold text-primary-text uppercase tracking-wider text-xs">Submit Return Shipping Tracking</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-muted-text uppercase mb-1.5">Return Carrier (e.g. India Post, BlueDart)</label>
+                          <input
+                            required
+                            type="text"
+                            placeholder="India Post"
+                            value={returnCarrierInput}
+                            onChange={(e) => setReturnCarrierInput(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-secondary border border-border text-primary-text focus:outline-none rounded focus:border-primary/50 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-muted-text uppercase mb-1.5">Return Tracking ID</label>
+                          <input
+                            required
+                            type="text"
+                            placeholder="RH123456789IN"
+                            value={returnTrackingIdInput}
+                            onChange={(e) => setReturnTrackingIdInput(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-secondary border border-border text-primary-text focus:outline-none rounded focus:border-primary/50 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-muted-text uppercase mb-1.5">Tracking Link (Optional)</label>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={returnTrackingUrlInput}
+                          onChange={(e) => setReturnTrackingUrlInput(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-secondary border border-border text-primary-text focus:outline-none rounded focus:border-primary/50 text-xs"
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        disabled={returnTrackingMutation.isPending}
+                        className="bg-primary hover:bg-primary/95 text-white font-bold text-[10px] uppercase tracking-wider py-1.5 px-4 rounded w-full sm:w-auto"
+                      >
+                        {returnTrackingMutation.isPending ? 'Submitting...' : 'Submit Tracking Info'}
+                      </Button>
+                    </form>
+                  )}
+                </motion.div>
+              )}
+              {status === 'RETURNED' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-5 rounded-2xl bg-green-500/5 border border-green-500/20"
+                >
+                  <h4 className="text-xs font-black uppercase tracking-wider text-green-400 mb-2 flex items-center gap-1.5">
+                    <Check className="w-4 h-4 text-green-400" /> Return Completed & Refunded
+                  </h4>
+                  <p className="text-xs text-secondary-text leading-relaxed font-sans mb-4">
+                    The return package has been received and verified. The refund of <strong className="text-white">{formatCurrency(grandTotalVal)}</strong> has been processed successfully.
+                  </p>
+                  <div className="p-4 bg-secondary/80 border border-border rounded-xl font-sans text-xs">
+                    <span className="text-[10px] font-bold text-muted-text uppercase tracking-wider block mb-1">Refund Method Details</span>
+                    <p className="text-xs font-bold text-primary-text leading-normal">
+                      {order.paymentMethod === 'COD' 
+                        ? `Refund sent manually to UPI ID: ${order.returnUpiId || 'N/A'}`
+                        : `Refund processed automatically via Razorpay to original payment method.`
+                      }
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+              {status === 'RETURN_REJECTED' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-5 rounded-2xl bg-red-500/5 border border-red-500/20"
+                >
+                  <h4 className="text-xs font-black uppercase tracking-wider text-red-400 mb-2 flex items-center gap-1.5">
+                    <X className="w-4 h-4 text-red-400" /> Return Request Declined
+                  </h4>
+                  <p className="text-xs text-secondary-text leading-relaxed font-sans">
+                    Your request for a return has been reviewed and declined. Please contact our 24x7 support if you have any questions.
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          )}
         </motion.div>
 
         {/* Main Grid Layout */}
@@ -1415,6 +1682,173 @@ export default function OrderDetailPage() {
             </div>
           </motion.div>
         )}
+
+        {/* Admin Return Management Controls */}
+        {isAdmin && isReturnFlow && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="glass-card p-6 md:p-8 border border-red-500/20 mt-8 space-y-6"
+          >
+            <div className="flex justify-between items-center pb-3 border-b border-border/40">
+              <h3 className="text-lg font-bold text-red-500 uppercase tracking-wider flex items-center gap-2">
+                <span>🛡️</span> Admin: Return Request Management
+              </h3>
+              <span className="text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded capitalize">
+                {status.toLowerCase().replace(/_/g, ' ')}
+              </span>
+            </div>
+
+            {/* Return details card */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-sans">
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-1">Return Reason</span>
+                  <p className="text-sm font-semibold text-primary-text bg-secondary/50 p-3 border border-border rounded-lg leading-relaxed">
+                    {order.returnReason || 'No reason provided.'}
+                  </p>
+                </div>
+
+                {order.paymentMethod === 'COD' && (
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-1">Refund UPI ID (COD order)</span>
+                    <div className="flex items-center gap-2 bg-secondary/50 p-3 border border-border rounded-lg">
+                      <span className="font-mono text-sm font-bold text-green-400 select-all flex-1">
+                        {order.returnUpiId || 'Not provided'}
+                      </span>
+                      {order.returnUpiId && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(order.returnUpiId || '')
+                            alert('UPI ID copied to clipboard!')
+                          }}
+                          className="px-2 py-1 bg-primary text-white text-[9px] font-bold uppercase rounded hover:bg-primary/95"
+                        >
+                          Copy
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {order.returnTrackingId && (
+                  <div>
+                    <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-1">Customer Return Tracking Details</span>
+                    <div className="p-3 bg-secondary/50 border border-border rounded-lg space-y-1.5 font-sans">
+                      <p className="text-xs font-bold text-primary-text">
+                        Carrier: <span className="text-secondary-text font-normal">{order.returnCarrier}</span>
+                      </p>
+                      <p className="text-xs font-bold text-primary-text">
+                        Tracking ID: <span className="font-mono text-secondary-text font-normal select-all">{order.returnTrackingId}</span>
+                      </p>
+                      {order.returnTrackingUrl && (
+                        <a
+                          href={order.returnTrackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary font-bold hover:underline"
+                        >
+                          Track Return Package ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-2">Product Image Proof</span>
+                {order.returnImage ? (
+                  <div className="relative aspect-video w-full max-w-sm border border-border rounded-lg overflow-hidden bg-secondary">
+                    <img
+                      src={order.returnImage}
+                      alt="Return Proof Image"
+                      className="w-full h-full object-cover cursor-zoom-in"
+                      onClick={() => window.open(order.returnImage || undefined, '_blank')}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-text italic">No image proof uploaded.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Status Update Buttons */}
+            <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-border/40">
+              {status === 'RETURN_REQUESTED' && (
+                <>
+                  <button
+                    onClick={async () => {
+                      if (confirm('Approve return request? User will be requested to ship the items back.')) {
+                        try {
+                          await api.patch(`/admin/orders/${orderId}/status`, {
+                            status: 'RETURN_APPROVED',
+                            notes: 'Return request approved by Administrator.'
+                          })
+                          alert('Return request approved successfully.')
+                          refetch()
+                        } catch (err: any) {
+                          alert(err.response?.data?.message || 'Failed to approve return request.')
+                        }
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded smooth-transition cursor-pointer"
+                  >
+                    Approve Return Request
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const reason = prompt('Enter decline reason:')
+                      if (reason === null) return
+                      try {
+                        await api.patch(`/admin/orders/${orderId}/status`, {
+                          status: 'RETURN_REJECTED',
+                          notes: `Return request declined by Admin. Reason: ${reason}`
+                        })
+                        alert('Return request declined successfully.')
+                        refetch()
+                      } catch (err: any) {
+                        alert(err.response?.data?.message || 'Failed to decline return request.')
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded smooth-transition cursor-pointer"
+                  >
+                    Decline Return Request
+                  </button>
+                </>
+              )}
+
+              {status === 'RETURN_APPROVED' && (
+                <button
+                  onClick={async () => {
+                    const confirmMsg = order.paymentMethod === 'COD'
+                      ? `Mark return as complete? You must manually refund the COD amount of ${formatCurrency(grandTotalVal)} to UPI ID: ${order.returnUpiId || 'N/A'}.`
+                      : `Mark return as complete? This will automatically refund ${formatCurrency(grandTotalVal)} to the user's original payment method via Razorpay.`
+                    
+                    if (confirm(confirmMsg)) {
+                      try {
+                        await api.patch(`/admin/orders/${orderId}/status`, {
+                          status: 'RETURNED',
+                          notes: order.paymentMethod === 'COD' 
+                            ? `Return completed. COD refund to UPI: ${order.returnUpiId || 'N/A'} marked as sent.`
+                            : 'Return completed. Refund processed automatically via Razorpay.'
+                        })
+                        alert('Return completed successfully.')
+                        refetch()
+                      } catch (err: any) {
+                        alert(err.response?.data?.message || 'Failed to complete return.')
+                      }
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded smooth-transition cursor-pointer"
+                >
+                  Mark Returned & Refund User
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Support Ticket Modal */}
@@ -1580,16 +2014,29 @@ export default function OrderDetailPage() {
                     alert('Please upload a proof image of the product')
                     return
                   }
+                  if (order.paymentMethod === 'COD') {
+                    if (!returnUpiId.trim()) {
+                      alert('Please enter a UPI ID for the refund')
+                      return
+                    }
+                    if (!upiVerificationResult || !upiVerificationResult.success) {
+                      alert('Please verify your UPI ID first. Payouts require a valid and verified UPI account.')
+                      return
+                    }
+                  }
                   try {
                     await returnMutation.mutateAsync({
                       orderId,
                       reason: userReturnReason,
-                      image: userReturnImage
+                      image: userReturnImage,
+                      upiId: order.paymentMethod === 'COD' ? returnUpiId.trim() : undefined
                     })
                     alert('Return request submitted successfully')
                     setIsReturnModalOpen(false)
                     setUserReturnReason('')
                     setUserReturnImage('')
+                    setReturnUpiId('')
+                    setUpiVerificationResult(null)
                   } catch (err: any) {
                     alert(err.response?.data?.message || 'Failed to submit return request')
                   }
@@ -1599,6 +2046,47 @@ export default function OrderDetailPage() {
                 <div className="p-3 bg-secondary/40 border border-border/50 rounded-lg font-sans font-bold">
                   <p className="font-bold text-xs text-primary-text font-sans">Order Number: #{order.orderNumber || order.id}</p>
                 </div>
+
+                {order.paymentMethod === 'COD' && (
+                  <div className="space-y-1.5 font-sans">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">UPI ID for Refund (Mandatory for Cash on Delivery)</label>
+                    <div className="flex gap-2">
+                      <input
+                        required
+                        type="text"
+                        placeholder="username@bank"
+                        value={returnUpiId}
+                        onChange={(e) => {
+                          setReturnUpiId(e.target.value)
+                          setUpiVerificationResult(null)
+                        }}
+                        className="flex-1 px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 rounded-lg text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyUpi}
+                        disabled={isVerifyingUpi || !returnUpiId.trim()}
+                        className="px-4 py-2.5 bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary font-bold text-xs uppercase tracking-wider rounded-lg disabled:opacity-50 disabled:cursor-not-allowed smooth-transition"
+                      >
+                        {isVerifyingUpi ? 'Verifying...' : 'Verify'}
+                      </button>
+                    </div>
+
+                    {upiVerificationResult && (
+                      <div className="mt-1">
+                        {upiVerificationResult.success ? (
+                          <p className="text-[10px] font-bold text-emerald-400">
+                            ✓ Verified Name: {upiVerificationResult.customerName || 'Valid UPI ID'}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] font-bold text-red-400">
+                            ✗ {upiVerificationResult.error || 'Invalid UPI ID format/account'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-1.5 font-sans">
                   <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Reason for Return (Mandatory)</label>

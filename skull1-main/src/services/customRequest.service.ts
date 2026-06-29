@@ -34,12 +34,23 @@ export class CustomRequestService {
       ? `Contact Phone: ${data.phone}${data.requirements ? `\n\nRequirements: ${data.requirements}` : ''}`
       : data.requirements;
 
-    return customRequestRepository.create({
+    const request = await customRequestRepository.create({
       userId,
       description: data.description,
       requirements: requirementsText,
       files: data.files,
     });
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: 'CUSTOM_REQUEST_CREATE',
+        details: `Created Custom Print Request (ID: ${request.id.slice(-6).toUpperCase()}) — ${data.description.substring(0, 60)}`,
+      },
+    }).catch(err => console.error('Error logging CUSTOM_REQUEST_CREATE activity:', err));
+
+    return request;
   }
 
   async updateCustomRequest(userId: string, id: string, data: any, isAdmin: boolean = false): Promise<any> {

@@ -235,7 +235,8 @@ export class OrderRepository {
   async saveReturnRequest(
     id: string,
     reason: string,
-    image: string
+    image: string,
+    upiId?: string
   ): Promise<Order> {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.update({
@@ -244,6 +245,7 @@ export class OrderRepository {
           status: OrderStatus.RETURN_REQUESTED,
           returnReason: reason,
           returnImage: image,
+          returnUpiId: upiId || null,
         },
       });
 

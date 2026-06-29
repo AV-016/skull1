@@ -6,7 +6,7 @@ export interface ProductQueryFilters {
   tag?: string;
   minPrice?: number;
   maxPrice?: number;
-  sort?: 'price_asc' | 'price_desc' | 'newest';
+  sort?: 'price_asc' | 'price_desc' | 'newest' | 'new' | 'bestsellers';
   q?: string;
   categoryId?: string;
   tagId?: string;

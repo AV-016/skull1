@@ -170,6 +170,15 @@ export class AuthService {
 
     logger.info(`User login successful: ${user.email} (ID: ${user.id})`);
 
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'USER_LOGIN',
+        details: `User ${user.name || user.email} logged in successfully`,
+      },
+    }).catch(e => logger.error('Error logging USER_LOGIN activity:', e));
+
     return formatAuthResponse(user, token);
   }
 
@@ -203,6 +212,15 @@ export class AuthService {
     await prisma.emailOTP.delete({
       where: { id: record.id },
     });
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'USER_REGISTER',
+        details: `User ${user.name || user.email} successfully completed registration and verification`,
+      },
+    }).catch(e => logger.error('Error logging USER_REGISTER activity:', e));
   }
 
   async resendOtp(emailInput: string): Promise<void> {

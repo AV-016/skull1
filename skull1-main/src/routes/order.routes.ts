@@ -12,9 +12,11 @@ const controller = new OrderController();
 router.use(protect); // All order routes require authentication
 router.post('/', validate(createOrderSchema), controller.createOrder);
 router.get('/', controller.getMyOrders);
+router.post('/validate-upi', controller.validateUpi);
 router.get('/:id', controller.getOrderById);
 router.post('/:id/cancel', controller.cancelOrder);
 router.post('/:id/return', controller.requestReturn);
+router.post('/:id/return-tracking', controller.submitReturnTracking);
 router.get('/:id/status-history', controller.getOrderHistory);
 
 // 2. Admin Order Routes (Mounted at /api/admin/orders)

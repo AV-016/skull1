@@ -69,7 +69,7 @@ export const CustomOrderBannerSection = () => {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <Link
-                href="#faq"
+                href="/faq"
                 className="px-6 py-3.5 border border-white/10 hover:border-white/20 text-white hover:bg-white/5 font-bold rounded-xl transition-all duration-300 text-xs uppercase tracking-wider"
               >
                 How It Works

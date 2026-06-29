@@ -186,6 +186,10 @@ model Order {
   trackingUrl              String?
   returnReason             String?
   returnImage              String?
+  returnTrackingId         String?
+  returnCarrier            String?
+  returnTrackingUrl        String?
+  returnUpiId              String?
   shippingZone             String?
   shippingActualWeight     Float?
   shippingVolumetricWeight Float?
@@ -338,6 +342,7 @@ model Settings {
   platformFeeType   String   @default("FIXED") // FIXED or PERCENTAGE
   platformFeeValue  Float    @default(0.0)
   volumetricDivisor Float    @default(5000.0)
+  returnAddress     String   @default("123 Maker Street, Print City, Filament State, 12345")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -376,6 +381,7 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   RETURN_REQUESTED
+  RETURN_APPROVED
   RETURNED
   RETURN_REJECTED
 }

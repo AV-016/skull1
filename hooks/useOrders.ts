@@ -42,8 +42,22 @@ export function useCancelOrder() {
 export function useReturnOrder() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ orderId, reason, image }: { orderId: string; reason: string; image: string }) => {
-      const response = await api.post(`/orders/${orderId}/return`, { reason, image })
+    mutationFn: async ({ orderId, reason, image, upiId }: { orderId: string; reason: string; image: string; upiId?: string }) => {
+      const response = await api.post(`/orders/${orderId}/return`, { reason, image, upiId })
+      return response.data.data
+    },
+    onSuccess: (_, { orderId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.orderDetail(orderId) })
+    },
+  })
+}
+
+export function useSubmitReturnTracking() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ orderId, carrier, trackingId, trackingUrl }: { orderId: string; carrier: string; trackingId: string; trackingUrl?: string }) => {
+      const response = await api.post(`/orders/${orderId}/return-tracking`, { carrier, trackingId, trackingUrl })
       return response.data.data
     },
     onSuccess: (_, { orderId }) => {

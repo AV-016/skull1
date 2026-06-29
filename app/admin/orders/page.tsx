@@ -9,11 +9,16 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { api } from '@/lib/api'
 
 export default function AdminOrders() {
-  const { data: orders, isLoading, error, refetch } = useAdminOrders()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [currentLimit, setCurrentLimit] = useState(10)
+
+  const { data: ordersData, isLoading, error, refetch } = useAdminOrders({ limit: 1000 })
   const updateStatusMutation = useUpdateOrderStatus()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+
+  const orders = ordersData?.orders || []
 
   const handleMarkPaid = async (orderId: string) => {
     setActionLoadingId(orderId)
@@ -41,12 +46,12 @@ export default function AdminOrders() {
   }
 
   // Compute metrics dynamically from the fetched orders
-  const totalOrders = orders?.length || 0
-  const pendingCount = orders?.filter((o: any) => o.status === 'PENDING').length || 0
-  const processingCount = orders?.filter((o: any) => o.status === 'PROCESSING').length || 0
-  const deliveredCount = orders?.filter((o: any) => o.status === 'DELIVERED').length || 0
+  const totalOrders = orders.length
+  const pendingCount = orders.filter((o: any) => o.status === 'PENDING').length
+  const processingCount = orders.filter((o: any) => o.status === 'PROCESSING').length
+  const deliveredCount = orders.filter((o: any) => o.status === 'DELIVERED').length
 
-  const filteredOrders = orders?.filter((order: any) => {
+  const filteredOrders = orders.filter((order: any) => {
     const orderNo = (order.orderNumber || '').toLowerCase()
     const shortId = (order.id || '').slice(-6).toLowerCase()
     const email = (order.user?.email || '').toLowerCase()
@@ -64,7 +69,11 @@ export default function AdminOrders() {
     const matchesStatus = statusFilter === 'ALL' || order.status.toUpperCase() === statusFilter.toUpperCase()
     
     return matchesSearch && matchesStatus
-  }) || []
+  })
+
+  const totalItems = filteredOrders.length
+  const totalPages = Math.ceil(totalItems / currentLimit)
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * currentLimit, currentPage * currentLimit)
 
   const handleStatusChange = async (id: string, status: string) => {
     let trackingId = ''
@@ -128,6 +137,8 @@ export default function AdminOrders() {
         return 'bg-red-500/5 text-red-400 border-red-500/20'
       case 'RETURN_REQUESTED':
         return 'bg-blue-500/5 text-blue-300 border-blue-500/20'
+      case 'RETURN_APPROVED':
+        return 'bg-emerald-500/5 text-emerald-300 border-emerald-500/20'
       case 'RETURNED':
         return 'bg-green-500/10 text-green-300 border-green-500/20'
       case 'RETURN_REJECTED':
@@ -209,7 +220,8 @@ export default function AdminOrders() {
             </div>
           </div>
         ) : (
-          <div className="glass-card overflow-x-auto border border-border">
+          <>
+            <div className="glass-card overflow-x-auto border border-border">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border/60 bg-secondary/40 text-[10px] font-bold text-muted-text uppercase tracking-widest">
@@ -223,7 +235,7 @@ export default function AdminOrders() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 text-xs">
-                {filteredOrders.map((order: any) => (
+                {paginatedOrders.map((order: any) => (
                   <tr key={order.id} className="hover:bg-secondary/25 smooth-transition">
                     <td className="px-6 py-4 font-bold text-primary-text">
                       #{order.orderNumber || order.id.slice(-6).toUpperCase()}
@@ -272,6 +284,7 @@ export default function AdminOrders() {
                         <option value="DELIVERED">Delivered</option>
                         <option value="CANCELLED">Cancelled</option>
                         <option value="RETURN_REQUESTED">Return Requested</option>
+                        <option value="RETURN_APPROVED">Return Approved</option>
                         <option value="RETURNED">Returned</option>
                         <option value="RETURN_REJECTED">Return Rejected</option>
                       </select>
@@ -322,6 +335,67 @@ export default function AdminOrders() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-secondary/10 border border-border p-4 rounded-xl mt-6 font-sans text-xs">
+              <div className="flex items-center gap-4 text-muted-text font-bold uppercase tracking-wider">
+                <span>
+                  Showing {Math.min(totalItems, (currentPage - 1) * currentLimit + 1)} - {Math.min(totalItems, currentPage * currentLimit)} of {totalItems} orders
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span>Show:</span>
+                  <select
+                    value={currentLimit}
+                    onChange={(e) => {
+                      setCurrentLimit(Number(e.target.value))
+                      setCurrentPage(1)
+                    }}
+                    className="bg-secondary border border-border rounded px-2 py-1 text-[10px] font-bold text-primary-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="px-3 py-1.5 bg-secondary border border-border rounded text-[10px] uppercase font-bold tracking-wider hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed smooth-transition animate-none"
+                >
+                  Previous
+                </button>
+                
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded border font-bold text-[10px] smooth-transition ${
+                        currentPage === pageNum
+                          ? 'bg-primary border-primary text-white'
+                          : 'bg-secondary border-border text-primary-text hover:bg-secondary/80'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="px-3 py-1.5 bg-secondary border border-border rounded text-[10px] uppercase font-bold tracking-wider hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed smooth-transition animate-none"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </motion.div>
     </AdminLayout>
