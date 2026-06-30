@@ -349,8 +349,8 @@ export class OrderService {
       throw new AppError(403, 'Forbidden access to this order');
     }
 
-    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.CONFIRMED) {
-      throw new AppError(400, 'Cannot cancel order that is already being processed or shipped');
+    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.CONFIRMED && order.status !== OrderStatus.PROCESSING) {
+      throw new AppError(400, 'Cannot cancel order that is already shipped');
     }
 
     // If the payment status is PAID and payment method was CARD, trigger Razorpay refund (bypass for custom orders)

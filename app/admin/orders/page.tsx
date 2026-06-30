@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { motion } from 'framer-motion'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useAdminOrders, useUpdateOrderStatus } from '@/hooks/useAdmin'
-import { Eye, Loader2, AlertTriangle, Search } from 'lucide-react'
+import { Eye, Loader2, AlertTriangle, Search, Printer, ChevronDown, ChevronUp, Calendar, DollarSign, User, Mail, Phone, MapPin, Box } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { api } from '@/lib/api'
 
@@ -17,6 +17,71 @@ export default function AdminOrders() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
+  const [openStatusMenuOrderId, setOpenStatusMenuOrderId] = useState<string | null>(null)
+  const [revertAlert, setRevertAlert] = useState<{ orderId: string, status: string, secondsLeft: number } | null>(null)
+
+  // Countdown timer for status revert warning
+  useEffect(() => {
+    if (!revertAlert) return
+
+    if (revertAlert.secondsLeft <= 0) {
+      handleStatusChangeRaw(revertAlert.orderId, revertAlert.status)
+      setRevertAlert(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setRevertAlert(prev => prev ? { ...prev, secondsLeft: prev.secondsLeft - 1 } : null)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [revertAlert])
+
+  const isPreviousStage = (current: string, target: string) => {
+    const currentUpper = current.toUpperCase()
+    const targetUpper = target.toUpperCase()
+    
+    // Linear order flow
+    const orderFlow = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED']
+    const currentIndex = orderFlow.indexOf(currentUpper)
+    const targetIndex = orderFlow.indexOf(targetUpper)
+    
+    if (currentIndex !== -1 && targetIndex !== -1) {
+      return targetIndex < currentIndex
+    }
+    
+    // For return flow
+    const returnFlow = ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNED']
+    const currentReturnIndex = returnFlow.indexOf(currentUpper)
+    const targetReturnIndex = returnFlow.indexOf(targetUpper)
+    
+    if (currentReturnIndex !== -1 && targetReturnIndex !== -1) {
+      return targetReturnIndex < currentReturnIndex
+    }
+    
+    return false
+  }
+
+  const handleStatusChange = (id: string, status: string) => {
+    const orderObj = orders.find((o: any) => o.id === id)
+    const currentStatus = orderObj ? orderObj.status : 'PENDING'
+
+    if (isPreviousStage(currentStatus, status)) {
+      setRevertAlert({ orderId: id, status, secondsLeft: 5 })
+    } else {
+      handleStatusChangeRaw(id, status)
+    }
+  }
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setOpenStatusMenuOrderId(null)
+    }
+    window.addEventListener('click', handleOutsideClick)
+    return () => window.removeEventListener('click', handleOutsideClick)
+  }, [])
 
   const orders = ordersData?.orders || []
 
@@ -75,7 +140,7 @@ export default function AdminOrders() {
   const totalPages = Math.ceil(totalItems / currentLimit)
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * currentLimit, currentPage * currentLimit)
 
-  const handleStatusChange = async (id: string, status: string) => {
+  const handleStatusChangeRaw = async (id: string, status: string) => {
     let trackingId = ''
     let carrier = ''
     let trackingUrl = ''
@@ -235,96 +300,298 @@ export default function AdminOrders() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 text-xs">
-                {paginatedOrders.map((order: any) => (
-                  <tr key={order.id} className="hover:bg-secondary/25 smooth-transition">
-                    <td className="px-6 py-4 font-bold text-primary-text">
-                      #{order.orderNumber || order.id.slice(-6).toUpperCase()}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-secondary-text">
-                      {order.user?.email || 'Guest User'}
-                    </td>
-                    <td className="px-6 py-4 text-muted-text">{formatDate(order.createdAt)}</td>
-                    <td className="px-6 py-4 font-bold text-primary-text">
-                      {formatCurrency(order.totalAmount || order.total)}
-                      {order.orderNumber?.startsWith('CR-') && (
-                        <div className="text-[9px] text-amber-500 font-medium mt-0.5">
-                          20% Adv: {formatCurrency(order.totalAmount * 0.20)} Paid
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-medium">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center">
-                          <span className="text-[10px] uppercase font-bold tracking-wider">{order.paymentMethod}</span>
-                          <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                            order.paymentStatus === 'PAID' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                            order.paymentStatus === 'REFUNDED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                            order.paymentStatus === 'PENDING' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
-                            order.paymentStatus === 'FAILED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            'bg-secondary text-muted-text'
-                          }`}>{order.paymentStatus}</span>
-                        </div>
-                        {order.paymentId && (
-                          <div className="text-[9px] font-mono text-muted-text mt-0.5 select-all">
-                            ID: {order.paymentId}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        disabled={updateStatusMutation.isPending}
-                        className={`px-3 py-1.5 border rounded uppercase font-bold tracking-wide text-[10px] cursor-pointer smooth-transition focus:outline-none ${getStatusStyle(order.status)}`}
-                      >
-                        <option value="PENDING">Pending</option>
-                        <option value="PROCESSING">Processing</option>
-                        <option value="SHIPPED">Shipped</option>
-                        <option value="DELIVERED">Delivered</option>
-                        <option value="CANCELLED">Cancelled</option>
-                        <option value="RETURN_REQUESTED">Return Requested</option>
-                        <option value="RETURN_APPROVED">Return Approved</option>
-                        <option value="RETURNED">Returned</option>
-                        <option value="RETURN_REJECTED">Return Rejected</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => window.location.href = `/orders/${order.id}`}
-                          className="p-2 border border-border hover:border-primary/50 text-secondary-text hover:text-primary smooth-transition cursor-pointer inline-flex items-center gap-1.5"
-                          title="View Details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span className="text-[10px] uppercase font-bold tracking-wider">Details</span>
-                        </button>
-                        
-                        {(order.paymentStatus === 'PENDING' || order.paymentStatus === 'FAILED') && order.paymentMethod === 'CARD' && (
-                          <button
-                            onClick={() => handleMarkPaid(order.id)}
-                            disabled={actionLoadingId === order.id}
-                            className="p-2 bg-green-500/10 border border-green-500/20 hover:border-green-500/50 text-green-400 disabled:opacity-50 smooth-transition cursor-pointer inline-flex items-center text-[10px] uppercase font-bold tracking-wider"
-                            title="Manually Confirm Payment"
-                          >
-                            {actionLoadingId === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Mark Paid'}
-                          </button>
-                        )}
+                {paginatedOrders.map((order: any) => {
+                  const isExpanded = expandedOrderId === order.id
+                  const isStatusMenuOpen = openStatusMenuOrderId === order.id
+                  
+                  const addressInfo = order.address || {}
+                  const parseStreetParts = (streetStr: string) => {
+                    const parts = { streetNo: '', locality: '', landmark: '' }
+                    if (!streetStr) return parts
+                    if (streetStr.includes('Street/House No:') && streetStr.includes('Locality:')) {
+                      const bits = streetStr.split('|')
+                      bits.forEach(bit => {
+                        const trimmed = bit.trim()
+                        if (trimmed.startsWith('Street/House No:')) {
+                          parts.streetNo = trimmed.replace('Street/House No:', '').trim()
+                        } else if (trimmed.startsWith('Locality:')) {
+                          parts.locality = trimmed.replace('Locality:', '').trim()
+                        } else if (trimmed.startsWith('Landmark:')) {
+                          parts.landmark = trimmed.replace('Landmark:', '').trim()
+                        }
+                      })
+                    } else {
+                      parts.streetNo = streetStr
+                    }
+                    return parts
+                  }
+                  const streetParts = parseStreetParts(addressInfo.street || '')
 
-                        {order.paymentStatus === 'PAID' && (
+                  return (
+                    <Fragment key={order.id}>
+                      <tr className={`hover:bg-secondary/25 smooth-transition ${isExpanded ? 'bg-secondary/10 border-l-2 border-primary' : ''}`}>
+                        <td className="px-6 py-4">
                           <button
-                            onClick={() => handleRefund(order.id)}
-                            disabled={actionLoadingId === order.id}
-                            className="p-2 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 text-red-400 disabled:opacity-50 smooth-transition cursor-pointer inline-flex items-center text-[10px] uppercase font-bold tracking-wider"
-                            title="Refund & Cancel Order"
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                            className="font-bold text-primary-text flex items-center gap-1.5 hover:text-primary smooth-transition cursor-pointer text-left focus:outline-none"
                           >
-                            {actionLoadingId === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Refund'}
+                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-primary shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-text shrink-0" />}
+                            <span>#{order.orderNumber || order.id.slice(-6).toUpperCase()}</span>
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-secondary-text">
+                          {order.user?.email || 'Guest User'}
+                        </td>
+                        <td className="px-6 py-4 text-muted-text">{formatDate(order.createdAt)}</td>
+                        <td className="px-6 py-4 font-bold text-primary-text">
+                          {formatCurrency(order.totalAmount || order.total)}
+                          {order.orderNumber?.startsWith('CR-') && (
+                            <div className="text-[9px] text-amber-500 font-medium mt-0.5">
+                              20% Adv: {formatCurrency((order.totalAmount || order.total) * 0.20)} Paid
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 font-medium">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center">
+                              <span className="text-[10px] uppercase font-bold tracking-wider">{order.paymentMethod}</span>
+                              <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                order.paymentStatus === 'PAID' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                                order.paymentStatus === 'REFUNDED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                order.paymentStatus === 'PENDING' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                                order.paymentStatus === 'FAILED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                'bg-secondary text-muted-text'
+                              }`}>{order.paymentStatus}</span>
+                            </div>
+                            {order.paymentId && (
+                              <div className="text-[9px] font-mono text-muted-text mt-0.5 select-all">
+                                ID: {order.paymentId}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 relative">
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenStatusMenuOrderId(isStatusMenuOpen ? null : order.id);
+                              }}
+                              disabled={updateStatusMutation.isPending}
+                              className={`px-2.5 py-1.5 border rounded-md uppercase font-black tracking-wider text-[9px] cursor-pointer smooth-transition flex items-center gap-1.5 hover:bg-neutral-800 focus:outline-none ${getStatusStyle(order.status)}`}
+                            >
+                              <span>{order.status.replace('_', ' ')}</span>
+                              <ChevronDown className="w-3 h-3 text-current opacity-70" />
+                            </button>
+
+                            {isStatusMenuOpen && (
+                              <div 
+                                className="absolute left-0 mt-2 w-52 bg-neutral-900 border border-border/40 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.6)] py-2.5 z-50 animate-fade-in font-sans text-left"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="px-3.5 pb-1.5 mb-1.5 border-b border-border/20 text-[9px] font-black uppercase tracking-wider text-muted-text">
+                                  Change Status
+                                </div>
+                                {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNED', 'RETURN_REJECTED'].map((st) => {
+                                  const isPrev = isPreviousStage(order.status, st);
+                                  return (
+                                    <button
+                                      key={st}
+                                      onClick={() => {
+                                        handleStatusChange(order.id, st);
+                                        setOpenStatusMenuOrderId(null);
+                                      }}
+                                      className={`w-full text-left px-3.5 py-2 text-[10px] uppercase font-bold tracking-wider smooth-transition flex items-center justify-between ${
+                                        order.status.toUpperCase() === st
+                                          ? 'bg-primary text-white font-black'
+                                          : isPrev
+                                          ? 'text-secondary-text/30 line-through hover:text-secondary-text/80 hover:bg-neutral-800/40'
+                                          : 'text-secondary-text hover:bg-neutral-800 hover:text-white'
+                                      }`}
+                                    >
+                                      <span className="flex items-center gap-1.5">
+                                        <span>{st.replace('_', ' ')}</span>
+                                        {isPrev && <span className="text-[7px] text-amber-500/80 tracking-normal normal-case border border-amber-500/20 px-1 rounded-sm bg-amber-500/5 font-mono">↩ Revert</span>}
+                                      </span>
+                                      {order.status.toUpperCase() === st && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => window.location.href = `/orders/${order.id}`}
+                              className="p-2 border border-border hover:border-primary/50 text-secondary-text hover:text-primary smooth-transition cursor-pointer inline-flex items-center gap-1.5"
+                              title="View Details"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span className="text-[10px] uppercase font-bold tracking-wider">Details</span>
+                            </button>
+                            
+                            <button 
+                              onClick={() => window.open(`/orders/${order.id}/invoice`, '_blank')}
+                              className="p-2 border border-border hover:border-primary/50 text-secondary-text hover:text-primary smooth-transition cursor-pointer inline-flex items-center gap-1.5"
+                              title="Print Packing Slip / Label"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="text-[10px] uppercase font-bold tracking-wider">Print</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Expanded Section */}
+                      {isExpanded && (
+                        <tr className="bg-secondary/5 border-b border-border/40 font-sans">
+                          <td colSpan={7} className="px-8 py-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-xs animate-fade-in text-left">
+                              
+                              {/* Column 1: Order Metadata */}
+                              <div className="space-y-4 border border-border/40 p-5 rounded-xl bg-neutral-900/30">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-text flex items-center gap-1.5 border-b border-border/20 pb-2 mb-3">
+                                  <Calendar className="w-3.5 h-3.5 text-primary" /> Order Overview
+                                </h4>
+                                
+                                <div className="space-y-2.5">
+                                  <div className="flex justify-between items-center text-secondary-text">
+                                    <span>Full ID:</span>
+                                    <span className="font-mono text-[10px] select-all font-bold text-primary-text">{order.id}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-secondary-text">
+                                    <span>Placing Date:</span>
+                                    <span className="font-bold text-primary-text">{formatDate(order.createdAt)} at {new Date(order.createdAt).toLocaleTimeString()}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-secondary-text">
+                                    <span>Payment Status:</span>
+                                    <span className="font-bold uppercase text-primary-text">{order.paymentStatus}</span>
+                                  </div>
+                                  {order.carrier && (
+                                    <div className="flex justify-between items-center text-secondary-text">
+                                      <span>Shipment Carrier:</span>
+                                      <span className="font-bold text-primary-text">{order.carrier}</span>
+                                    </div>
+                                  )}
+                                  {order.trackingId && (
+                                    <div className="flex justify-between items-center text-secondary-text">
+                                      <span>Tracking Code:</span>
+                                      <span className="font-mono text-primary-text">{order.trackingId}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Manual Confirm & Refunds in Expander */}
+                                <div className="pt-3 border-t border-border/20 flex flex-wrap gap-2">
+                                  {(order.paymentStatus === 'PENDING' || order.paymentStatus === 'FAILED') && order.paymentMethod === 'CARD' && (
+                                    <button
+                                      onClick={() => handleMarkPaid(order.id)}
+                                      disabled={actionLoadingId === order.id}
+                                      className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 hover:border-green-500/50 text-green-400 disabled:opacity-50 smooth-transition cursor-pointer text-[10px] uppercase font-black tracking-wider rounded-md"
+                                    >
+                                      {actionLoadingId === order.id ? 'Loading...' : 'Mark as Paid'}
+                                    </button>
+                                  )}
+
+                                  {order.paymentStatus === 'PAID' && (
+                                    <button
+                                      onClick={() => handleRefund(order.id)}
+                                      disabled={actionLoadingId === order.id}
+                                      className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 text-red-400 disabled:opacity-50 smooth-transition cursor-pointer text-[10px] uppercase font-black tracking-wider rounded-md"
+                                    >
+                                      {actionLoadingId === order.id ? 'Refunding...' : 'Refund Order'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Column 2: Customer Address Card */}
+                              <div className="space-y-4 border border-border/40 p-5 rounded-xl bg-neutral-900/30">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-text flex items-center gap-1.5 border-b border-border/20 pb-2 mb-3">
+                                  <User className="w-3.5 h-3.5 text-primary" /> Delivery & Customer Details
+                                </h4>
+                                
+                                <div className="space-y-2.5 leading-relaxed">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-primary-text">{order.user?.name || 'Customer'}</span>
+                                    <span className="text-[9px] bg-secondary text-secondary-text px-1.5 py-0.5 rounded font-mono uppercase font-bold">Buyer</span>
+                                  </div>
+
+                                  <div className="space-y-1.5 text-secondary-text font-mono text-[11px]">
+                                    <div className="flex items-center gap-2">
+                                      <Mail className="w-3.5 h-3.5 text-muted-text shrink-0" />
+                                      <span className="normal-case select-all font-bold">{order.user?.email || 'N/A'}</span>
+                                    </div>
+                                    {addressInfo.phone && (
+                                      <div className="flex items-center gap-2">
+                                        <Phone className="w-3.5 h-3.5 text-muted-text shrink-0" />
+                                        <span className="select-all font-bold">{addressInfo.phone}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="pt-2 border-t border-border/20 text-secondary-text space-y-1">
+                                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-text flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-muted-text" /> Shipping Address:
+                                    </p>
+                                    <p className="capitalize text-primary-text leading-normal">
+                                      {streetParts.streetNo && `${streetParts.streetNo}, `}
+                                      {streetParts.locality && `${streetParts.locality}, `}
+                                      {streetParts.landmark && `(Landmark: ${streetParts.landmark}), `}
+                                      {addressInfo.city && `${addressInfo.city}, `}
+                                      {addressInfo.state && `${addressInfo.state}`}
+                                      {addressInfo.postalCode && ` - ${addressInfo.postalCode}`}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Column 3: Order Items Grid */}
+                              <div className="space-y-4 border border-border/40 p-5 rounded-xl bg-neutral-900/30">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-text flex items-center gap-1.5 border-b border-border/20 pb-2 mb-3">
+                                  <Box className="w-3.5 h-3.5 text-primary" /> Products Ordered ({order.items?.length || 0})
+                                </h4>
+                                
+                                <div className="space-y-3.5 max-h-[220px] overflow-y-auto pr-1">
+                                  {order.items?.map((item: any, idx: number) => {
+                                    const material = item.specifications?.Material || 'PLA'
+                                    const color = item.specifications?.Color || 'Default'
+                                    const wt = item.specifications?.Weight || ''
+                                    
+                                    return (
+                                      <div key={idx} className="flex justify-between items-start gap-4 pb-3 border-b border-border/10 last:border-0 last:pb-0">
+                                        <div className="space-y-1">
+                                          <p className="font-bold text-primary-text uppercase leading-tight hover:text-primary cursor-pointer" onClick={() => window.open(`/products/${item.productId || ''}`, '_blank')}>
+                                            {item.name || 'Product'}
+                                          </p>
+                                          <p className="text-[9px] text-muted-text font-mono">
+                                            SKU: {item.sku || `SKT-${idx + 1}`}
+                                          </p>
+                                          <div className="flex gap-2 flex-wrap pt-0.5 text-[8px] font-bold font-mono">
+                                            <span className="bg-secondary text-secondary-text px-1 rounded uppercase">{material}</span>
+                                            <span className="bg-secondary text-secondary-text px-1 rounded uppercase">{color}</span>
+                                            {wt && <span className="bg-secondary text-secondary-text px-1 rounded">{wt}</span>}
+                                          </div>
+                                        </div>
+                                        <div className="text-right whitespace-nowrap">
+                                          <p className="font-black text-primary-text">Qty {item.quantity || 1}</p>
+                                          <p className="text-[10px] text-muted-text font-mono mt-0.5">{formatCurrency(item.price || 0)}</p>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
                 {filteredOrders.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
@@ -398,6 +665,29 @@ export default function AdminOrders() {
           </>
         )}
       </motion.div>
+
+      {/* Floating Revert Timer Alert */}
+      {revertAlert && (
+        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 border-2 border-amber-500/50 rounded-xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.7)] max-w-sm animate-fade-in font-sans">
+          <div className="flex items-start gap-3 text-left">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-1.5">
+              <h4 className="font-bold text-amber-500 text-xs uppercase tracking-wider">Reverting Order Status</h4>
+              <p className="text-[11px] text-secondary-text leading-relaxed">
+                Accidental rollback detected. Updating order status to <span className="font-mono text-primary-text font-black uppercase bg-neutral-800 px-1 rounded">{revertAlert.status.replace('_', ' ')}</span> in <span className="font-black text-amber-400 text-sm font-mono">{revertAlert.secondsLeft}s</span>...
+              </p>
+              <div className="pt-1 flex gap-2">
+                <button
+                  onClick={() => setRevertAlert(null)}
+                  className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[10px] font-bold uppercase tracking-wider rounded border border-border/40 smooth-transition cursor-pointer"
+                >
+                  Cancel Reversal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }

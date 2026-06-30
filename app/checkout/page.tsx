@@ -7,7 +7,7 @@ import { Footer } from '@/components/layout/Footer'
 import Link from 'next/link'
 import Script from 'next/script'
 import { useSettings } from '@/context/SettingsContext'
-import { CreditCard, ShoppingBag, CheckCircle, ArrowRight, Loader2, MapPin, Phone, Plus, Minus, Trash2 } from 'lucide-react'
+import { CreditCard, ShoppingBag, CheckCircle, ArrowRight, Loader2, MapPin, Phone, Plus, Minus, Trash2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useProducts } from '@/hooks/useProducts'
@@ -84,6 +84,7 @@ function CheckoutContent() {
   const [savedAddresses, setSavedAddresses] = useState<any[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string>('new')
   const [saveAddressToProfile, setSaveAddressToProfile] = useState(true)
+  const [showAllAddresses, setShowAllAddresses] = useState(false)
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -97,6 +98,7 @@ function CheckoutContent() {
     cardNumber: '',
     cardExpiry: '',
     cardCvc: '',
+    address: '',
   })
 
   const handleSelectSavedAddress = (addr: any) => {
@@ -113,6 +115,7 @@ function CheckoutContent() {
       phone: parsedPh.phone,
       alternatePhone: parsedPh.alternatePhone,
     }))
+    setShowAllAddresses(false)
   }
 
   const handleAddNewAddressClick = () => {
@@ -127,6 +130,7 @@ function CheckoutContent() {
       phone: '+91',
       alternatePhone: '',
     }))
+    setShowAllAddresses(false)
   }
   
   const { formatPrice } = useSettings()
@@ -797,57 +801,128 @@ function CheckoutContent() {
                         <div className="sm:col-span-2 space-y-3 mb-2">
                           <label className="text-xs font-bold text-secondary-text uppercase tracking-wider block">Deliver to Saved Address</label>
                           <div className="grid grid-cols-1 gap-3">
-                            {savedAddresses.map((addr) => (
-                              <div
-                                key={addr.id}
-                                onClick={() => handleSelectSavedAddress(addr)}
-                                className={`p-4 border rounded-xl cursor-pointer transition-all ${
-                                  selectedAddressId === addr.id
-                                    ? 'border-primary bg-primary/5'
-                                    : 'border-border bg-secondary hover:border-border/80'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between">
+                            {showAllAddresses ? (
+                              <>
+                                {savedAddresses.map((addr) => (
+                                  <div
+                                    key={addr.id}
+                                    onClick={() => handleSelectSavedAddress(addr)}
+                                    className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                                      selectedAddressId === addr.id
+                                        ? 'border-primary bg-primary/5'
+                                        : 'border-border bg-secondary hover:border-border/80'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="radio"
+                                          name="selectedAddress"
+                                          checked={selectedAddressId === addr.id}
+                                          onChange={() => handleSelectSavedAddress(addr)}
+                                          className="accent-primary"
+                                        />
+                                        <span className="text-xs font-bold text-primary-text capitalize">{formData.fullName}</span>
+                                        {addr.isDefault && (
+                                          <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">Default</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-xs text-secondary-text mt-2 pl-5 space-y-1">
+                                      <p>{addr.street}</p>
+                                      <p>{addr.city}, {addr.postalCode}</p>
+                                      <p className="flex items-center gap-1 mt-1 text-[11px]"><Phone className="w-3 h-3" /> {addr.phone || 'N/A'}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div
+                                  onClick={handleAddNewAddressClick}
+                                  className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                                    selectedAddressId === 'new'
+                                      ? 'border-primary bg-primary/5'
+                                      : 'border-border bg-secondary hover:border-border/80'
+                                  }`}
+                                >
                                   <div className="flex items-center gap-2">
                                     <input
                                       type="radio"
                                       name="selectedAddress"
-                                      checked={selectedAddressId === addr.id}
-                                      onChange={() => handleSelectSavedAddress(addr)}
+                                      checked={selectedAddressId === 'new'}
+                                      onChange={handleAddNewAddressClick}
                                       className="accent-primary"
                                     />
-                                    <span className="text-xs font-bold text-primary-text capitalize">{formData.fullName}</span>
-                                    {addr.isDefault && (
-                                      <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">Default</span>
-                                    )}
+                                    <span className="text-xs font-bold text-primary-text">Add / Deliver to a new address</span>
                                   </div>
                                 </div>
-                                <div className="text-xs text-secondary-text mt-2 pl-5 space-y-1">
-                                  <p>{addr.street}</p>
-                                  <p>{addr.city}, {addr.postalCode}</p>
-                                  <p className="flex items-center gap-1 mt-1 text-[11px]"><Phone className="w-3 h-3" /> {addr.phone || 'N/A'}</p>
-                                </div>
-                              </div>
-                            ))}
-                            <div
-                              onClick={handleAddNewAddressClick}
-                              className={`p-4 border rounded-xl cursor-pointer transition-all ${
-                                selectedAddressId === 'new'
-                                  ? 'border-primary bg-primary/5'
-                                  : 'border-border bg-secondary hover:border-border/80'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="radio"
-                                  name="selectedAddress"
-                                  checked={selectedAddressId === 'new'}
-                                  onChange={handleAddNewAddressClick}
-                                  className="accent-primary"
-                                />
-                                <span className="text-xs font-bold text-primary-text">Add / Deliver to a new address</span>
-                              </div>
-                            </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllAddresses(false)}
+                                  className="w-full mt-1.5 py-2.5 bg-neutral-900 border border-border/40 hover:bg-neutral-850 hover:text-white text-secondary-text rounded-xl text-[10px] font-black uppercase tracking-wider smooth-transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                >
+                                  <span>Collapse Address List</span>
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* Show only the selected address */}
+                                {selectedAddressId !== 'new' ? (() => {
+                                  const addr = savedAddresses.find(a => a.id === selectedAddressId) || savedAddresses[0];
+                                  if (!addr) return null;
+                                  return (
+                                    <div
+                                      onClick={() => setShowAllAddresses(true)}
+                                      className="p-4 border-2 border-primary bg-primary/5 rounded-xl cursor-pointer hover:bg-primary/10 transition-all border-dashed text-left"
+                                    >
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="radio"
+                                            name="selectedAddress"
+                                            checked={true}
+                                            readOnly
+                                            className="accent-primary"
+                                          />
+                                          <span className="text-xs font-bold text-primary-text capitalize">{formData.fullName}</span>
+                                          {addr.isDefault && (
+                                            <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">Default</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-xs text-secondary-text mt-2 pl-5 space-y-1">
+                                        <p>{addr.street}</p>
+                                        <p>{addr.city}, {addr.postalCode}</p>
+                                        <p className="flex items-center gap-1 mt-1 text-[11px]"><Phone className="w-3 h-3" /> {addr.phone || 'N/A'}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })() : (
+                                  <div
+                                    onClick={() => setShowAllAddresses(true)}
+                                    className="p-4 border-2 border-primary bg-primary/5 rounded-xl cursor-pointer hover:bg-primary/10 transition-all border-dashed text-left"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="radio"
+                                        name="selectedAddress"
+                                        checked={true}
+                                        readOnly
+                                        className="accent-primary"
+                                      />
+                                      <span className="text-xs font-bold text-primary-text">Add / Deliver to a new address</span>
+                                    </div>
+                                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllAddresses(true)}
+                                  className="w-full mt-1.5 py-2.5 bg-neutral-900 border border-border/40 hover:bg-neutral-850 hover:text-white text-primary rounded-xl text-[10px] font-black uppercase tracking-wider smooth-transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                >
+                                  <span>Change Address / Show Other Addresses</span>
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1032,10 +1107,20 @@ function CheckoutContent() {
                     )}
                   </div>
 
-                  <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl text-xs text-secondary-text space-y-1.5">
-                    <p className="font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider text-[10px]">Important Shipping & Return Notice:</p>
-                    <p className="leading-relaxed">• Orders **cannot be canceled** once they have been shipped.</p>
-                    <p className="leading-relaxed">• Returns are only accepted within **3 days** of order delivery. Returns requested after 3 days of delivery will not be approved.</p>
+                  <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl text-xs text-secondary-text space-y-2 text-left">
+                    <p className="font-bold text-amber-500 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Important Shipping & Return Notice:
+                    </p>
+                    <ul className="space-y-1 list-none pl-0">
+                      <li className="leading-relaxed flex items-start gap-1.5">
+                        <span className="text-amber-500 shrink-0 font-bold">•</span>
+                        <span>Orders <strong className="text-primary-text font-black">cannot be canceled</strong> once they have been shipped.</span>
+                      </li>
+                      <li className="leading-relaxed flex items-start gap-1.5">
+                        <span className="text-amber-500 shrink-0 font-bold">•</span>
+                        <span>Returns are only accepted within <strong className="text-primary-text font-black">3 days</strong> of order delivery. Returns requested after 3 days of delivery will not be approved.</span>
+                      </li>
+                    </ul>
                   </div>
 
                   {submitError && (

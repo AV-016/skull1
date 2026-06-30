@@ -395,12 +395,15 @@ export default function OrderDetailPage() {
         return findHistory('SHIPPED')?.createdAt
       case 'delivered':
         return findHistory('DELIVERED')?.createdAt
+      case 'cancelled':
+        return findHistory('CANCELLED')?.createdAt || order.updatedAt
       default:
         return null
     }
   }
 
   const isReturnFlow = ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNED', 'RETURN_REJECTED'].includes(status)
+  const isCancelledFlow = status === 'CANCELLED'
   
   const RETURN_STAGES = [
     { key: 'return_requested', label: 'Return Request' },
@@ -408,7 +411,16 @@ export default function OrderDetailPage() {
     { key: 'return_instructions', label: 'Follow Instructions for Return' }
   ]
   
-  const currentStages = isReturnFlow ? RETURN_STAGES : STAGES
+  const CANCELLED_STAGES = [
+    { key: 'placed', label: 'Order Placed' },
+    { key: 'cancelled', label: 'Order Cancelled' }
+  ]
+  
+  const currentStages = isReturnFlow 
+    ? RETURN_STAGES 
+    : isCancelledFlow 
+    ? CANCELLED_STAGES 
+    : STAGES
 
   const getReturnStageState = (index: number) => {
     let isCompleted = false
@@ -426,6 +438,20 @@ export default function OrderDetailPage() {
     } else if (status === 'RETURN_REJECTED') {
       if (index === 0) isCompleted = true
       if (index === 1) isRejected = true
+    }
+
+    return { isCompleted, isActive, isRejected }
+  }
+
+  const getCancelledStageState = (index: number) => {
+    let isCompleted = false
+    let isActive = false
+    let isRejected = false
+
+    if (index === 0) {
+      isCompleted = true
+    } else if (index === 1) {
+      isRejected = true
     }
 
     return { isCompleted, isActive, isRejected }
@@ -538,10 +564,9 @@ export default function OrderDetailPage() {
     }
     switch (status) {
       case 'PENDING':
-        return 'You can cancel this order before printing begins.'
       case 'CONFIRMED':
       case 'PROCESSING':
-        return 'Printing has started. Cancellation may incur charges.'
+        return 'You can cancel this order before shipping begins.'
       case 'SHIPPED':
         return 'Order has been shipped. Returns are available within 3 days after delivery.'
       case 'DELIVERED':
@@ -551,7 +576,9 @@ export default function OrderDetailPage() {
           : '3 days after delivery'
         return `Eligible for return until ${formattedWindowDate}.`
       case 'CANCELLED':
-        return 'This order has been cancelled. Refund processing updates will show below.'
+        return isRefunded
+          ? 'This order has been cancelled. Refund processing updates will show below.'
+          : 'This order has been cancelled.'
       case 'RETURNED':
       case 'RETURN_REQUESTED':
         return 'Return request is currently under review or processed.'
@@ -630,7 +657,7 @@ export default function OrderDetailPage() {
         </motion.div>
 
         {/* Payment Query Param / Resume Alerts */}
-        {(paymentSuccess || paymentAlert?.type === 'success') && (
+        {(paymentSuccess || paymentAlert?.type === 'success') && !isCancelled && !isReturned && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -694,6 +721,8 @@ export default function OrderDetailPage() {
             {currentStages.map((stage, idx) => {
               const { isCompleted, isActive, isRejected } = isReturnFlow 
                 ? getReturnStageState(idx) 
+                : isCancelledFlow
+                ? getCancelledStageState(idx)
                 : { ...getStageState(idx), isRejected: false }
               const time = isReturnFlow 
                 ? getReturnStageTime(stage.key) 
@@ -739,6 +768,8 @@ export default function OrderDetailPage() {
             {currentStages.map((stage, idx) => {
               const { isCompleted, isActive, isRejected } = isReturnFlow 
                 ? getReturnStageState(idx) 
+                : isCancelledFlow
+                ? getCancelledStageState(idx)
                 : { ...getStageState(idx), isRejected: false }
               const time = isReturnFlow 
                 ? getReturnStageTime(stage.key) 
@@ -1161,6 +1192,10 @@ export default function OrderDetailPage() {
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 border border-blue-500/20 text-blue-400 uppercase tracking-wide">
                       Refunded
                     </span>
+                  ) : status === 'CANCELLED' ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 border border-red-500/20 text-red-400 uppercase tracking-wide font-sans">
+                      Cancelled
+                    </span>
                   ) : order.paymentMethod === 'COD' ? (
                     status === 'DELIVERED' ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 border border-green-500/20 text-green-400 uppercase tracking-wide font-sans">
@@ -1187,7 +1222,13 @@ export default function OrderDetailPage() {
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5 font-sans">Payment Date</span>
-                  <span className="font-semibold text-primary-text">{(order.paymentStatus === 'PAID' || (order.paymentMethod === 'COD' && status === 'DELIVERED')) ? formatDate(order.updatedAt) : 'Pending Confirmation'}</span>
+                  <span className="font-semibold text-primary-text">
+                    {(order.paymentStatus === 'PAID' || (order.paymentMethod === 'COD' && status === 'DELIVERED')) 
+                      ? formatDate(order.updatedAt) 
+                      : status === 'CANCELLED'
+                      ? 'N/A'
+                      : 'Pending Confirmation'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-text uppercase tracking-wider block mb-0.5 font-sans">Order ID</span>
@@ -1197,15 +1238,18 @@ export default function OrderDetailPage() {
 
               {/* Invoice Download Action */}
               <div className="pt-4 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
-                {order.paymentStatus === 'PAID' || status === 'DELIVERED' ? (
+                {status === 'CANCELLED' ? (
+                  <p className="text-xs text-red-400 font-medium">No invoice available for cancelled orders.</p>
+                ) : order.paymentStatus === 'PAID' || status === 'DELIVERED' ? (
                   <>
-                    <p className="text-xs text-muted-text">A detailed tax invoice is ready for download.</p>
-                    <Button 
-                      onClick={() => alert('Generating tax invoice PDF... Invoice downloaded successfully.')}
-                      className="bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider px-6 py-2 border-primary w-full sm:w-auto"
+                    <p className="text-xs text-muted-text">A detailed tax invoice and packaging slip is ready for print.</p>
+                    <Link
+                      href={`/orders/${order.id}/invoice`}
+                      target="_blank"
+                      className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider px-6 py-2.5 rounded-lg border-primary smooth-transition w-full sm:w-auto text-center cursor-pointer font-sans shadow-md"
                     >
-                      <Download className="w-4 h-4 mr-2" /> Download Invoice
-                    </Button>
+                      <Printer className="w-4 h-4" /> Print Invoice / Label
+                    </Link>
                   </>
                 ) : (
                   <p className="text-xs text-amber-500/90 font-medium">Invoice will be generated after payment confirmation.</p>
@@ -1300,7 +1344,7 @@ export default function OrderDetailPage() {
             </div>
 
             {/* 9. Refund Information Card (Conditional) */}
-            {(isCancelled || isReturned || isRefunded) && (
+            {isRefunded && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -1450,38 +1494,26 @@ export default function OrderDetailPage() {
                   </Button>
                 )}
 
-                {/* Status: Pending -> Cancel */}
-                {status === 'PENDING' && (
+                {/* Status: Before Shipping -> Cancel Order */}
+                {['PENDING', 'CONFIRMED', 'PROCESSING'].includes(status) && (
                   <Button
                     variant="outline"
                     className="w-full border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
-                    onClick={() => cancelMutation.mutate(orderId)}
+                    onClick={() => {
+                      if (confirm('Are you sure you want to cancel this order?')) {
+                        cancelMutation.mutate(orderId)
+                      }
+                    }}
                     disabled={cancelMutation.isPending}
                   >
                     {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
                   </Button>
                 )}
 
-                {/* Status: Confirmed -> Request Cancellation */}
-                {status === 'CONFIRMED' && (
-                  <Button
-                    variant="outline"
-                    className="w-full border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
-                    onClick={() => {
-                      if (confirm('Request cancellation of this order? Our team will review design specifications.')) {
-                        cancelMutation.mutate(orderId)
-                      }
-                    }}
-                    disabled={cancelMutation.isPending}
-                  >
-                    Request Cancellation
-                  </Button>
-                )}
-
                 {/* Status: Processing/Printing/Quality Check/Packed -> Contact Seller */}
                 {['PROCESSING', 'QUALITY_CHECK', 'PACKED'].includes(status) && (
                   <Button
-                    className="w-full bg-primary text-white hover:bg-primary/90 font-bold py-2.5 rounded-lg cursor-pointer"
+                    className="w-full bg-primary text-white hover:bg-primary/90 font-bold py-2.5 rounded-lg cursor-pointer mt-2"
                     onClick={() => setIsSupportModalOpen(true)}
                   >
                     Contact Seller
@@ -1520,7 +1552,7 @@ export default function OrderDetailPage() {
                 )}
 
                 {/* Status: Cancelled -> View Refund Status */}
-                {status === 'CANCELLED' && (
+                {status === 'CANCELLED' && isRefunded && (
                   <button 
                     onClick={() => alert(`Refund Initiated: Expected completion in 5-7 working days. Amount: ${formatCurrency(grandTotalVal)}`)}
                     className="w-full px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-lg transition-colors text-center cursor-pointer font-sans"
