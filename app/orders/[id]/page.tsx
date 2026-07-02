@@ -46,6 +46,7 @@ export default function OrderDetailPage() {
   const [returnTrackingUrlInput, setReturnTrackingUrlInput] = useState('')
   const [returnUpiId, setReturnUpiId] = useState('')
   const [isVerifyingUpi, setIsVerifyingUpi] = useState(false)
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false)
   const [upiVerificationResult, setUpiVerificationResult] = useState<{ success: boolean; customerName?: string; error?: string } | null>(null)
   
   // Payment States
@@ -1303,7 +1304,7 @@ export default function OrderDetailPage() {
                 <div className="text-secondary-text text-xs space-y-2.5 font-sans">
                   <div>
                     <span className="text-[10px] text-muted-text uppercase tracking-wider block">Courier</span>
-                    <span className="font-bold text-primary-text">India Post</span>
+                    <span className="font-bold text-primary-text">{order.carrier || 'N/A'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-muted-text uppercase tracking-wider block">Tracking Number</span>
@@ -1496,18 +1497,40 @@ export default function OrderDetailPage() {
 
                 {/* Status: Before Shipping -> Cancel Order */}
                 {['PENDING', 'CONFIRMED', 'PROCESSING'].includes(status) && (
-                  <Button
-                    variant="outline"
-                    className="w-full border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
-                    onClick={() => {
-                      if (confirm('Are you sure you want to cancel this order?')) {
-                        cancelMutation.mutate(orderId)
-                      }
-                    }}
-                    disabled={cancelMutation.isPending}
-                  >
-                    {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
-                  </Button>
+                  <div className="w-full space-y-2">
+                    {isConfirmingCancel ? (
+                      <div className="flex flex-col gap-2 p-3 border border-red-500/20 bg-red-500/5 rounded-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <p className="text-xs font-bold text-center text-red-400">Are you sure you want to cancel?</p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1 border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-bold py-1.5 text-xs rounded-md cursor-pointer"
+                            onClick={() => cancelMutation.mutate(orderId)}
+                            disabled={cancelMutation.isPending}
+                          >
+                            {cancelMutation.isPending ? 'Cancelling...' : 'Yes, Cancel'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 border-border text-primary-text hover:bg-secondary font-bold py-1.5 text-xs rounded-md cursor-pointer"
+                            onClick={() => setIsConfirmingCancel(false)}
+                            disabled={cancelMutation.isPending}
+                          >
+                            No
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="w-full border-red-500/20 text-red-500 hover:bg-red-500/5 font-bold py-2.5 rounded-lg cursor-pointer"
+                        onClick={() => setIsConfirmingCancel(true)}
+                        disabled={cancelMutation.isPending}
+                      >
+                        {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 {/* Status: Processing/Printing/Quality Check/Packed -> Contact Seller */}

@@ -3,7 +3,7 @@
 $BASE_URL = "http://localhost:5000/api"
 $RAND = Get-Random -Minimum 1000 -Maximum 9999
 $CUST_EMAIL = "test_cust_$RAND@example.com"
-$CUST_PASS = "customerpassword123"
+$CUST_PASS = "CustomerPassword123!"
 
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host "STARTING E-COMMERCE & ADMIN API FUNCTIONAL TESTS" -ForegroundColor Cyan
@@ -92,14 +92,14 @@ Run-Curl "GET" "/auth/me" $null $CustToken
 
 # 3. ADDRESS MANAGEMENT
 Write-Host "`n--- 3. Testing Address Creation ---" -ForegroundColor Blue
-$AddrPayload = "{`"street`":`"123 Main St`",`"city`":`"Noida`",`"state`":`"UP`",`"postalCode`":`"201301`",`"country`":`"India`",`"phone`":`"9999999999`"}"
+$AddrPayload = "{`"street`":`"123 Main St`",`"city`":`"Noida`",`"state`":`"UP`",`"postalCode`":`"201301`",`"country`":`"India`",`"phone`":`"+919999999999`"}"
 $AddrRes = Run-Curl "POST" "/addresses" $AddrPayload $CustToken
 $AddressId = ($AddrRes | ConvertFrom-Json).data.id
 Write-Host "Created Address ID: $AddressId" -ForegroundColor Yellow
 
 # 4. ADMIN ACTIONS (CATEGORY, TAG, PRODUCT)
 Write-Host "`n--- 4. Testing Admin Login & Creation ---" -ForegroundColor Blue
-$AdminLoginPayload = "{`"email`":`"admin_test_123@example.com`",`"password`":`"adminpassword123`"}"
+$AdminLoginPayload = "{`"email`":`"admin@skulture.com`",`"password`":`"AdminPassword123`"}"
 $AdminLoginRes = Run-Curl "POST" "/auth/login" $AdminLoginPayload
 $AdminToken = ($AdminLoginRes | ConvertFrom-Json).data.token
 Write-Host "Admin Token: $AdminToken" -ForegroundColor Yellow

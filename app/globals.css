@@ -75,32 +75,32 @@
   --card-foreground: #FFFFFF;
   --popover: #23272B;
   --popover-foreground: #FFFFFF;
-  --primary: #14B8A6;
+  --primary: #DC2626;
   --primary-foreground: #FFFFFF;
   --secondary: #15181A;
   --secondary-foreground: #CFCFCF;
   --muted: #9CA3AF;
   --muted-foreground: #9CA3AF;
-  --accent: #14B8A6;
+  --accent: #DC2626;
   --accent-foreground: #FFFFFF;
   --destructive: #EF4444;
   --border: rgba(250, 245, 215, 0.12);
   --input: rgba(250, 245, 215, 0.12);
-  --ring: #14B8A6;
-  --chart-1: #14B8A6;
-  --chart-2: #2DD4BF;
+  --ring: #DC2626;
+  --chart-1: #DC2626;
+  --chart-2: #EF4444;
   --chart-3: #A1A1AA;
   --chart-4: #71717A;
   --chart-5: #52525B;
   --radius: 0px;
   --sidebar: #15181A;
   --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #14B8A6;
+  --sidebar-primary: #DC2626;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #23272B;
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: rgba(250, 245, 215, 0.12);
-  --sidebar-ring: #14B8A6;
+  --sidebar-ring: #DC2626;
 }
 
 :root.light {

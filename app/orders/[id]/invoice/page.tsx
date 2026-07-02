@@ -443,17 +443,23 @@ export default function OrderInvoicePage() {
                 <span className="text-[9px] font-black uppercase tracking-widest text-neutral-450 block mb-2">DELIVER TO (RECIPIENT):</span>
                 
                 <div className="space-y-3">
-                  {/* Customer name */}
                   <h4 className="text-xl font-black uppercase tracking-wide text-black leading-none">{order.user?.name || 'Recipient Details'}</h4>
                   
                   {/* Physical Address */}
                   <div className="text-xs text-black leading-relaxed font-bold space-y-1 capitalize">
                     {streetParts.streetNo && <p>Street/House No: {streetParts.streetNo}</p>}
                     {streetParts.locality && <p>Locality/Village: {streetParts.locality}</p>}
-                    {streetParts.landmark && <p className="normal-case text-neutral-500 text-[10px] font-medium">Landmark: {streetParts.landmark}</p>}
-                    <p className="text-sm font-black text-black">
-                      {addressInfo.city || 'N/A'}, {addressInfo.state || 'N/A'} - <span className="font-mono bg-black text-white px-2 py-0.5 rounded text-[11px]">{addressInfo.postalCode || 'N/A'}</span>
+                    <p className="text-sm font-normal text-black uppercase">
+                      {addressInfo.city || 'N/A'} - {addressInfo.postalCode || 'N/A'}
                     </p>
+                    <p className="text-sm font-normal text-black uppercase">
+                      {addressInfo.state || 'N/A'}
+                    </p>
+                    {streetParts.landmark && (
+                      <p className="text-xs font-bold text-black uppercase mt-1 normal-case">
+                        Landmark: <span className="font-normal">{streetParts.landmark}</span>
+                      </p>
+                    )}
                     <p className="text-[10px] text-neutral-400 uppercase tracking-wider font-mono mt-0.5">{addressInfo.country || 'India'}</p>
                   </div>
 
@@ -467,11 +473,35 @@ export default function OrderInvoicePage() {
                 </div>
               </div>
 
+              {/* PACKAGE CONTENTS & DETAILS */}
+              <div className="border-4 border-black rounded-xl p-4 bg-neutral-50/10 mb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-neutral-450 block mb-1">Contents:</span>
+                  <div className="text-xs font-bold text-black font-sans leading-tight">
+                    {order.items?.map((item: any, idx: number) => (
+                      <div key={idx} className="truncate uppercase">
+                        • {item.name || item.product?.name || '3D Printed Part'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-l-2 border-black pl-4 flex flex-col justify-center font-mono text-[10px] font-bold text-black uppercase">
+                  <span>Qty: {order.items?.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0) || 1}</span>
+                  <span className="text-[7px] text-neutral-450 font-bold mt-1 leading-tight">Total items in package</span>
+                </div>
+              </div>
+
             </div>
 
-            {/* MONOCHROME FOOTER & FRAGILE SYMBOLS */}
-            <div className="border-t-4 border-black pt-4 mt-4">
-              <div className="flex justify-between items-center text-[9px] text-neutral-500 font-mono uppercase tracking-wider select-none">
+            {/* Emergency / Handling Note & Monochrome Footer */}
+            <div className="border-t-4 border-black pt-4 mt-4 space-y-4">
+              {/* Subtle emergency handling section */}
+              <div className="text-[8px] text-black font-mono uppercase tracking-wider select-none text-center leading-relaxed">
+                <p className="font-bold">If undelivered, return to sender.</p>
+                <p>Do not fold. • Handle with care. • Contains 3D Printed Parts.</p>
+              </div>
+
+              <div className="flex justify-between items-center text-[9px] text-neutral-500 font-mono uppercase tracking-wider select-none border-t border-black/10 pt-3">
                 <div>
                   <p className="font-black text-black">Skulture Fulfillment System</p>
                   <p className="text-[8px]">Order Ref: #{order.id}</p>
@@ -484,7 +514,7 @@ export default function OrderInvoicePage() {
                     <span>☔</span>
                     <span>⬆️</span>
                   </div>
-                  <p className="text-[7px] tracking-widest">FRAGILE • KEEP DRY • THIS SIDE UP</p>
+                  <p className="text-[7px] tracking-widest font-bold">FRAGILE • KEEP DRY • THIS SIDE UP</p>
                 </div>
 
                 <div className="text-right">

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Star } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useRouter } from 'next/navigation'
-import { sanitizeProducts } from '@/lib/mockProducts'
+import { sanitizeProducts, mockProducts } from '@/lib/mockProducts'
 
 export const HeroSection = () => {
   const router = useRouter()
@@ -62,47 +62,16 @@ export const HeroSection = () => {
     return name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 16) + '.STL'
   }
 
-  // 1. Main Floating Product
-  const product1 = products[0] || {
-    slug: 'shogun-cyber-oni-figure',
-    name: 'Shogun Cyber-Oni',
-    image: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&auto=format&fit=crop&q=80',
-    specifications: {
-      'Dimensions': '150x150x220 mm',
-      'Scale': '1:10 SCALE',
-      'Volume': 'VOL: 4.8 L'
-    }
+  // Helper to dynamically cycle through available products or mockProducts fallback
+  const getProduct = (index: number) => {
+    const list = products.length > 0 ? products : mockProducts
+    return list[index % list.length]
   }
 
-  // 2. Floating Product 2 (Top Left)
-  const product2 = products[1] || {
-    slug: 'steampunk-gear-keychain',
-    name: 'Steampunk Gear Keychain',
-    image: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&auto=format&fit=crop&q=80',
-    specifications: {
-      'Diameter': '80mm'
-    }
-  }
-
-  // 3. Floating Product 3 (Bottom Right)
-  const product3 = products[2] || {
-    slug: 'parametric-origami-vase',
-    name: 'Parametric Origami Vase',
-    image: 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?w=400&auto=format&fit=crop&q=80',
-    specifications: {
-      'Height': '120mm'
-    }
-  }
-
-  // 4. Floating Product 4 (Bottom Left)
-  const product4 = products[3] || {
-    slug: 'articulated-crystal-dragon',
-    name: 'Articulated Dragon',
-    image: 'https://images.unsplash.com/photo-1594787318286-3d835c1d207f?w=400&auto=format&fit=crop&q=80',
-    specifications: {
-      'Length': '50mm'
-    }
-  }
+  const product1 = getProduct(0)
+  const product2 = getProduct(1)
+  const product3 = getProduct(2)
+  const product4 = getProduct(3)
 
   const containerVariants = {
     hidden: { opacity: 0 },

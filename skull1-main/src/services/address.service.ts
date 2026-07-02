@@ -32,6 +32,7 @@ export class AddressService {
           state: data.state,
           postalCode: data.postalCode,
           country: data.country,
+          phone: data.phone,
           isDefault,
           isActive: data.isActive !== undefined ? data.isActive : true,
         },
