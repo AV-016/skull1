@@ -767,13 +767,7 @@ export default function AccountPage() {
                   <span>Payments</span>
                 </div>
                 <div className="flex flex-col pb-2 pl-11">
-                  <Link
-                    href="/rewards"
-                    className="py-2 text-left font-semibold flex items-center justify-between pr-4 text-gray-700 dark:text-gray-300 hover:text-red-500 smooth-transition"
-                  >
-                    <span>Gift Cards</span>
-                    <span className="text-green-600 font-bold">₹0</span>
-                  </Link>
+
                   <button
                     onClick={() => setActiveTab('upi')}
                     className={`py-2 text-left font-semibold smooth-transition ${

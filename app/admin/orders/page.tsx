@@ -562,17 +562,31 @@ export default function AdminOrders() {
                                     
                                     return (
                                       <div key={idx} className="flex justify-between items-start gap-4 pb-3 border-b border-border/10 last:border-0 last:pb-0">
-                                        <div className="space-y-1">
-                                          <p className="font-bold text-primary-text uppercase leading-tight hover:text-primary cursor-pointer" onClick={() => window.open(`/products/${item.productId || ''}`, '_blank')}>
-                                            {item.name || 'Product'}
-                                          </p>
-                                          <p className="text-[9px] text-muted-text font-mono">
-                                            SKU: {item.sku || `SKT-${idx + 1}`}
-                                          </p>
-                                          <div className="flex gap-2 flex-wrap pt-0.5 text-[8px] font-bold font-mono">
-                                            <span className="bg-secondary text-secondary-text px-1 rounded uppercase">{material}</span>
-                                            <span className="bg-secondary text-secondary-text px-1 rounded uppercase">{color}</span>
-                                            {wt && <span className="bg-secondary text-secondary-text px-1 rounded">{wt}</span>}
+                                        <div className="flex gap-3 items-start">
+                                          {/* Product Image Thumbnail */}
+                                          <div className="w-12 h-12 rounded-lg border border-border/20 overflow-hidden shrink-0 bg-neutral-800 flex items-center justify-center cursor-pointer" onClick={() => window.open(`/products/${item.productId || ''}`, '_blank')}>
+                                            <img 
+                                              src={item.image || '/placeholder.jpg'} 
+                                              alt={item.name || 'Product'} 
+                                              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                              onError={(e) => {
+                                                (e.target as HTMLImageElement).src = '/placeholder.jpg'
+                                              }}
+                                            />
+                                          </div>
+                                          
+                                          <div className="space-y-1">
+                                            <p className="font-bold text-primary-text uppercase leading-tight hover:text-primary cursor-pointer" onClick={() => window.open(`/products/${item.productId || ''}`, '_blank')}>
+                                              {item.name || 'Product'}
+                                            </p>
+                                            <p className="text-[9px] text-muted-text font-mono">
+                                              SKU: {item.sku || `SKT-${idx + 1}`}
+                                            </p>
+                                            <div className="flex gap-2 flex-wrap pt-0.5 text-[8px] font-bold font-mono">
+                                              <span className="bg-secondary text-secondary-text px-1 rounded uppercase">{material}</span>
+                                              <span className="bg-secondary text-secondary-text px-1 rounded uppercase">{color}</span>
+                                              {wt && <span className="bg-secondary text-secondary-text px-1 rounded">{wt}</span>}
+                                            </div>
                                           </div>
                                         </div>
                                         <div className="text-right whitespace-nowrap">

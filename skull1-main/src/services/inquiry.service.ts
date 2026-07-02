@@ -117,18 +117,18 @@ export class InquiryService {
 
     // Mark as read based on who is viewing
     if (user) {
-      if (user.role === 'ADMIN') {
-        await prisma.inquiry.update({
-          where: { id },
-          data: { isReadByAdmin: true },
-        });
-        (inquiry as any).isReadByAdmin = true;
-      } else if (inquiry.userId === user.id) {
+      if (inquiry.userId === user.id) {
         await prisma.inquiry.update({
           where: { id },
           data: { isReadByCustomer: true },
         });
         (inquiry as any).isReadByCustomer = true;
+      } else if (user.role === 'ADMIN') {
+        await prisma.inquiry.update({
+          where: { id },
+          data: { isReadByAdmin: true },
+        });
+        (inquiry as any).isReadByAdmin = true;
       }
     }
 

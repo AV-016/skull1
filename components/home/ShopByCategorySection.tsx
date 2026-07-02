@@ -68,16 +68,18 @@ export const ShopByCategorySection = () => {
   const { data: serverCategories = [] } = useCategories()
 
   const categories: CategoryCard[] = serverCategories.length > 0
-    ? serverCategories.map((cat: Category) => {
-        const slug = cat.slug.toLowerCase()
-        const image = cat.imageUrl || categoryImages[slug] || fallbackImage
-        return {
-          title: cat.name,
-          image,
-          href: `/products?category=${encodeURIComponent(cat.slug)}`,
-          count: 'Explore'
-        }
-      })
+    ? serverCategories
+        .filter((cat: Category) => cat.slug.toLowerCase() !== 'custom-orders')
+        .map((cat: Category) => {
+          const slug = cat.slug.toLowerCase()
+          const image = cat.imageUrl || categoryImages[slug] || fallbackImage
+          return {
+            title: cat.name,
+            image,
+            href: `/products?category=${encodeURIComponent(cat.slug)}`,
+            count: 'Explore'
+          }
+        })
     : defaultCategoryCards
 
   const containerVariants = {

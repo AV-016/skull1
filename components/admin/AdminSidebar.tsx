@@ -19,7 +19,8 @@ import {
   Users, 
   Award,
   Globe,
-  Calendar
+  Calendar,
+  Mail
 } from 'lucide-react'
 
 export function AdminSidebar() {
@@ -36,7 +37,7 @@ export function AdminSidebar() {
     { label: 'Orders', href: '/admin/orders', icon: ShoppingCart },
     { label: 'Custom Requests', href: '/admin/custom-requests', icon: Sparkles },
     { label: 'Reviews', href: '/admin/reviews', icon: Star },
-    { label: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
+    { label: 'Email Inquiries', href: '/admin/inquiries', icon: Mail },
     { label: 'Loyalty Stamps', href: '/admin/loyalty', icon: Award },
     { label: 'Settings', href: '/admin/settings', icon: Settings },
   ]

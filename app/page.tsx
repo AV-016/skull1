@@ -11,7 +11,6 @@ import { CustomerCreationsSection } from '@/components/home/CustomerCreationsSec
 import { ReviewsSection } from '@/components/home/ReviewsSection'
 import { FinalCTASection } from '@/components/home/FinalCTASection'
 import { Footer } from '@/components/layout/Footer'
-import { DevStickyPanel } from '@/components/dev/DevStickyPanel'
 
 export default function HomePage() {
   return (
@@ -29,7 +28,6 @@ export default function HomePage() {
       <ReviewsSection />
       <FinalCTASection />
       <Footer />
-      <DevStickyPanel />
     </main>
   )
 }

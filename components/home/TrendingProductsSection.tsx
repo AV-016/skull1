@@ -171,23 +171,25 @@ export const TrendingProductsSection = () => {
 
                   {/* Product Details */}
                   <div className="p-6">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <div className="flex text-primary">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-3.5 h-3.5 ${
-                              i < Math.floor(product.rating)
-                                ? 'fill-primary text-primary'
-                                : 'text-white/10'
-                            }`}
-                          />
-                        ))}
+                    {product.reviewsCount > 0 && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <div className="flex text-primary">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3.5 h-3.5 ${
+                                i < Math.floor(product.rating)
+                                  ? 'fill-primary text-primary'
+                                  : 'text-white/10'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[11px] text-muted-text font-medium">
+                          ({product.reviewsCount})
+                        </span>
                       </div>
-                      <span className="text-[11px] text-muted-text font-medium">
-                        ({product.reviewsCount})
-                      </span>
-                    </div>
+                    )}
 
                     <h4 className="text-primary-text font-bold text-lg group-hover:text-primary transition-colors duration-300 line-clamp-1">
                       {product.name}

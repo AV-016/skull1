@@ -277,7 +277,12 @@ export default function OrderDetailPage() {
   }
 
   const handleReviewSubmit = async (productId: string) => {
-    const state = reviewsState[productId] || { rating: 5, comment: '', images: [], submitted: false, error: null, submitting: false }
+    const state = reviewsState[productId] || { rating: 0, comment: '', images: [], submitted: false, error: null, submitting: false }
+    
+    if (state.rating === 0) {
+      alert('Please select a rating before submitting your review.')
+      return
+    }
     
     setReviewsState(prev => ({
       ...prev,
@@ -989,7 +994,7 @@ export default function OrderDetailPage() {
               <h2 className="text-lg font-bold text-primary-text mb-6 pb-2 border-b border-border/40">Order Items & Custom Specs</h2>
               <div className="space-y-8">
                 {order.items?.map((item: any, idx: number) => {
-                  const review = reviewsState[item.productId] || { rating: 5, comment: '', images: [] as string[], isUploading: false, submitted: false, error: null, submitting: false }
+                  const review = reviewsState[item.productId] || { rating: 0, comment: '', images: [] as string[], isUploading: false, submitted: false, error: null, submitting: false }
                   const specs = getPrintSpecs(item)
                   const designFiles = getDesignFiles(item)
 
@@ -1040,7 +1045,7 @@ export default function OrderDetailPage() {
                             <div className="space-y-3">
                               <p className="text-xs font-bold text-primary-text uppercase tracking-wider">Write a Product Review</p>
                               
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1.5 py-1">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <button
                                     key={star}
@@ -1049,9 +1054,15 @@ export default function OrderDetailPage() {
                                       ...prev,
                                       [item.productId]: { ...review, rating: star }
                                     }))}
-                                    className="text-amber-400 hover:scale-110 transition-transform cursor-pointer text-lg"
+                                    className="hover:scale-115 transition-all duration-200 cursor-pointer p-0.5"
                                   >
-                                    {star <= review.rating ? '★' : '☆'}
+                                    <Star 
+                                      className={`w-5 h-5 transition-all duration-150 ${
+                                        star <= review.rating 
+                                          ? 'fill-amber-400 text-amber-400 filter drop-shadow-[0_0_3px_rgba(245,158,11,0.25)]' 
+                                          : 'text-neutral-600 dark:text-neutral-500 hover:text-amber-400 hover:scale-105'
+                                      }`}
+                                    />
                                   </button>
                                 ))}
                               </div>
@@ -1607,7 +1618,7 @@ export default function OrderDetailPage() {
               
               <div className="space-y-3.5 text-xs font-sans">
                 <button 
-                  onClick={() => alert('Starting live chat connection with support team... Please stay online.')}
+                  onClick={() => alert('Coming soon! Please use our Raise Ticket Thread option.')}
                   className="w-full flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary border border-border/40 rounded-lg transition-colors group cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5 font-semibold text-primary-text">
@@ -1631,7 +1642,7 @@ export default function OrderDetailPage() {
               {/* Display existing ticket status if inquiry is found */}
               {order.inquiries && order.inquiries.length > 0 && (
                 <div className="mt-5 p-3.5 bg-secondary/40 border border-border/40 rounded-lg font-sans">
-                  <p className="text-[10px] font-bold text-muted-text uppercase tracking-wider">Active Inquiries ({order.inquiries.length})</p>
+                  <p className="text-[10px] font-bold text-muted-text uppercase tracking-wider">Active Email Inquiries ({order.inquiries.length})</p>
                   <div className="mt-2 space-y-2">
                     {order.inquiries.map((inq: any, inqIdx: number) => (
                       <div key={inqIdx} className="flex justify-between items-center text-[11px] font-medium py-1 border-b border-border/20 last:border-0">

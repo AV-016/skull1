@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useAdminInquiries, useUpdateInquiryStatus } from '@/hooks/useAdmin'
-import { Loader2, Eye, X, Mail, CheckCircle2, Send } from 'lucide-react'
+import { Loader2, Eye, X, Mail, CheckCircle2, Search } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import api from '@/lib/api'
 
@@ -15,8 +15,6 @@ export default function AdminInquiries() {
   
   // Message Thread States
   const [activeDetails, setActiveDetails] = useState<any | null>(null)
-  const [replyText, setReplyText] = useState('')
-  const [sendingReply, setSendingReply] = useState(false)
   const [loadingThread, setLoadingThread] = useState(false)
 
   const fetchThreadDetails = async (id: string) => {
@@ -46,22 +44,7 @@ export default function AdminInquiries() {
     }
   }, [selectedInq?.id])
 
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!replyText.trim() || !selectedInq) return
-    try {
-      setSendingReply(true)
-      await api.post(`/admin/inquiries/${selectedInq.id}/messages`, {
-        message: replyText.trim()
-      })
-      setReplyText('')
-      await fetchThreadDetails(selectedInq.id)
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to send reply')
-    } finally {
-      setSendingReply(false)
-    }
-  }
+
 
   const handleResolve = (id: string) => {
     updateStatusMutation.mutate(
@@ -84,15 +67,15 @@ export default function AdminInquiries() {
       >
         {/* Header */}
         <div>
-          <h1 className="heading-2 uppercase tracking-wide">Inquiries</h1>
-          <p className="text-xs text-muted-text uppercase tracking-widest">Manage customer feedback and messages</p>
+          <h1 className="heading-2 uppercase tracking-wide">Email Inquiries</h1>
+          <p className="text-xs text-muted-text uppercase tracking-widest">Manage customer email complaints and queries</p>
         </div>
 
         {/* Inquiries table */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
-            <p className="text-xs font-bold uppercase tracking-widest text-secondary-text">Loading inquiries...</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-secondary-text">Loading email inquiries...</p>
           </div>
         ) : (
           <div className="glass-card overflow-x-auto border border-border">
@@ -140,7 +123,7 @@ export default function AdminInquiries() {
                 {inquiries?.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-10 text-center text-muted-text uppercase tracking-widest text-[10px]">
-                      No inquiries received.
+                      No email inquiries received.
                     </td>
                   </tr>
                 )}
@@ -170,7 +153,7 @@ export default function AdminInquiries() {
             >
               <div className="flex justify-between items-center pb-3 border-b border-border">
                 <h3 className="font-bold text-sm uppercase tracking-widest text-primary-text flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-primary" /> Read Inquiry
+                  <Mail className="w-4 h-4 text-primary" /> Read Email Inquiry
                 </h3>
                 <button 
                   onClick={() => setSelectedInq(null)}
@@ -252,28 +235,30 @@ export default function AdminInquiries() {
                     })}
                   </div>
 
-                  {/* Reply Input Box */}
-                  <form onSubmit={handleSendReply} className="flex gap-2 items-center border-t border-border pt-3">
-                    <input
-                      type="text"
-                      placeholder="Type your response reply..."
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      disabled={sendingReply}
-                      className="flex-1 px-3 py-2 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50 rounded text-xs"
-                    />
-                    <button
-                      type="submit"
-                      disabled={sendingReply || !replyText.trim()}
-                      className="p-2 bg-primary text-white rounded hover:bg-primary/90 cursor-pointer disabled:opacity-50 smooth-transition"
+                  {/* Action Buttons for Mail */}
+                  <div className="border-t border-border pt-3 grid grid-cols-2 gap-3">
+                    <a
+                      href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(`from:${selectedInq.email} OR to:${selectedInq.email}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 bg-secondary text-secondary-text hover:text-primary-text border border-border text-center font-bold uppercase tracking-widest text-[10px] rounded flex items-center justify-center gap-2 smooth-transition cursor-pointer"
                     >
-                      {sendingReply ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </button>
-                  </form>
+                      <Search className="w-3.5 h-3.5 text-muted-text" />
+                      Search History
+                    </a>
+                    
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selectedInq.email)}&su=${encodeURIComponent(`Re: ${selectedInq.subject || 'Inquiry'}`)}&body=${encodeURIComponent(
+                        `Hello ${selectedInq.name || 'Customer'},\n\nThis email is from Skulture regarding your inquiry about "${selectedInq.subject}".\n\nYour original message:\n"${selectedInq.message}"\n\n--\n\n[Type your reply here]\n\nBest regards,\nSkulture Team`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 bg-primary text-white hover:bg-primary/95 text-center font-bold uppercase tracking-widest text-[10px] rounded flex items-center justify-center gap-2 smooth-transition shadow-lg shadow-primary/10 cursor-pointer"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Reply via Gmail
+                    </a>
+                  </div>
 
                   {/* Action buttons */}
                   <div className="pt-3 border-t border-border flex justify-between gap-3">

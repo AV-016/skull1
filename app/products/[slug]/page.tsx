@@ -449,24 +449,27 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                    </button>
                  </div>
 
-                {/* Rating below title */}
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex text-primary">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.floor(sanitizedProduct.rating)
-                            ? 'fill-primary text-primary'
-                            : 'text-white/10'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-secondary-text font-medium">
-                    {sanitizedProduct.rating} / 5 ({sanitizedProduct.reviewsCount} {sanitizedProduct.reviewsCount === 1 ? 'review' : 'reviews'})
-                  </span>
-                </div>
+                 {/* Rating below title */}
+                 {sanitizedProduct.reviewsCount > 0 && (
+                   <div className="flex items-center gap-2 mb-4">
+                     <div className="flex text-primary">
+                       {[...Array(5)].map((_, i) => (
+                         <Star
+                           key={i}
+                           className={`w-4 h-4 ${
+                             i < Math.floor(sanitizedProduct.rating)
+                               ? 'fill-primary text-primary'
+                               : 'text-white/10'
+                           }`}
+                         />
+                       ))}
+                     </div>
+                     <span className="text-sm text-secondary-text font-medium">
+                       {sanitizedProduct.rating} / 5 ({sanitizedProduct.reviewsCount} {sanitizedProduct.reviewsCount === 1 ? 'review' : 'reviews'})
+                     </span>
+                   </div>
+                 )}
+
                  {/* Category */}
                  <div className="flex items-center gap-2 mb-6">
                    <span className="text-xs bg-secondary text-primary border border-border px-3 py-1 rounded-full font-semibold">

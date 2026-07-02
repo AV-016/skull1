@@ -48,7 +48,10 @@ export const Navbar = () => {
                 message: inq.messages?.[inq.messages.length - 1]?.message || `Update on: ${inq.subject}`,
                 link: '/dashboard',
                 color: 'text-red-500',
-                updatedAt: inq.updatedAt
+                updatedAt: inq.updatedAt,
+                markRead: () => {
+                  api.get(`/inquiries/${inq.id}`).catch((err) => console.error('Failed to mark inquiry read:', err))
+                }
               }))
           }
         } catch (e) {
@@ -213,6 +216,32 @@ export const Navbar = () => {
       window.removeEventListener('storage', updateCartCount);
     };
   }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    if (!isProfileOpen && !isNotificationsOpen) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      const clickedProfileButton = target.closest('[data-profile-btn]');
+      const clickedProfileMenu = target.closest('[data-profile-menu]');
+      
+      const clickedNotifButton = target.closest('[data-notif-btn]');
+      const clickedNotifMenu = target.closest('[data-notif-menu]');
+
+      if (!clickedProfileButton && !clickedProfileMenu) {
+        setIsProfileOpen(false);
+      }
+      
+      if (!clickedNotifButton && !clickedNotifMenu) {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [isProfileOpen, isNotificationsOpen]);
   const suggestions = [
     'Anime Figures',
     'Keychains',
@@ -319,6 +348,7 @@ export const Navbar = () => {
             {user && (
               <div className="relative">
                 <button
+                  data-notif-btn
                   onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                   className="relative p-2 hover:bg-secondary rounded-lg smooth-transition text-primary-text cursor-pointer"
                   title="Notifications"
@@ -335,6 +365,7 @@ export const Navbar = () => {
                 <AnimatePresence>
                   {isNotificationsOpen && (
                     <motion.div
+                      data-notif-menu
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -395,6 +426,7 @@ export const Navbar = () => {
             ) : (
               <div className="relative hidden md:block">
                 <button
+                  data-profile-btn
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex items-center gap-2 p-0.5 bg-secondary border border-border hover:border-primary/50 smooth-transition cursor-pointer"
                   title={user.name}
@@ -422,6 +454,7 @@ export const Navbar = () => {
                 <AnimatePresence>
                   {isProfileOpen && (
                     <motion.div
+                      data-profile-menu
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -495,14 +528,7 @@ export const Navbar = () => {
                           {user.loyaltyStamps || 0}/8
                         </span>
                       </Link>
-                      <Link
-                        href="/rewards"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-[11px] font-bold text-secondary-text hover:text-primary hover:bg-secondary smooth-transition uppercase tracking-wider"
-                      >
-                        <Gift className="w-4 h-4 text-muted-text" />
-                        <span>Gift Cards</span>
-                      </Link>
+
 
                       {/* Section: Support & Settings */}
                       <div className="text-[9px] font-black text-muted-text uppercase tracking-widest px-3 py-1.5 mt-2">Support & Settings</div>

@@ -185,11 +185,15 @@ export function BestSellersSection() {
 
               {/* Action Button */}
               <div className="pt-6 border-t border-border flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Star className="w-4 h-4 text-primary fill-primary" />
-                  <span className="text-primary-text text-sm font-semibold">{heroProduct.rating}</span>
-                  <span className="text-muted-text text-xs">({heroProduct.reviewsCount} reviews)</span>
-                </div>
+                {heroProduct.reviewsCount > 0 ? (
+                  <div className="flex items-center gap-1.5">
+                    <Star className="w-4 h-4 text-primary fill-primary" />
+                    <span className="text-primary-text text-sm font-semibold">{heroProduct.rating}</span>
+                    <span className="text-muted-text text-xs">({heroProduct.reviewsCount} reviews)</span>
+                  </div>
+                ) : (
+                  <div />
+                )}
                 <Link
                   href={`/products/${heroProduct.slug}`}
                   className="px-6 py-3 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl transition-all duration-300 shadow-md flex items-center gap-2"
@@ -222,10 +226,12 @@ export function BestSellersSection() {
                   {/* Body Content */}
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center gap-1 mb-1.5">
-                        <Star className="w-3 h-3 text-primary fill-primary" />
-                        <span className="text-[10px] text-primary-text font-bold">{product.rating}</span>
-                      </div>
+                      {product.reviewsCount > 0 && (
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <Star className="w-3 h-3 text-primary fill-primary" />
+                          <span className="text-[10px] text-primary-text font-bold">{product.rating}</span>
+                        </div>
+                      )}
                       <h4 className="text-primary-text font-bold text-base group-hover:text-primary transition-colors duration-300 truncate">
                         {product.name}
                       </h4>

@@ -108,19 +108,21 @@ function ProductsContent() {
                     >
                       All
                     </button>
-                    {serverCategories.map((cat: any) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategory(cat.slug)}
-                        className={`w-full text-left px-3 py-2 rounded-lg smooth-transition text-sm cursor-pointer ${
-                          selectedCategory === cat.slug
-                            ? 'bg-primary text-white font-semibold'
-                            : 'bg-secondary text-secondary-text hover:bg-card hover:text-primary-text'
-                        }`}
-                      >
-                        {cat.name}
-                      </button>
-                    ))}
+                     {serverCategories
+                      .filter((cat: any) => cat.slug !== 'custom-orders')
+                      .map((cat: any) => (
+                        <button
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.slug)}
+                          className={`w-full text-left px-3 py-2 rounded-lg smooth-transition text-sm cursor-pointer ${
+                            selectedCategory === cat.slug
+                              ? 'bg-primary text-white font-semibold'
+                              : 'bg-secondary text-secondary-text hover:bg-card hover:text-primary-text'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
                   </div>
                 </div>
               </motion.div>
