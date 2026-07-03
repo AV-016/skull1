@@ -760,36 +760,7 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              {/* Payments Section */}
-              <div className="border-b border-gray-100 dark:border-gray-800">
-                <div className="flex items-center gap-3 p-4 pb-2 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">
-                  <CreditCard className="w-4 h-4 text-red-500" />
-                  <span>Payments</span>
-                </div>
-                <div className="flex flex-col pb-2 pl-11">
 
-                  <button
-                    onClick={() => setActiveTab('upi')}
-                    className={`py-2 text-left font-semibold smooth-transition ${
-                      activeTab === 'upi' 
-                        ? 'text-red-600 dark:text-red-400 font-bold' 
-                        : 'text-gray-700 dark:text-gray-300 hover:text-red-500'
-                    }`}
-                  >
-                    Saved UPI
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('cards')}
-                    className={`py-2 text-left font-semibold smooth-transition ${
-                      activeTab === 'cards' 
-                        ? 'text-red-600 dark:text-red-400 font-bold' 
-                        : 'text-gray-700 dark:text-gray-300 hover:text-red-500'
-                    }`}
-                  >
-                    Saved Cards
-                  </button>
-                </div>
-              </div>
 
               {/* My Stuff Section */}
               <div className="border-b border-gray-100 dark:border-gray-800">
@@ -1478,26 +1449,6 @@ export default function AccountPage() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
-
-            {activeTab === 'upi' && (
-              <div className="space-y-6">
-                <h3 className="text-base font-bold text-black dark:text-white">Saved UPI Accounts</h3>
-                <p className="text-gray-600 dark:text-gray-400">Configure your default UPI VPA tags for faster checkouts.</p>
-                <div className="p-8 border border-dashed border-gray-300 dark:border-gray-800 rounded text-center text-gray-500">
-                  No saved UPI IDs found.
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'cards' && (
-              <div className="space-y-6">
-                <h3 className="text-base font-bold text-black dark:text-white">Saved Cards</h3>
-                <p className="text-gray-600 dark:text-gray-400">Safely manage your credit/debit card details in compliance with standard bank regulations.</p>
-                <div className="p-8 border border-dashed border-gray-300 dark:border-gray-800 rounded text-center text-gray-500">
-                  No saved payment cards found.
-                </div>
               </div>
             )}
 
