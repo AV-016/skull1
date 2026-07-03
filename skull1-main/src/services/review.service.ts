@@ -81,8 +81,8 @@ export class ReviewService {
     await reviewRepository.delete(reviewId);
   }
 
-  async getAllReviews(page: number = 1, limit: number = 10): Promise<any> {
-    const { reviews, total } = await reviewRepository.findAll(page, limit);
+  async getAllReviews(page: number = 1, limit: number = 10, userId?: string): Promise<any> {
+    const { reviews, total } = await reviewRepository.findAll(page, limit, userId);
     return {
       data: reviews.map(formatReviewResponse),
       meta: {

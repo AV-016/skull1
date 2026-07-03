@@ -339,6 +339,43 @@ export default function AccountPage() {
     return () => clearInterval(interval)
   }, [fetchNotifications])
 
+  // Fetch user reviews on tab change
+  const [reviews, setReviews] = useState<any[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+
+  const fetchUserReviews = useCallback(async () => {
+    if (!user) {
+      setReviews([])
+      return
+    }
+    setReviewsLoading(true)
+    try {
+      const res = await api.get(`/reviews?userId=${user.id}`)
+      setReviews(res.data?.data || [])
+    } catch (err) {
+      console.error('Error fetching reviews:', err)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (activeTab === 'reviews') {
+      fetchUserReviews()
+    }
+  }, [activeTab, fetchUserReviews])
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Are you sure you want to delete this review? This action cannot be undone.')) return
+    try {
+      await api.delete(`/reviews/${reviewId}`)
+      fetchUserReviews()
+    } catch (err) {
+      console.error('Error deleting review:', err)
+      alert('Failed to delete review. Please try again.')
+    }
+  }
+
   // Save personal info (name, gender)
   const handleSavePersonalInfo = async () => {
     try {
@@ -1464,11 +1501,70 @@ export default function AccountPage() {
 
             {activeTab === 'reviews' && (
               <div className="space-y-6">
-                <h3 className="text-base font-bold text-black dark:text-white">My Reviews & Ratings</h3>
-                <p className="text-gray-600 dark:text-gray-400">View and update ratings you gave to 3D print catalog products.</p>
-                <div className="p-8 border border-dashed border-gray-300 dark:border-gray-800 rounded text-center text-gray-500">
-                  You haven't submitted any reviews yet.
+                <div>
+                  <h3 className="text-base font-bold text-black dark:text-white">My Reviews & Ratings</h3>
+                  <p className="text-gray-600 dark:text-gray-400">View and update ratings you gave to 3D print catalog products.</p>
                 </div>
+
+                {reviewsLoading ? (
+                  <div className="flex items-center gap-2 text-gray-500 py-4">
+                    <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                    <span>Loading reviews...</span>
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="p-8 border border-dashed border-gray-300 dark:border-gray-800 rounded text-center text-gray-500">
+                    You haven't submitted any reviews yet.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <div 
+                        key={review.id} 
+                        className="p-4 bg-gray-50/30 dark:bg-black/10 border border-gray-200 dark:border-gray-850 rounded flex flex-col justify-between gap-3 smooth-transition"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            {review.product && (
+                              <Link 
+                                href={`/products/${review.product.slug}`}
+                                className="text-xs font-bold text-black dark:text-white hover:text-red-500 transition-colors uppercase tracking-wider"
+                              >
+                                {review.product.name}
+                              </Link>
+                            )}
+                            <div className="flex items-center gap-1 mt-1 text-amber-500">
+                              {Array.from({ length: 5 }).map((_, idx) => (
+                                <Star 
+                                  key={idx} 
+                                  className={`w-3.5 h-3.5 ${
+                                    idx < review.rating ? 'fill-current' : 'text-gray-300 dark:text-gray-700'
+                                  }`} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteReview(review.id)}
+                            className="p-1.5 border border-gray-200 dark:border-gray-800 hover:border-red-500 text-gray-500 hover:text-red-500 rounded smooth-transition cursor-pointer"
+                            title="Delete Review"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {review.comment && (
+                          <p className="text-xs text-gray-700 dark:text-gray-300 italic bg-gray-50/50 dark:bg-black/20 p-2.5 rounded border border-gray-150/40 dark:border-gray-800/40">
+                            "{review.comment}"
+                          </p>
+                        )}
+
+                        <div className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">
+                          Submitted on {new Date(review.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

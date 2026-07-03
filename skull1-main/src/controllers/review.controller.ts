@@ -68,7 +68,8 @@ export class ReviewController {
     try {
       const page = req.query.page ? Number(req.query.page) : 1;
       const limit = req.query.limit ? Number(req.query.limit) : 10;
-      const result = await reviewService.getAllReviews(page, limit);
+      const userId = req.query.userId as string || undefined;
+      const result = await reviewService.getAllReviews(page, limit, userId);
       res.status(200).json({
         success: true,
         message: 'All reviews retrieved successfully',

@@ -41,10 +41,12 @@ export class ReviewRepository {
     }) as Promise<ReviewWithDetails[]>;
   }
 
-  async findAll(page: number = 1, limit: number = 10): Promise<{ reviews: ReviewWithDetails[]; total: number }> {
+  async findAll(page: number = 1, limit: number = 10, userId?: string): Promise<{ reviews: ReviewWithDetails[]; total: number }> {
     const skip = (page - 1) * limit;
+    const whereClause = userId ? { userId } : {};
     const [reviews, total] = await Promise.all([
       prisma.review.findMany({
+        where: whereClause,
         include: {
           user: true,
           images: true,
@@ -70,7 +72,7 @@ export class ReviewRepository {
         skip,
         take: limit,
       }),
-      prisma.review.count(),
+      prisma.review.count({ where: whereClause }),
     ]);
 
     return {
