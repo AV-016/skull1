@@ -3,12 +3,15 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/admin/AdminLayout'
-import { Plus, X, Loader2, Info, Edit2, Trash2, Upload, Calendar } from 'lucide-react'
+import { Plus, X, Loader2, Info, Edit2, Trash2, Upload, Calendar, Search } from 'lucide-react'
 import api from '@/lib/api'
 
 export default function AdminEvents() {
   const [events, setEvents] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [productSearch, setProductSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null)
@@ -32,12 +35,14 @@ export default function AdminEvents() {
   const fetchEventsAndProducts = async () => {
     setIsLoading(true)
     try {
-      const [eventsRes, productsRes] = await Promise.all([
+      const [eventsRes, productsRes, categoriesRes] = await Promise.all([
         api.get('/admin/events'),
-        api.get('/products')
+        api.get('/products'),
+        api.get('/categories')
       ])
       setEvents(eventsRes.data?.data || [])
       setProducts(productsRes.data?.data || [])
+      setCategories(categoriesRes.data?.data || [])
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -111,6 +116,8 @@ export default function AdminEvents() {
       themeColor: '#EF4444',
       productIds: []
     })
+    setProductSearch('')
+    setCategoryFilter('')
     setIsModalOpen(true)
   }
 
@@ -135,6 +142,8 @@ export default function AdminEvents() {
       themeColor: event.themeColor || '#EF4444',
       productIds: event.products?.map((p: any) => p.id) || []
     })
+    setProductSearch('')
+    setCategoryFilter('')
     setIsModalOpen(true)
   }
 
@@ -159,6 +168,36 @@ export default function AdminEvents() {
       }
     })
   }
+
+  const handleSelectAllCategoryProducts = (catId: string) => {
+    if (!catId) return
+    const categoryProductIds = products
+      .filter((prod: any) => prod.category?.id === catId)
+      .map((prod: any) => prod.id)
+    
+    setFormData(prev => {
+      const uniqueIds = Array.from(new Set([...prev.productIds, ...categoryProductIds]))
+      return { ...prev, productIds: uniqueIds }
+    })
+  }
+
+  const handleDeselectAllCategoryProducts = (catId: string) => {
+    if (!catId) return
+    const categoryProductIds = products
+      .filter((prod: any) => prod.category?.id === catId)
+      .map((prod: any) => prod.id)
+    
+    setFormData(prev => ({
+      ...prev,
+      productIds: prev.productIds.filter(id => !categoryProductIds.includes(id))
+    }))
+  }
+
+  const filteredProducts = products.filter((prod: any) => {
+    const matchesSearch = prod.name.toLowerCase().includes(productSearch.toLowerCase())
+    const matchesCategory = categoryFilter ? prod.category?.id === categoryFilter : true
+    return matchesSearch && matchesCategory
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -478,27 +517,90 @@ export default function AdminEvents() {
                 </div>
 
                 {/* Categorize Associated Products */}
-                <div className="space-y-2 border-t border-border/40 pt-4">
-                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Categorize Products under Event</label>
-                  <p className="text-[9px] text-muted-text italic">Select which products will be showcased as part of this event/promotion</p>
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-secondary/10 border border-border rounded-lg">
-                    {products.map((prod: any) => {
-                      const isChecked = formData.productIds.includes(prod.id)
-                      return (
-                        <label 
-                          key={prod.id} 
-                          className="flex items-center gap-2 px-2 py-1.5 hover:bg-secondary/40 rounded cursor-pointer smooth-transition select-none text-[10px] text-primary-text font-semibold"
+                <div className="space-y-3 border-t border-border/40 pt-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Categorize Products under Event</label>
+                    <p className="text-[9px] text-muted-text italic">Select which products will be showcased as part of this event/promotion</p>
+                  </div>
+                  
+                  {/* Search and Category Filter controls */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-text" />
+                      <input
+                        type="text"
+                        placeholder="Search product name..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 bg-secondary/20 border border-border rounded-lg text-[10px] focus:outline-none focus:border-primary text-primary-text"
+                      />
+                    </div>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-secondary/20 border border-border rounded-lg text-[10px] focus:outline-none focus:border-primary text-primary-text font-medium cursor-pointer"
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map((cat: any) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Direct category discount / selection helpers */}
+                  {categoryFilter && (
+                    <div className="flex items-center justify-between p-2 bg-primary/5 border border-primary/20 rounded-lg text-[9px] font-bold">
+                      <span className="text-secondary-text">
+                        Category Action: {categories.find((c: any) => c.id === categoryFilter)?.name}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAllCategoryProducts(categoryFilter)}
+                          className="px-2 py-1 bg-primary text-white rounded hover:bg-primary/95 transition-colors uppercase tracking-wider"
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleProductToggle(prod.id)}
-                            className="w-3.5 h-3.5 rounded border-border bg-secondary text-primary accent-primary cursor-pointer"
-                          />
-                          <span className="truncate">{prod.name}</span>
-                        </label>
-                      )
-                    })}
+                          Select All in Category
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeselectAllCategoryProducts(categoryFilter)}
+                          className="px-2 py-1 bg-secondary text-primary-text border border-border rounded hover:bg-secondary/80 transition-colors uppercase tracking-wider"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-secondary/10 border border-border rounded-lg">
+                    {filteredProducts.length > 0 ? (
+                      filteredProducts.map((prod: any) => {
+                        const isChecked = formData.productIds.includes(prod.id)
+                        return (
+                          <label 
+                            key={prod.id} 
+                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-secondary/40 rounded cursor-pointer smooth-transition select-none text-[10px] text-primary-text font-semibold"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleProductToggle(prod.id)}
+                              className="w-3.5 h-3.5 rounded border-border bg-secondary text-primary accent-primary cursor-pointer"
+                            />
+                            <span className="truncate flex-1">{prod.name}</span>
+                            {prod.category && (
+                              <span className="text-[8px] px-1.5 py-0.5 bg-secondary text-muted-text rounded shrink-0 uppercase tracking-wider">
+                                {prod.category.name}
+                              </span>
+                            )}
+                          </label>
+                        )
+                      })
+                    ) : (
+                      <div className="col-span-2 py-4 text-center text-muted-text text-[10px]">
+                        No products match your search or filter criteria.
+                      </div>
+                    )}
                   </div>
                 </div>
 
