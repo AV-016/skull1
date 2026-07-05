@@ -10,6 +10,7 @@ import {
   useDeleteProduct,
   useAdminCategories 
 } from '@/hooks/useAdmin'
+import { useTags } from '@/hooks/useProducts'
 import { Plus, Edit2, Trash2, Search, Loader2, X, AlertTriangle, Upload } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import api from '@/lib/api'
@@ -24,6 +25,7 @@ export default function AdminProducts() {
   // React Query queries and mutations
   const { data: products, isLoading, error, refetch } = useAdminProducts()
   const { data: categories } = useAdminCategories()
+  const { data: tags = [], refetch: refetchTags } = useTags()
   
   const createMutation = useCreateProduct()
   const updateMutation = useUpdateProduct()
@@ -42,7 +44,8 @@ export default function AdminProducts() {
     isActive: true,
     isFeatured: false,
     bestSellerOrder: 0,
-    specifications: [] as { key: string; value: string }[]
+    specifications: [] as { key: string; value: string }[],
+    tags: [] as string[]
   })
 
   const [manualUrl, setManualUrl] = useState('')
@@ -150,7 +153,8 @@ export default function AdminProducts() {
         { key: 'Dimensions', value: '' },
         { key: 'Weight', value: '' },
         { key: 'Finish', value: '' }
-      ]
+      ],
+      tags: []
     })
     setIsModalOpen(true)
   }
@@ -194,7 +198,8 @@ export default function AdminProducts() {
       isActive: product.isActive ?? true,
       isFeatured: product.isFeatured ?? false,
       bestSellerOrder: product.bestSellerOrder ?? 0,
-      specifications: specsList
+      specifications: specsList,
+      tags: product.tags ? product.tags.map((t: any) => t.id) : []
     })
     setIsModalOpen(true)
   }
@@ -231,7 +236,8 @@ export default function AdminProducts() {
         price: v.price ? parseFloat(v.price) : null,
         stock: parseInt(v.stock, 10) || 0,
         images: v.images || []
-      }))
+      })),
+      tags: formData.tags
     }
 
     if (selectedProduct) {
@@ -257,7 +263,20 @@ export default function AdminProducts() {
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
       deleteMutation.mutate(id, {
-        onSuccess: () => refetch()
+        onSuccess: () => refetch(),
+        onError: (err: any) => {
+          const errorMessage = err.response?.data?.message || err.message || '';
+          if (
+            errorMessage.includes('constraint') || 
+            errorMessage.includes('foreign key') || 
+            errorMessage.toLowerCase().includes('delete') ||
+            err.response?.status === 500
+          ) {
+            alert('Cannot delete this product because it has already been ordered by customers. You can toggle it to "INACTIVE" instead to hide it from the store.');
+          } else {
+            alert(`Error deleting product: ${errorMessage}`);
+          }
+        }
       })
     }
   }
@@ -355,13 +374,24 @@ export default function AdminProducts() {
                       <td className="px-6 py-4 font-bold text-primary-text">{formatCurrency(product.price)}</td>
                       <td className="px-6 py-4 text-secondary-text">{product.stock} units</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-0.5 border text-[10px] uppercase font-bold tracking-wider rounded ${
-                          product.isActive 
-                            ? 'bg-green-500/5 text-green-400 border-green-500/20' 
-                            : 'bg-red-500/5 text-red-400 border-red-500/20'
-                        }`}>
+                        <button
+                          onClick={() => {
+                            updateMutation.mutate({ 
+                              id: product.id, 
+                              data: { isActive: !product.isActive } 
+                            }, {
+                              onSuccess: () => refetch()
+                            })
+                          }}
+                          className={`px-2.5 py-0.5 border text-[10px] uppercase font-bold tracking-wider rounded cursor-pointer smooth-transition hover:scale-105 ${
+                            product.isActive 
+                              ? 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/25 hover:border-green-500/50' 
+                              : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/25 hover:border-red-500/50'
+                          }`}
+                          title="Click to toggle status"
+                        >
                           {product.isActive ? 'Active' : 'Draft'}
-                        </span>
+                        </button>
                       </td>
                       <td className="px-6 py-4 font-bold text-primary-text">
                         {product.salesCount ?? 0} units
@@ -455,7 +485,7 @@ export default function AdminProducts() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   {/* Price */}
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Price (₹)</label>
@@ -465,6 +495,19 @@ export default function AdminProducts() {
                       required
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
+                    />
+                  </div>
+
+                  {/* Compare At Price */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Original Price (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.compareAtPrice}
+                      onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })}
+                      placeholder="e.g. 1400"
                       className="w-full px-4 py-2.5 bg-secondary border border-border text-primary-text focus:outline-none focus:border-primary/50"
                     />
                   </div>
@@ -495,6 +538,90 @@ export default function AdminProducts() {
                         <option key={cat.id} value={cat.id}>{cat.name}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                {/* Themes (Tags) Section */}
+                <div className="space-y-2 pt-2">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Themes / Franchise (Tags)</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-36 overflow-y-auto border border-border p-3 rounded-lg bg-secondary/20">
+                    {tags.map((tag: any) => {
+                      const isChecked = formData.tags.includes(tag.id)
+                      return (
+                        <label key={tag.id} className="flex items-center gap-2 text-xs text-primary-text cursor-pointer select-none hover:text-primary smooth-transition">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({ ...formData, tags: [...formData.tags, tag.id] })
+                              } else {
+                                setFormData({ ...formData, tags: formData.tags.filter(id => id !== tag.id) })
+                              }
+                            }}
+                            className="rounded border-border bg-secondary text-primary focus:ring-primary w-3.5 h-3.5"
+                          />
+                          <span>{tag.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* Create New Theme */}
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      placeholder="Add new theme (e.g. Dragon Ball Z)"
+                      id="newThemeInput"
+                      className="flex-1 px-3 py-1.5 bg-secondary border border-border text-xs text-primary-text focus:outline-none focus:border-primary/55 rounded-lg"
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const input = e.currentTarget;
+                          const name = input.value.trim();
+                          if (!name) return;
+                          try {
+                            const res = await api.post('/admin/tags', { name });
+                            if (res.data?.success && res.data?.data) {
+                              const newTag = res.data.data;
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: [...prev.tags, newTag.id]
+                              }));
+                              input.value = '';
+                              refetchTags();
+                            }
+                          } catch (err: any) {
+                            alert(err.response?.data?.message || 'Failed to create theme');
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        const input = document.getElementById('newThemeInput') as HTMLInputElement;
+                        const name = input?.value.trim();
+                        if (!name) return;
+                        try {
+                          const res = await api.post('/admin/tags', { name });
+                          if (res.data?.success && res.data?.data) {
+                            const newTag = res.data.data;
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags, newTag.id]
+                            }));
+                            if (input) input.value = '';
+                            refetchTags();
+                          }
+                        } catch (err: any) {
+                          alert(err.response?.data?.message || 'Failed to create theme');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 transition-colors cursor-pointer"
+                    >
+                      Add Theme
+                    </button>
                   </div>
                 </div>
 

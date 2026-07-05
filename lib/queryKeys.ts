@@ -12,6 +12,7 @@ export const queryKeys = {
   productDetail: (slug: string) => ['products', 'detail', slug],
   categories: () => ['categories'],
   categoryDetail: (slug: string) => ['categories', slug],
+  tags: () => ['tags'],
   search: (query: string) => ['products', 'search', query],
 
   // Cart

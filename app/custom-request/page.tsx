@@ -10,6 +10,7 @@ import { FileUploadDropzone } from '@/components/custom-requests/FileUploadDropz
 import { CustomRequestSchema } from '@/lib/validators'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/lib/api'
+import { useProducts } from '@/hooks/useProducts'
 import Link from 'next/link'
 
 export default function CustomRequestPage() {
@@ -20,6 +21,9 @@ export default function CustomRequestPage() {
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([])
 
   const { user } = useAuth()
+  const { data: customCreations = [] } = useProducts({
+    category: 'custom-orders',
+  })
 
   useEffect(() => {
     if (submitSuccess) {
@@ -64,6 +68,15 @@ export default function CustomRequestPage() {
 
   const title = watch('title')
   const description = watch('description')
+
+  const handleRequestSimilar = (creationName: string) => {
+    setValue('title', `Custom: ${creationName}`, { shouldValidate: true })
+    setValue('description', `Hi! I would like to request a custom 3D print similar to the "${creationName}" project. Here are my modifications: `, { shouldValidate: true })
+    const formElement = document.getElementById('custom-request-form')
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   const handleAddFiles = (newFiles: File[]) => {
     setFiles([...files, ...newFiles])
@@ -230,6 +243,7 @@ export default function CustomRequestPage() {
               </motion.div>
             ) : (
               <motion.form
+                id="custom-request-form"
                 onSubmit={handleSubmit(onSubmit)}
                 className="space-y-8"
                 initial={{ opacity: 0 }}
@@ -358,6 +372,56 @@ export default function CustomRequestPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Creations Section */}
+      {!submitSuccess && customCreations.length > 0 && (
+        <div className="py-16 bg-secondary/10 border-t border-border/60">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-10">
+                <h2 className="heading-3 text-2xl text-primary-text mb-2">Our Custom Creations</h2>
+                <p className="text-secondary-text text-sm max-w-xl mx-auto font-medium">
+                  Get inspired by functional parts, miniature props, and custom prints we have crafted for our clients.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {customCreations.map((prod) => {
+                  const primaryImg = prod.image || (prod.images && prod.images[0]) || '/placeholder.jpg'
+                  return (
+                    <div 
+                      key={prod.id}
+                      className="group border border-border bg-card rounded-2xl smooth-transition p-5 shadow-sm flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="aspect-video rounded-xl overflow-hidden bg-secondary mb-4 border border-border relative">
+                          <img 
+                            src={primaryImg} 
+                            alt={prod.name} 
+                            className="w-full h-full object-cover group-hover:scale-102 smooth-transition" 
+                          />
+                        </div>
+                        <h4 className="font-bold text-base text-primary-text mb-2">{prod.name}</h4>
+                        <p className="text-xs text-secondary-text leading-relaxed line-clamp-3 mb-4">{prod.description}</p>
+                      </div>
+                      <div className="flex justify-between items-center pt-4 border-t border-border/40">
+                        <span className="text-sm font-bold text-primary">₹{prod.price}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRequestSimilar(prod.name)}
+                          className="px-3.5 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 transition-colors cursor-pointer"
+                        >
+                          Request Similar
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </main>

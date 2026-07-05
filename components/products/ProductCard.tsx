@@ -105,6 +105,18 @@ export const ProductCard = ({ product }: ProductCardProps) => {
                       {formatPrice(product.eventPromo.discountedPrice)}
                     </span>
                   </>
+                ) : product.compareAtPrice && product.compareAtPrice > product.price ? (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs text-green-600 dark:text-green-400 font-bold flex items-center gap-0.5">
+                      ↓{Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}%
+                    </span>
+                    <span className="text-xs text-muted-text line-through font-medium leading-none">
+                      {formatPrice(product.compareAtPrice)}
+                    </span>
+                    <span className="text-lg font-bold text-primary-text leading-none">
+                      {formatPrice(product.price)}
+                    </span>
+                  </div>
                 ) : (
                   <span className="text-lg font-bold text-primary-text leading-none">
                     {formatPrice(product.price)}

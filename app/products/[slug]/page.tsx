@@ -544,7 +544,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                  )}
                </div>
 
-               {/* Purchase Section */}
+                {/* Purchase Section */}
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">
                  {/* Left Side: Pricing & Quantity */}
                  <div className="space-y-4">
@@ -559,6 +559,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                               {formatPrice(currentOriginalPrice)}
                             </span>
                           </>
+                        ) : sanitizedProduct.compareAtPrice && sanitizedProduct.compareAtPrice > currentOriginalPrice ? (
+                          <>
+                            <span className="text-4xl font-bold text-primary-text">
+                              {formatPrice(currentOriginalPrice)}
+                            </span>
+                            <span className="text-xl text-muted-text line-through font-semibold">
+                              {formatPrice(sanitizedProduct.compareAtPrice)}
+                            </span>
+                          </>
                         ) : (
                           <span className="text-4xl font-bold text-primary-text">
                             {formatPrice(currentOriginalPrice)}
@@ -566,11 +575,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                         )}
                         <span className="text-secondary-text text-sm">per unit</span>
                       </div>
-                      {sanitizedProduct.eventPromo && (
+                      {sanitizedProduct.eventPromo ? (
                         <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
                           {sanitizedProduct.eventPromo.discountPercentage}% OFF — Under {sanitizedProduct.eventPromo.eventTitle}
                         </span>
-                      )}
+                      ) : sanitizedProduct.compareAtPrice && sanitizedProduct.compareAtPrice > currentOriginalPrice ? (
+                        <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
+                          ↓{Math.round(((sanitizedProduct.compareAtPrice - currentOriginalPrice) / sanitizedProduct.compareAtPrice) * 100)}% OFF
+                        </span>
+                      ) : null}
                       {sanitizedProduct.bestSellerOrder && sanitizedProduct.bestSellerOrder > 0 ? (
                         <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1.5 flex items-center gap-1.5 shadow-sm">
                           🔥 #{sanitizedProduct.bestSellerOrder} Best Seller

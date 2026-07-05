@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
-import { useProducts, useCategories } from '@/hooks/useProducts'
+import { useProducts, useCategories, useTags } from '@/hooks/useProducts'
 import { ProductCard } from '@/components/products/ProductCard'
 import { sanitizeProducts } from '@/lib/mockProducts'
 import { useSearchParams } from 'next/navigation'
@@ -14,10 +14,13 @@ function ProductsContent() {
   const urlCategory = searchParams.get('category')
   const urlFilter = searchParams.get('filter')
   const urlSearch = searchParams.get('search') || searchParams.get('q')
+  const urlTag = searchParams.get('tag')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   const { data: serverCategories = [] } = useCategories()
+  const { data: serverTags = [] } = useTags()
 
   // Sync category from URL query parameter
   useEffect(() => {
@@ -34,6 +37,20 @@ function ProductsContent() {
     }
   }, [urlCategory, serverCategories])
 
+  // Sync tag from URL query parameter
+  useEffect(() => {
+    if (urlTag) {
+      const matched = serverTags.find(
+        (tag: any) =>
+          tag.slug.toLowerCase() === urlTag.toLowerCase() ||
+          tag.name.toLowerCase() === urlTag.toLowerCase()
+      )
+      setSelectedTag(matched ? matched.slug : urlTag)
+    } else {
+      setSelectedTag(null)
+    }
+  }, [urlTag, serverTags])
+
   useEffect(() => {
     if (urlSearch) {
       setSearchQuery(urlSearch)
@@ -46,9 +63,13 @@ function ProductsContent() {
     category: selectedCategory || undefined,
     search: searchQuery || undefined,
     sort: urlFilter || undefined,
+    tag: selectedTag || undefined,
   })
 
-  const sanitizedProducts = sanitizeProducts(products)
+  const sanitizedProducts = sanitizeProducts(products).filter((p: any) => {
+    const categorySlug = p.category?.slug || '';
+    return categorySlug !== 'custom-orders';
+  })
 
   return (
     <main className="min-h-screen bg-background text-primary-text transition-colors duration-300">
@@ -125,6 +146,38 @@ function ProductsContent() {
                       ))}
                   </div>
                 </div>
+
+                {/* Theme Filter */}
+                {serverTags.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-primary-text mb-3">Themes / Franchise</label>
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      <button
+                        onClick={() => setSelectedTag(null)}
+                        className={`w-full text-left px-3 py-2 rounded-lg smooth-transition text-sm cursor-pointer ${
+                          !selectedTag
+                            ? 'bg-primary text-white font-semibold'
+                            : 'bg-secondary text-secondary-text hover:bg-card hover:text-primary-text'
+                        }`}
+                      >
+                        All Themes
+                      </button>
+                      {serverTags.map((tag: any) => (
+                        <button
+                          key={tag.id}
+                          onClick={() => setSelectedTag(tag.slug)}
+                          className={`w-full text-left px-3 py-2 rounded-lg smooth-transition text-sm cursor-pointer ${
+                            selectedTag === tag.slug
+                              ? 'bg-primary text-white font-semibold'
+                              : 'bg-secondary text-secondary-text hover:bg-card hover:text-primary-text'
+                          }`}
+                        >
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             </div>
 

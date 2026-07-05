@@ -23,6 +23,12 @@ export interface ProductVariant {
   images: string[]
 }
 
+export interface Tag {
+  id: string
+  name: string
+  slug: string
+}
+
 // Product Types
 export interface Product {
   id: string
@@ -30,6 +36,7 @@ export interface Product {
   name: string
   description: string
   price: number
+  compareAtPrice?: number | null
   stock: number
   image: string
   images: string[]
@@ -40,6 +47,7 @@ export interface Product {
   salesCount?: number
   createdAt: string
   variants?: ProductVariant[]
+  tags?: Tag[]
   eventPromo?: {
     eventId: string
     eventTitle: string

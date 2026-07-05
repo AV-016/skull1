@@ -118,13 +118,15 @@ export class ProductRepository {
       q,
       categoryId,
       tagId,
+      showInactive,
     } = filters;
 
     const skip = (page - 1) * limit;
 
-    const whereClause: Prisma.ProductWhereInput = {
-      isActive: true,
-    };
+    const whereClause: Prisma.ProductWhereInput = {};
+    if (!showInactive) {
+      whereClause.isActive = true;
+    }
 
     if (featured !== undefined) {
       whereClause.isFeatured = featured;
@@ -233,7 +235,7 @@ export class ProductRepository {
   }
 
   async update(id: string, data: Prisma.ProductUpdateInput): Promise<Product> {
-    const { images, variants, ...updateData } = data as any;
+    const { images, variants, tags, ...updateData } = data as any;
     
     return prisma.$transaction(async (tx) => {
       // 1. Update main images
@@ -275,7 +277,14 @@ export class ProductRepository {
       
       return tx.product.update({
         where: { id },
-        data: updateData,
+        data: {
+          ...updateData,
+          ...(tags && Array.isArray(tags) ? {
+            tags: {
+              set: tags.map((tagId: string) => ({ id: tagId }))
+            }
+          } : {})
+        },
       });
     });
   }

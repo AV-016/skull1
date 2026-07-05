@@ -180,7 +180,7 @@ export default function BestSellersManager() {
             {Array.from({ length: 10 }).map((_, idx) => {
               const slotNum = idx + 1
               const assignedProductId = slots[slotNum]
-              const assignedProduct = products?.find((p: any) => p.id === assignedProductId)
+              const assignedProduct = products?.find((p: any) => p.id === assignedProductId) as any
               const primaryImg = assignedProduct?.images?.find((img: any) => img.isPrimary)?.url || assignedProduct?.image || '/placeholder.jpg'
 
               return (

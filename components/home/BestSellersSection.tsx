@@ -124,7 +124,7 @@ export function BestSellersSection() {
               <img
                 src={heroProduct.image}
                 alt={heroProduct.name}
-                className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700 ease-out"
+                className="w-full h-full object-contain group-hover:scale-103 transition-transform duration-700 ease-out"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
               <span className="absolute top-6 left-6 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-lg">
@@ -157,6 +157,18 @@ export function BestSellersSection() {
                           {heroProduct.eventPromo.discountPercentage}% OFF — {heroProduct.eventPromo.eventTitle}
                         </span>
                       </>
+                    ) : heroProduct.compareAtPrice && heroProduct.compareAtPrice > heroProduct.price ? (
+                      <>
+                        <span className="text-sm text-muted-text line-through font-semibold leading-none">
+                          {formatPrice(heroProduct.compareAtPrice)}
+                        </span>
+                        <span className="text-2xl font-black text-primary block mt-1 leading-none">
+                          {formatPrice(heroProduct.price)}
+                        </span>
+                        <span className="text-[8px] text-green-500 font-bold uppercase tracking-wider block mt-1">
+                          ↓{Math.round(((heroProduct.compareAtPrice - heroProduct.price) / heroProduct.compareAtPrice) * 100)}% OFF
+                        </span>
+                      </>
                     ) : (
                       <>
                         <span className="text-2xl font-black text-primary-text block leading-none">
@@ -168,8 +180,17 @@ export function BestSellersSection() {
                   </div>
                 </div>
 
-                <p className="text-secondary-text text-sm mt-4 leading-relaxed whitespace-pre-line">
-                  {heroProduct.description}
+                <p className="text-secondary-text text-sm mt-4 leading-relaxed">
+                  {heroProduct.description.length > 180 ? (
+                    <>
+                      {heroProduct.description.slice(0, 180)}...
+                      <Link href={`/products/${heroProduct.slug}`} className="text-primary hover:underline font-bold ml-1.5 inline-block cursor-pointer">
+                        Read More
+                      </Link>
+                    </>
+                  ) : (
+                    heroProduct.description
+                  )}
                 </p>
 
                 {/* Tech specifications highlight */}
@@ -252,6 +273,15 @@ export function BestSellersSection() {
                                 {formatPrice(product.eventPromo.discountedPrice)}
                               </span>
                             </>
+                          ) : product.compareAtPrice && product.compareAtPrice > product.price ? (
+                            <>
+                              <span className="text-[10px] text-muted-text line-through font-medium leading-none">
+                                {formatPrice(product.compareAtPrice)}
+                              </span>
+                              <span className="text-primary font-extrabold text-base mt-0.5 leading-none">
+                                {formatPrice(product.price)}
+                              </span>
+                            </>
                           ) : (
                             <span className="text-primary-text font-extrabold text-base leading-none">
                               {formatPrice(product.price)}
@@ -262,11 +292,15 @@ export function BestSellersSection() {
                           View Details →
                         </span>
                       </div>
-                      {product.eventPromo && (
+                      {product.eventPromo ? (
                         <div className="text-[9px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
                           {product.eventPromo.discountPercentage}% OFF — {product.eventPromo.eventTitle}
                         </div>
-                      )}
+                      ) : product.compareAtPrice && product.compareAtPrice > product.price ? (
+                        <div className="text-[9px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                          ↓{Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}% OFF
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </Link>

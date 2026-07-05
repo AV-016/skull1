@@ -10,6 +10,7 @@ export interface ProductQueryFilters {
   q?: string;
   categoryId?: string;
   tagId?: string;
+  showInactive?: boolean;
 }
 
 export interface CreateProductVariantInput {

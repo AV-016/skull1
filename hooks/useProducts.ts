@@ -51,3 +51,13 @@ export const useSearch = (query: string) => {
     enabled: !!query && query.length > 2,
   })
 }
+
+export const useTags = () => {
+  return useQuery({
+    queryKey: queryKeys.tags(),
+    queryFn: async () => {
+      const response = await api.get<any>('/tags')
+      return response.data.data || []
+    },
+  })
+}

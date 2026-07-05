@@ -190,6 +190,15 @@ export function NewArrivalsSection() {
                           {formatPrice(product.eventPromo.discountedPrice)}
                         </span>
                       </>
+                    ) : product.compareAtPrice && product.compareAtPrice > product.price ? (
+                      <>
+                        <span className="text-xs text-muted-text line-through font-medium leading-none">
+                          {formatPrice(product.compareAtPrice)}
+                        </span>
+                        <span className="text-primary font-extrabold text-xl mt-1 leading-none">
+                          {formatPrice(product.price)}
+                        </span>
+                      </>
                     ) : (
                       <span className="text-primary-text font-extrabold text-xl leading-none">
                         {formatPrice(product.price)}
@@ -204,11 +213,15 @@ export function NewArrivalsSection() {
                     Add
                   </button>
                 </div>
-                {product.eventPromo && (
+                {product.eventPromo ? (
                   <div className="text-[10px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
                     {product.eventPromo.discountPercentage}% OFF — Under {product.eventPromo.eventTitle}
                   </div>
-                )}
+                ) : product.compareAtPrice && product.compareAtPrice > product.price ? (
+                  <div className="text-[10px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                    ↓{Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}% OFF
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}
@@ -331,6 +344,15 @@ export function NewArrivalsSection() {
                             {formatPrice(selectedProduct.eventPromo.discountedPrice)}
                           </span>
                         </>
+                      ) : selectedProduct.compareAtPrice && selectedProduct.compareAtPrice > selectedProduct.price ? (
+                        <>
+                          <span className="text-xs text-muted-text line-through font-medium leading-none">
+                            {formatPrice(selectedProduct.compareAtPrice)}
+                          </span>
+                          <span className="text-2xl font-extrabold text-primary mt-1 leading-none">
+                            {formatPrice(selectedProduct.price)}
+                          </span>
+                        </>
                       ) : (
                         <span className="text-2xl font-extrabold text-primary-text leading-none">
                           {formatPrice(selectedProduct.price)}
@@ -348,11 +370,15 @@ export function NewArrivalsSection() {
                       Add To Cart
                     </button>
                   </div>
-                  {selectedProduct.eventPromo && (
+                  {selectedProduct.eventPromo ? (
                     <div className="text-[11px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
                       {selectedProduct.eventPromo.discountPercentage}% OFF — Under {selectedProduct.eventPromo.eventTitle}
                     </div>
-                  )}
+                  ) : selectedProduct.compareAtPrice && selectedProduct.compareAtPrice > selectedProduct.price ? (
+                    <div className="text-[11px] text-green-500 font-bold uppercase tracking-wider mt-0.5">
+                      ↓{Math.round(((selectedProduct.compareAtPrice - selectedProduct.price) / selectedProduct.compareAtPrice) * 100)}% OFF
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </motion.div>

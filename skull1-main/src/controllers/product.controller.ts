@@ -17,6 +17,7 @@ export class ProductController {
         maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
         sort: req.query.sort as any,
         q: (req.query.q || req.query.search) as string,
+        showInactive: req.query.showInactive === 'true' ? true : undefined,
       };
 
       const result = await productService.getProducts(filters);

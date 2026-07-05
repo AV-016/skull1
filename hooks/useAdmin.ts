@@ -21,8 +21,9 @@ export const useAdminProducts = () => {
   return useQuery({
     queryKey: ['admin', 'products'],
     queryFn: async () => {
-      // Fetch products list from the public product list but with all items
-      const response = await api.get<{ data: Product[] }>('/products')
+      const response = await api.get<{ data: Product[] }>('/products', {
+        params: { showInactive: true, limit: 1000 }
+      })
       return response.data.data || []
     },
     staleTime: 5 * 60 * 1000,
