@@ -277,8 +277,7 @@ export class AuthService {
 
     const user = await userRepository.findByEmail(email);
     if (!user) {
-      // Proactively succeed or fail silently to avoid email enumeration
-      return;
+      throw new AppError(404, 'No account found with this email address.');
     }
 
     // Generate a 6-digit OTP
