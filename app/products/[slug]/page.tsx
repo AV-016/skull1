@@ -32,6 +32,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
 
+  const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({
+    transform: 'scale(1)',
+    transformOrigin: 'center center'
+  })
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - left) / width) * 100
+    const y = ((e.clientY - top) / height) * 100
+    setZoomStyle({
+      transform: 'scale(2.2)',
+      transformOrigin: `${x}% ${y}%`
+    })
+  }
+
+  const handleMouseLeave = () => {
+    setZoomStyle({
+      transform: 'scale(1)',
+      transformOrigin: 'center center'
+    })
+  }
+
   const sanitizedProduct = useMemo(() => {
     return product ? sanitizeProducts([product])[0] : null
   }, [product])
@@ -348,13 +370,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
           >
             {/* Image Slider */}
             <div className="space-y-4">
-              <div className="relative aspect-square rounded-lg overflow-hidden bg-secondary border border-border group">
+              <div 
+                className="relative aspect-square rounded-lg overflow-hidden bg-secondary border border-border group cursor-zoom-in"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+              >
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={currentImageIndex}
                     src={displayImages[currentImageIndex]}
                     alt={sanitizedProduct.name}
-                    className="w-full h-full object-cover"
+                    style={zoomStyle}
+                    className="w-full h-full object-cover transition-transform duration-100 ease-out"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
