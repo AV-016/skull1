@@ -18,8 +18,7 @@ const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname
-      config.baseURL = `http://${hostname}:5000/api`
+      config.baseURL = '/api'
       
       const token = localStorage.getItem('authToken')
       if (token) {

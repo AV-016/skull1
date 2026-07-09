@@ -383,6 +383,43 @@ function CheckoutContent() {
     }
   }
 
+  const handlePaymentFailure = async (orderId: string, errorType: string, description: string = '', itemsToRestore: CartItem[]) => {
+    try {
+      // 1. Cancel the order in the backend
+      await api.post(`/orders/${orderId}/cancel`)
+      
+      // 2. Restore the cart in database and local storage
+      if (itemsToRestore.length > 0) {
+        if (typeof window !== 'undefined') {
+          if (isBuyNow) {
+            localStorage.setItem('buyNowItem', JSON.stringify(itemsToRestore[0]))
+          } else {
+            localStorage.setItem('cart', JSON.stringify(itemsToRestore))
+            window.dispatchEvent(new Event('cart-updated'))
+          }
+        }
+
+        // Sync back to database cart
+        await api.delete('/cart/clear').catch(() => {})
+        await Promise.all(
+          itemsToRestore.map((item) =>
+            api.post('/cart/items', {
+              productId: item.productId || item.id,
+              variantId: item.variantId || null,
+              quantity: item.quantity
+            }).catch(() => {})
+          )
+        )
+      }
+    } catch (err) {
+      console.error('Error handling payment failure:', err)
+    } finally {
+      setIsSubmitting(false)
+      const descParam = description ? `&description=${encodeURIComponent(description)}` : ''
+      router.push(`/orders/${orderId}?payment_error=${errorType}${descParam}`)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -518,8 +555,7 @@ function CheckoutContent() {
           },
           modal: {
             ondismiss: function () {
-              setIsSubmitting(false)
-              router.push(`/orders/${order.id}?payment_error=cancelled`)
+              handlePaymentFailure(order.id, 'cancelled', '', cartItems)
             }
           }
         }
@@ -527,7 +563,7 @@ function CheckoutContent() {
         const rzp = new (window as any).Razorpay(options)
         rzp.on('payment.failed', function (response: any) {
           console.error('Razorpay payment failed:', response.error)
-          router.push(`/orders/${order.id}?payment_error=failed&description=${encodeURIComponent(response.error.description || '')}`)
+          handlePaymentFailure(order.id, 'failed', response.error.description || '', cartItems)
         })
         rzp.open()
       } else {
