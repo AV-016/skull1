@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useSettings } from '@/context/SettingsContext'
 import api from '@/lib/api'
+import { useProducts } from '@/hooks/useProducts'
+import { sanitizeProducts } from '@/lib/mockProducts'
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -250,12 +252,30 @@ export const Navbar = () => {
     'Engineering Models',
   ];
 
+  const { data: rawProducts = [] } = useProducts({ limit: 100 });
+  const allProducts = sanitizeProducts(rawProducts);
+
+  const filteredSuggestions = query.trim()
+    ? allProducts
+        .filter((p: any) => p.name.toLowerCase().includes(query.toLowerCase()))
+        .map((p: any) => ({
+          name: p.name,
+          image: p.image || '/placeholder.jpg'
+        }))
+        .filter((val, idx, self) => self.findIndex((t) => t.name === val.name) === idx)
+    : suggestions.map((s) => ({
+        name: s,
+        image: null
+      }));
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
       router.push(`/products?search=${encodeURIComponent(query.trim())}`);
-      setIsSearchFocused(false);
+    } else {
+      router.push('/products');
     }
+    setIsSearchFocused(false);
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -312,17 +332,37 @@ export const Navbar = () => {
             {/* Dropdown Suggestions */}
             {isSearchFocused && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-2xl p-4 shadow-2xl z-50">
-                <span className="text-muted-text text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">Try searching:</span>
+                <span className="text-muted-text text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">
+                  {filteredSuggestions.length > 0 ? 'Try searching:' : 'No Product found'}
+                </span>
                 <div className="grid grid-cols-1 gap-1">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      onMouseDown={() => handleSuggestionClick(s)}
-                      className="w-full text-left px-3 py-2 hover:bg-secondary hover:text-primary rounded-lg text-primary-text text-sm font-semibold smooth-transition cursor-pointer"
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  {filteredSuggestions.length > 0 ? (
+                    filteredSuggestions.map((item) => (
+                      <button
+                        key={item.name}
+                        onMouseDown={() => handleSuggestionClick(item.name)}
+                        className="w-full text-left px-3 py-2 hover:bg-secondary hover:text-primary rounded-lg text-primary-text text-sm font-semibold smooth-transition cursor-pointer flex items-center gap-3"
+                      >
+                        {item.image && (
+                          <div className="w-8 h-8 rounded border border-border overflow-hidden shrink-0 bg-secondary flex items-center justify-center">
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder.jpg'
+                              }}
+                            />
+                          </div>
+                        )}
+                        <span>{item.name}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-muted-text text-sm italic">
+                      No matching products found in suggestions
+                    </div>
+                  )}
                 </div>
               </div>
             )}

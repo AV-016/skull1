@@ -54,16 +54,21 @@ export class ShippingService {
       const response = await fetch(`https://api.postalpincode.in/pincode/${cleanPin}`);
       const data = await response.json() as any;
 
-      if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice?.[0]) {
-        const info = data[0].PostOffice[0];
-        const result = {
-          state: info.State.trim(),
-          district: info.District.trim()
-        };
-        pincodeCache.set(cleanPin, result);
-        return result;
+      if (data && data[0]) {
+        if (data[0].Status === 'Success' && data[0].PostOffice?.[0]) {
+          const info = data[0].PostOffice[0];
+          const result = {
+            state: info.State.trim(),
+            district: info.District.trim()
+          };
+          pincodeCache.set(cleanPin, result);
+          return result;
+        } else if (data[0].Status === 'Error') {
+          throw new AppError(400, 'Invalid pincode. No records found.');
+        }
       }
     } catch (err) {
+      if (err instanceof AppError) throw err;
       logger.error(`Failed to lookup pincode ${cleanPin} from API, using fallback:`, err);
     }
 

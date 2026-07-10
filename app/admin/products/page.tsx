@@ -21,6 +21,8 @@ export default function AdminProducts() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [currentLimit, setCurrentLimit] = useState(10)
   
   // React Query queries and mutations
   const { data: products, isLoading, error, refetch } = useAdminProducts()
@@ -287,6 +289,10 @@ export default function AdminProducts() {
     (p.category?.name && p.category.name.toLowerCase().includes(searchTerm.toLowerCase()))
   ) || []
 
+  const totalItems = filteredProducts.length
+  const totalPages = Math.ceil(totalItems / currentLimit)
+  const paginatedProducts = filteredProducts.slice((currentPage - 1) * currentLimit, currentPage * currentLimit)
+
   return (
     <AdminLayout>
       <motion.div
@@ -336,7 +342,8 @@ export default function AdminProducts() {
             </div>
           </div>
         ) : (
-          <div className="glass-card overflow-x-auto border border-border">
+          <>
+            <div className="glass-card overflow-x-auto border border-border">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border/60 bg-secondary/40 text-[10px] font-bold text-muted-text uppercase tracking-widest">
@@ -351,7 +358,7 @@ export default function AdminProducts() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 text-xs">
-                {filteredProducts.map((product: any) => {
+                {paginatedProducts.map((product: any) => {
                   const primaryImg = product.images?.find((img: any) => img.isPrimary)?.url || product.image || '/placeholder.jpg'
                   return (
                     <tr key={product.id} className="hover:bg-secondary/25 smooth-transition">
@@ -427,6 +434,67 @@ export default function AdminProducts() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-secondary/10 border border-border p-4 rounded-xl mt-6 font-sans text-xs">
+              <div className="flex items-center gap-4 text-muted-text font-bold uppercase tracking-wider">
+                <span>
+                  Showing {Math.min(totalItems, (currentPage - 1) * currentLimit + 1)} - {Math.min(totalItems, currentPage * currentLimit)} of {totalItems} products
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span>Show:</span>
+                  <select
+                    value={currentLimit}
+                    onChange={(e) => {
+                      setCurrentLimit(Number(e.target.value))
+                      setCurrentPage(1)
+                    }}
+                    className="bg-secondary border border-border rounded px-2 py-1 text-[10px] font-bold text-primary-text focus:outline-none focus:border-primary/55 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="px-3 py-1.5 bg-secondary border border-border rounded text-[10px] uppercase font-bold tracking-wider hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed smooth-transition animate-none"
+                >
+                  Previous
+                </button>
+                
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded border font-bold text-[10px] smooth-transition ${
+                        currentPage === pageNum
+                          ? 'bg-primary border-primary text-white'
+                          : 'bg-secondary border-border text-primary-text hover:bg-secondary/80'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="px-3 py-1.5 bg-secondary border border-border rounded text-[10px] uppercase font-bold tracking-wider hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed smooth-transition animate-none"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </motion.div>
 

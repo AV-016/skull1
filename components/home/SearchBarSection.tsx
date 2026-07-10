@@ -21,6 +21,8 @@ export const SearchBarSection = () => {
     e.preventDefault()
     if (query.trim()) {
       router.push(`/products?search=${encodeURIComponent(query.trim())}`)
+    } else {
+      router.push('/products')
     }
   }
 

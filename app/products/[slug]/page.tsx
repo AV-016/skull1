@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { ProductCard } from '@/components/products/ProductCard'
 import { useAuth } from '@/context/AuthContext'
+import { useOrders } from '@/hooks/useOrders'
 
 export default function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = React.use(params)
@@ -28,7 +29,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const router = useRouter()
   const [isDescExpanded, setIsDescExpanded] = useState(false)
   const { user } = useAuth()
-  
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
 
@@ -57,6 +57,63 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const sanitizedProduct = useMemo(() => {
     return product ? sanitizeProducts([product])[0] : null
   }, [product])
+
+  const { data: orders = [] } = useOrders()
+
+  const [pincode, setPincode] = useState('')
+  const [pincodeResult, setPincodeResult] = useState<{
+    success: boolean;
+    estimatedDelivery?: string;
+    shippingCharge?: number;
+    error?: string;
+  } | null>(null)
+  const [checkingPincode, setCheckingPincode] = useState(false)
+
+  const loggedInPincode = useMemo(() => {
+    if (!user || !orders || orders.length === 0) return null;
+    return orders[0]?.address?.postalCode || null;
+  }, [user, orders]);
+
+  const handleCheckPincode = async (pinToCheck: string) => {
+    const pin = pinToCheck.trim();
+    if (!/^\d{6}$/.test(pin)) {
+      setPincodeResult({ success: false, error: 'Invalid pincode. Must be 6 digits.' })
+      return
+    }
+    if (!sanitizedProduct?.id) return;
+    try {
+      setCheckingPincode(true);
+      setPincodeResult(null);
+      const res = await api.post('/shipping/calculate', {
+        customerPincode: pin,
+        items: [{ productId: sanitizedProduct.id, quantity: 1 }]
+      });
+      if (res.data?.success && res.data?.data) {
+        const { estimatedDelivery, shipping } = res.data.data;
+        setPincodeResult({
+          success: true,
+          estimatedDelivery,
+          shippingCharge: shipping
+        });
+      } else {
+        setPincodeResult({ success: false, error: 'Failed to retrieve delivery information.' });
+      }
+    } catch (err: any) {
+      setPincodeResult({
+        success: false,
+        error: err.response?.data?.message || 'Delivery not available for this pincode.'
+      });
+    } finally {
+      setCheckingPincode(false);
+    }
+  }
+
+  useEffect(() => {
+    if (loggedInPincode && sanitizedProduct?.id) {
+      setPincode(loggedInPincode)
+      handleCheckPincode(loggedInPincode)
+    }
+  }, [loggedInPincode, sanitizedProduct?.id])
 
   const currentOriginalPrice = useMemo(() => {
     if (!sanitizedProduct) return 0
@@ -570,6 +627,52 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                    </div>
                  )}
                </div>
+
+                {/* Pincode Checker */}
+                <div className="mb-6 border-t border-border/60 pt-6 space-y-2">
+                  <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                    Delivery Availability
+                  </span>
+                  <div className="flex gap-2 max-w-sm">
+                    <input
+                      type="text"
+                      placeholder="Enter 6-digit Pincode"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="flex-1 px-3 py-2 bg-secondary border border-border text-xs text-primary-text focus:outline-none focus:border-primary/55 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleCheckPincode(pincode)}
+                      disabled={checkingPincode || pincode.length !== 6}
+                      className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      {checkingPincode ? 'Checking...' : 'Check'}
+                    </button>
+                  </div>
+                  {pincodeResult && (
+                    <div className="mt-2 text-xs max-w-sm">
+                      {pincodeResult.success ? (
+                        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 space-y-1">
+                          <p className="font-bold flex items-center gap-1.5">
+                            <span>✓ Deliverable</span>
+                          </p>
+                          <p className="text-secondary-text">
+                            Estimated Delivery: <span className="text-primary-text font-semibold">{pincodeResult.estimatedDelivery}</span>
+                          </p>
+                          <p className="text-secondary-text">
+                            Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge)}</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+                          <p className="font-bold">✗ Not Deliverable</p>
+                          <p className="text-secondary-text mt-0.5">{pincodeResult.error}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Purchase Section */}
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">

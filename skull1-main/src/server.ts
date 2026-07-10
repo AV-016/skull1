@@ -13,12 +13,12 @@ const startServer = async () => {
     await prisma.$connect();
     logger.info('Database connected successfully.');
   } catch (error) {
-    logger.error('⚠️ Database connection failed on startup. Server will start, but database queries may fail:', error);
+    logger.error(' Database connection failed on startup. Server will start, but database queries may fail:', error);
   }
 
   try {
     const server = app.listen(PORT, () => {
-      logger.info(`🚀 Server running in ${env.NODE_ENV} mode on port ${PORT}`);
+      logger.info(` Server running in ${env.NODE_ENV} mode on port ${PORT}`);
     });
 
     // Graceful shutdown handling

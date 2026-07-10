@@ -1,6 +1,9 @@
 import { prisma } from '../config/database';
 import { Address } from '@prisma/client';
 import { AppError } from '../middlewares/error.middleware';
+import { ShippingService } from './shipping.service';
+
+const shippingService = new ShippingService();
 
 export class AddressService {
   async getAddresses(userId: string): Promise<Address[]> {
@@ -11,6 +14,10 @@ export class AddressService {
   }
 
   async createAddress(userId: string, data: any): Promise<Address> {
+    if (data.postalCode) {
+      await shippingService.lookupPincode(data.postalCode);
+    }
+
     return prisma.$transaction(async (tx) => {
       // If setting this address as default, turn off default on other addresses
       if (data.isDefault) {
@@ -53,6 +60,10 @@ export class AddressService {
   async updateAddress(userId: string, id: string, data: any): Promise<Address> {
     // Verify ownership
     await this.getAddressById(userId, id);
+
+    if (data.postalCode) {
+      await shippingService.lookupPincode(data.postalCode);
+    }
 
     return prisma.$transaction(async (tx) => {
       if (data.isDefault) {

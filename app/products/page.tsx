@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -66,6 +66,20 @@ function ProductsContent() {
     tag: selectedTag || undefined,
   })
 
+  const { data: allProductsForCategories = [] } = useProducts({ limit: 1000 })
+
+  const availableCategorySlugs = useMemo(() => {
+    const slugs = new Set<string>()
+    const sanitized = sanitizeProducts(allProductsForCategories)
+    sanitized.forEach((p: any) => {
+      const slug = p.category?.slug || (typeof p.category === 'string' ? p.category.toLowerCase().replace(/\s+/g, '-') : '')
+      if (slug) {
+        slugs.add(slug.toLowerCase())
+      }
+    })
+    return slugs
+  }, [allProductsForCategories])
+
   const sanitizedProducts = sanitizeProducts(products).filter((p: any) => {
     const categorySlug = p.category?.slug || '';
     return categorySlug !== 'custom-orders';
@@ -130,7 +144,12 @@ function ProductsContent() {
                       All
                     </button>
                      {serverCategories
-                      .filter((cat: any) => cat.slug !== 'custom-orders')
+                      .filter((cat: any) => {
+                        if (cat.slug === 'custom-orders') return false
+                        const slugLower = cat.slug.toLowerCase()
+                        const nameSlug = cat.name.toLowerCase().replace(/\s+/g, '-')
+                        return availableCategorySlugs.has(slugLower) || availableCategorySlugs.has(nameSlug)
+                      })
                       .map((cat: any) => (
                         <button
                           key={cat.id}
@@ -199,7 +218,7 @@ function ProductsContent() {
                 </div>
               ) : sanitizedProducts.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-secondary-text">No products found</p>
+                  <p className="text-secondary-text font-medium text-lg">No Product found</p>
                 </div>
               ) : (
                 <motion.div
