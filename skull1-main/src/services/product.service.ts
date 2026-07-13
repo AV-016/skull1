@@ -143,6 +143,92 @@ export class ProductService {
       });
     });
   }
+
+  async bulkCreateProducts(products: CreateProductInput[]): Promise<any[]> {
+    const created: any[] = [];
+    
+    for (const pData of products) {
+      try {
+        let categoryId = pData.categoryId;
+        
+        // Resolve categoryName if categoryId not supplied or is empty
+        if ((!categoryId || categoryId.trim() === '') && pData.categoryName) {
+          const categorySlug = pData.categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+          let category = await prisma.category.findFirst({
+            where: {
+              OR: [
+                { name: { equals: pData.categoryName, mode: 'insensitive' } },
+                { slug: categorySlug }
+              ]
+            }
+          });
+          
+          if (!category) {
+            category = await prisma.category.create({
+              data: {
+                name: pData.categoryName,
+                slug: categorySlug,
+                description: `Imported via bulk CSV upload`
+              }
+            });
+          }
+          categoryId = category.id;
+        }
+
+        // Handle category fallback if still not resolved
+        if (!categoryId || categoryId.trim() === '') {
+          const firstCategory = await prisma.category.findFirst();
+          if (firstCategory) {
+            categoryId = firstCategory.id;
+          } else {
+            const fallbackCat = await prisma.category.create({
+              data: {
+                name: 'General',
+                slug: 'general',
+                description: 'Default category for imports'
+              }
+            });
+            categoryId = fallbackCat.id;
+          }
+        }
+
+        // Generate unique slug
+        const baseSlug = pData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        let slug = baseSlug;
+        let counter = 1;
+        while (true) {
+          const existing = await prisma.product.findUnique({ where: { slug } });
+          if (!existing) {
+            break;
+          }
+          slug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+
+        // Insert product as draft
+        const newProd = await productRepository.create({
+          ...pData,
+          categoryId,
+          slug,
+          isActive: false, // Draft by default
+        });
+
+        created.push({ id: newProd.id, name: newProd.name, slug: newProd.slug, success: true });
+      } catch (err: any) {
+        created.push({ name: pData.name, success: false, error: err.message || 'Unknown error' });
+      }
+    }
+    
+    return created;
+  }
+
+  async bulkPublishProducts(): Promise<number> {
+    const result = await prisma.product.updateMany({
+      where: { isActive: false },
+      data: { isActive: true },
+    });
+    return result.count;
+  }
 }
 
 export default ProductService;

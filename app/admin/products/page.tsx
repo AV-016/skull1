@@ -11,7 +11,7 @@ import {
   useAdminCategories 
 } from '@/hooks/useAdmin'
 import { useTags } from '@/hooks/useProducts'
-import { Plus, Edit2, Trash2, Search, Loader2, X, AlertTriangle, Upload } from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, Loader2, X, AlertTriangle, Upload, Download } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import api from '@/lib/api'
 
@@ -23,6 +23,158 @@ export default function AdminProducts() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [currentLimit, setCurrentLimit] = useState(10)
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'all' | 'drafts'>('all')
+  const [isPublishing, setIsPublishing] = useState(false)
+
+  const handlePublishAllDrafts = async () => {
+    if (!confirm('Are you sure you want to publish all draft products?')) return
+    setIsPublishing(true)
+    try {
+      const res = await api.patch('/admin/products/bulk-publish')
+      if (res.data?.success) {
+        alert(res.data.message || 'All draft products published successfully')
+        refetch()
+      } else {
+        alert('Failed to publish draft products')
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Error publishing draft products')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  // Bulk Import States
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importResults, setImportResults] = useState<any[] | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+
+  const handleCsvImport = async () => {
+    if (!csvFile) {
+      setCsvError('Please select a CSV file first')
+      return
+    }
+
+    setIsImporting(true)
+    setCsvError(null)
+    setImportResults(null)
+
+    try {
+      const text = await csvFile.text()
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '')
+      if (lines.length <= 1) {
+        throw new Error('CSV file is empty or missing data rows')
+      }
+
+      // Safe CSV Row Parsing Helper supporting quotes
+      const parseCSVRow = (row: string) => {
+        const result = []
+        let current = ''
+        let inQuotes = false
+        for (let i = 0; i < row.length; i++) {
+          const char = row[i]
+          if (char === '"') {
+            inQuotes = !inQuotes
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim())
+            current = ''
+          } else {
+            current += char
+          }
+        }
+        result.push(current.trim())
+        return result.map(val => val.replace(/^"|"$/g, ''))
+      }
+
+      const headers = parseCSVRow(lines[0])
+      const required = ['name', 'description', 'price', 'categoryName']
+      const missing = required.filter(h => !headers.includes(h))
+      
+      if (missing.length > 0) {
+        throw new Error(`CSV is missing required headers: ${missing.join(', ')}`)
+      }
+
+      const productsList: any[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVRow(lines[i])
+        if (values.length < headers.length) continue
+
+        const p: Record<string, any> = {}
+        headers.forEach((h, index) => {
+          const val = values[index]
+          if (h === 'price' || h === 'compareAtPrice' || h === 'weightGrams' || h === 'lengthCm' || h === 'widthCm' || h === 'heightCm') {
+            p[h] = val ? parseFloat(val) : 0
+          } else if (h === 'stock') {
+            p[h] = val ? parseInt(val, 10) : 0
+          } else if (h === 'images') {
+            p[h] = val ? val.split(';').map(url => url.trim()).filter(url => url !== '') : []
+          } else {
+            p[h] = val
+          }
+        })
+        productsList.push(p)
+      }
+
+      const res = await api.post('/admin/products/bulk', { products: productsList })
+      if (res.data?.success) {
+        setImportResults(res.data.data)
+        refetch()
+      } else {
+        throw new Error(res.data?.message || 'Import failed')
+      }
+    } catch (err: any) {
+      setCsvError(err.message || 'Error processing CSV file')
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const handleExportCSV = () => {
+    if (!products || products.length === 0) {
+      alert('No products to export')
+      return
+    }
+
+    const headers = ['name', 'description', 'price', 'compareAtPrice', 'stock', 'categoryName', 'images', 'weightGrams', 'lengthCm', 'widthCm', 'heightCm']
+    const rows = products.map((p: any) => {
+      const categoryName = p.category?.name || ''
+      const imagesStr = (p.images || []).map((img: any) => img.url).join(';')
+
+      const values = [
+        p.name || '',
+        p.description || '',
+        p.price || 0,
+        p.compareAtPrice || '',
+        p.stock || 0,
+        categoryName,
+        imagesStr,
+        p.weightGrams || 0,
+        p.lengthCm || 0,
+        p.widthCm || 0,
+        p.heightCm || 0
+      ]
+
+      return values.map(val => {
+        const str = String(val).replace(/"/g, '""')
+        return str.includes(',') || str.includes('\n') || str.includes('"') ? `"${str}"` : str
+      }).join(',')
+    })
+
+    const csvContent = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `products_export_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
   
   // React Query queries and mutations
   const { data: products, isLoading, error, refetch } = useAdminProducts()
@@ -283,11 +435,18 @@ export default function AdminProducts() {
     }
   }
 
-  // Filter products by search term
-  const filteredProducts = products?.filter((p: any) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.category?.name && p.category.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  ) || []
+  // Filter products by search term and selected tab (live/draft)
+  const filteredProducts = products?.filter((p: any) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.category?.name && p.category.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    if (activeTab === 'drafts') {
+      return p.isActive === false;
+    }
+    return p.isActive === true;
+  }) || []
 
   const totalItems = filteredProducts.length
   const totalPages = Math.ceil(totalItems / currentLimit)
@@ -306,13 +465,34 @@ export default function AdminProducts() {
             <h1 className="heading-2 uppercase tracking-wide">Products</h1>
             <p className="text-xs text-muted-text uppercase tracking-widest">Manage your 3D print catalog</p>
           </div>
-          <button 
-            onClick={openAddModal}
-            className="px-6 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 smooth-transition flex items-center gap-2 text-xs tracking-wider uppercase cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Add Product
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleExportCSV}
+              className="px-6 py-2.5 bg-secondary/80 border border-border text-primary-text font-bold rounded-lg hover:bg-secondary smooth-transition flex items-center gap-2 text-xs tracking-wider uppercase cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+            <button 
+              onClick={() => {
+                setCsvFile(null)
+                setCsvError(null)
+                setImportResults(null)
+                setIsBulkModalOpen(true)
+              }}
+              className="px-6 py-2.5 bg-secondary/80 border border-border text-primary-text font-bold rounded-lg hover:bg-secondary smooth-transition flex items-center gap-2 text-xs tracking-wider uppercase cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              Import CSV
+            </button>
+            <button 
+              onClick={openAddModal}
+              className="px-6 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 smooth-transition flex items-center gap-2 text-xs tracking-wider uppercase cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Add Product
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -325,6 +505,49 @@ export default function AdminProducts() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 bg-secondary/80 border border-border text-primary-text placeholder-muted-text text-sm focus:outline-none focus:border-primary/50 smooth-transition"
           />
+        </div>
+
+        {/* Tabs navigation */}
+        <div className="flex justify-between items-center border-b border-border">
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setActiveTab('all')
+                setCurrentPage(1)
+              }}
+              className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                activeTab === 'all' 
+                  ? 'border-primary text-primary-text' 
+                  : 'border-transparent text-muted-text hover:text-primary-text'
+              }`}
+            >
+              Live Products
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('drafts')
+                setCurrentPage(1)
+              }}
+              className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                activeTab === 'drafts' 
+                  ? 'border-primary text-primary-text' 
+                  : 'border-transparent text-muted-text hover:text-primary-text'
+              }`}
+            >
+              Drafts & CSV Imports
+            </button>
+          </div>
+
+          {activeTab === 'drafts' && (
+            <button
+              onClick={handlePublishAllDrafts}
+              disabled={isPublishing || filteredProducts.length === 0}
+              className="mb-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-lg smooth-transition flex items-center gap-2 text-xs tracking-wider uppercase cursor-pointer"
+            >
+              {isPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              Publish All ({filteredProducts.length})
+            </button>
+          )}
         </div>
 
         {/* Products Catalog */}
@@ -560,6 +783,7 @@ export default function AdminProducts() {
                     <input
                       type="number"
                       step="0.01"
+                      min="0"
                       required
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -573,6 +797,7 @@ export default function AdminProducts() {
                     <input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={formData.compareAtPrice}
                       onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })}
                       placeholder="e.g. 1400"
@@ -585,6 +810,7 @@ export default function AdminProducts() {
                     <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Inventory Stock</label>
                     <input
                       type="number"
+                      min="0"
                       required
                       value={formData.stock}
                       onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
@@ -984,6 +1210,7 @@ export default function AdminProducts() {
                               <label className="block text-[8px] font-bold text-muted-text uppercase tracking-wider mb-1">Stock</label>
                               <input
                                 type="number"
+                                min="0"
                                 required
                                 placeholder="0"
                                 value={variant.stock}
@@ -1000,6 +1227,7 @@ export default function AdminProducts() {
                               <input
                                 type="number"
                                 step="0.01"
+                                min="0"
                                 placeholder="Optional"
                                 value={variant.price}
                                 onChange={(e) => {
@@ -1198,6 +1426,113 @@ export default function AdminProducts() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* CSV Bulk Import Modal */}
+        {isBulkModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-popover border border-border rounded-xl max-w-lg w-full overflow-hidden shadow-2xl"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-border bg-secondary/35">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-primary-text flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-primary" /> Bulk Import Products (CSV)
+                </h3>
+                <button
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="p-1 text-muted-text hover:text-primary-text rounded-lg hover:bg-secondary smooth-transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <p className="text-xs text-muted-text leading-relaxed">
+                  Select a CSV file containing your product catalog. Imported products will be saved as **Drafts** so you can review details (e.g. upload images) before making them active.
+                  <code className="block mt-1 p-2 bg-secondary rounded border border-border text-[10px] text-primary-text font-mono">
+                    name, description, price, compareAtPrice, stock, categoryName, images, weightGrams, lengthCm, widthCm, heightCm
+                  </code>
+                  <span className="block mt-1 text-[10px] text-muted-text font-semibold">
+                    * The "images" field is optional and can be left empty. Separate multiple image URLs inside it with a semicolon (<code>;</code>).
+                  </span>
+                </p>
+
+                {/* File Input */}
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">Choose CSV File</label>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setCsvFile(e.target.files[0])
+                        setCsvError(null)
+                        setImportResults(null)
+                      }
+                    }}
+                    className="w-full text-xs text-muted-text file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/95 file:cursor-pointer"
+                  />
+                </div>
+
+                {/* Error Banner */}
+                {csvError && (
+                  <div className="flex gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{csvError}</span>
+                  </div>
+                )}
+
+                {/* Loading spinner */}
+                {isImporting && (
+                  <div className="flex flex-col items-center justify-center py-6 space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <span className="text-xs text-muted-text font-bold uppercase tracking-wider">Uploading and processing CSV...</span>
+                  </div>
+                )}
+
+                {/* Import Results Summary */}
+                {importResults && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-bold text-secondary-text uppercase tracking-wider">Import Summary</h4>
+                    <div className="max-h-40 overflow-y-auto border border-border rounded-lg bg-secondary/30 divide-y divide-border">
+                      {importResults.map((res, i) => (
+                        <div key={i} className="flex justify-between items-center p-2.5 text-xs font-semibold">
+                          <span className="truncate max-w-[70%] text-primary-text">{res.name || 'Unnamed Product'}</span>
+                          {res.success ? (
+                            <span className="text-emerald-400 text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Success</span>
+                          ) : (
+                            <span className="text-red-400 text-[10px] bg-red-500/10 px-2 py-0.5 rounded font-bold uppercase tracking-wider" title={res.error}>Failed</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 p-5 border-t border-border bg-secondary/35">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="px-5 py-2 border border-border text-primary-text hover:bg-secondary smooth-transition uppercase tracking-widest text-[10px] font-bold cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCsvImport}
+                  disabled={isImporting || !csvFile}
+                  className="px-6 py-2 bg-primary text-white hover:bg-primary/95 disabled:opacity-50 smooth-transition uppercase tracking-widest text-[10px] font-bold flex items-center gap-2 cursor-pointer"
+                >
+                  {isImporting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Import Catalog
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

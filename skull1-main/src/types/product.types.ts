@@ -23,14 +23,21 @@ export interface CreateProductVariantInput {
 
 export interface CreateProductInput {
   name: string;
+  slug?: string;
   description: string;
   price: number;
   compareAtPrice?: number;
   stock: number;
   categoryId: string;
+  categoryName?: string;
   tags?: string[]; // Tag slugs or ids
   images?: string[]; // Image URLs
   variants?: CreateProductVariantInput[];
   specifications?: Record<string, string> | null;
   bestSellerOrder?: number;
+  weightGrams?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
+  isActive?: boolean;
 }

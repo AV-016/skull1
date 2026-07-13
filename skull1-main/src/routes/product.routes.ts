@@ -25,6 +25,8 @@ router.patch('/images/:imageId/primary', protect, controller.setPrimaryImage);
 export const adminProductRouter = Router();
 adminProductRouter.use(protect, restrictToAdmin);
 adminProductRouter.post('/', validate(createProductSchema), controller.createProduct);
+adminProductRouter.post('/bulk', controller.bulkCreateProducts);
+adminProductRouter.patch('/bulk-publish', controller.bulkPublishProducts);
 adminProductRouter.patch('/:id', validate(updateProductSchema), controller.updateProduct);
 adminProductRouter.delete('/:id', controller.deleteProduct);
 adminProductRouter.patch('/:id/toggle-active', controller.toggleActive);

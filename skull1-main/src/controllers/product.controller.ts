@@ -84,6 +84,32 @@ export class ProductController {
     }
   }
 
+  async bulkCreateProducts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await productService.bulkCreateProducts(req.body.products);
+      res.status(201).json({
+        success: true,
+        message: 'Products imported successfully',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async bulkPublishProducts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const count = await productService.bulkPublishProducts();
+      res.status(200).json({
+        success: true,
+        message: `${count} products published successfully`,
+        data: { count },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async updateProduct(req: Request, res: Response, next: NextFunction) {
     try {
       const product = await productService.updateProduct(req.params.id, req.body);

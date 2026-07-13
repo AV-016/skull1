@@ -19,11 +19,14 @@ export interface MonitoringStats {
 
 export class MonitoringService {
   async getStats(): Promise<MonitoringStats> {
+    const timeLimit = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24 hours
+
     let paymentFailures = 0;
     try {
       paymentFailures = await prisma.order.count({
         where: {
           paymentStatus: 'FAILED',
+          createdAt: { gte: timeLimit }
         },
       });
     } catch (dbErr) {
@@ -36,10 +39,30 @@ export class MonitoringService {
     let dbFailures = 0;
 
     try {
-      errors500 = await prisma.alertLog.count({ where: { category: '500 Internal Error' } });
-      webhookFailures = await prisma.alertLog.count({ where: { category: 'Webhook Verification' } });
-      smtpFailures = await prisma.alertLog.count({ where: { category: 'SMTP Delivery' } });
-      dbFailures = await prisma.alertLog.count({ where: { category: 'Database / Timeout' } });
+      errors500 = await prisma.alertLog.count({
+        where: {
+          category: '500 Internal Error',
+          timestamp: { gte: timeLimit }
+        }
+      });
+      webhookFailures = await prisma.alertLog.count({
+        where: {
+          category: 'Webhook Verification',
+          timestamp: { gte: timeLimit }
+        }
+      });
+      smtpFailures = await prisma.alertLog.count({
+        where: {
+          category: 'SMTP Delivery',
+          timestamp: { gte: timeLimit }
+        }
+      });
+      dbFailures = await prisma.alertLog.count({
+        where: {
+          category: 'Database / Timeout',
+          timestamp: { gte: timeLimit }
+        }
+      });
     } catch (err) {
       logger.error('Error querying AlertLog counts:', err);
     }
@@ -47,6 +70,9 @@ export class MonitoringService {
     const recentAlerts: Array<{ category: string; message: string; timestamp: string }> = [];
     try {
       const logs = await prisma.alertLog.findMany({
+        where: {
+          timestamp: { gte: timeLimit }
+        },
         orderBy: { timestamp: 'desc' },
         take: 15,
       });
@@ -65,7 +91,7 @@ export class MonitoringService {
     let status: 'healthy' | 'warning' | 'critical' = 'healthy';
     const totalIssues = errors500 + webhookFailures + smtpFailures + dbFailures + paymentFailures;
 
-    if (dbFailures > 0 || errors500 > 10) {
+    if (dbFailures > 5 || errors500 > 10) {
       status = 'critical';
     } else if (totalIssues > 0) {
       status = 'warning';

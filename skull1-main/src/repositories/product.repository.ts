@@ -193,10 +193,28 @@ export class ProductRepository {
   }
 
   async create(data: CreateProductInput): Promise<Product> {
-    const { name, description, price, compareAtPrice, stock, categoryId, tags = [], images = [], variants = [], specifications = null, bestSellerOrder = 0 } = data;
+    const { 
+      name, 
+      description, 
+      price, 
+      compareAtPrice, 
+      stock, 
+      categoryId, 
+      tags = [], 
+      images = [], 
+      variants = [], 
+      specifications = null, 
+      bestSellerOrder = 0,
+      slug: customSlug,
+      weightGrams = 0,
+      lengthCm = 0,
+      widthCm = 0,
+      heightCm = 0,
+      isActive = true
+    } = data;
     
-    // Generate slug from name
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    // Generate slug from name if custom slug not provided
+    const slug = customSlug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
     return prisma.product.create({
       data: {
@@ -208,6 +226,11 @@ export class ProductRepository {
         stock,
         categoryId,
         bestSellerOrder,
+        weightGrams,
+        lengthCm,
+        widthCm,
+        heightCm,
+        isActive,
         specifications: specifications || undefined,
         tags: {
           connect: tags.map((id) => ({ id })),

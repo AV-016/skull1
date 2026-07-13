@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, X, ShoppingCart, Settings, Search, LayoutDashboard, Package, LogOut, Shield, Heart, Gift, MessageSquare, Layers, Bell } from 'lucide-react';
+import { Menu, X, ShoppingCart, Settings, Search, LayoutDashboard, Package, LogOut, Shield, Heart, Gift, MessageSquare, Layers, Bell, SlidersHorizontal } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,6 +19,11 @@ export const Navbar = () => {
   const [query, setQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+
+  // Search filter states
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedFilterSort, setSelectedFilterSort] = useState('');
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState('');
   const router = useRouter();
   const { appearance, accent, setAppearance, setAccent } = useSettings();
   const { user, logout, isAdmin } = useAuth()
@@ -221,7 +226,7 @@ export const Navbar = () => {
 
   // Close dropdowns when clicking outside
   useEffect(() => {
-    if (!isProfileOpen && !isNotificationsOpen) return;
+    if (!isProfileOpen && !isNotificationsOpen && !isFilterOpen) return;
 
     const handleOutsideClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -232,6 +237,9 @@ export const Navbar = () => {
       const clickedNotifButton = target.closest('[data-notif-btn]');
       const clickedNotifMenu = target.closest('[data-notif-menu]');
 
+      const clickedFilterButton = target.closest('[data-filter-btn]');
+      const clickedFilterMenu = target.closest('[data-filter-menu]');
+
       if (!clickedProfileButton && !clickedProfileMenu) {
         setIsProfileOpen(false);
       }
@@ -239,11 +247,15 @@ export const Navbar = () => {
       if (!clickedNotifButton && !clickedNotifMenu) {
         setIsNotificationsOpen(false);
       }
+
+      if (!clickedFilterButton && !clickedFilterMenu) {
+        setIsFilterOpen(false);
+      }
     };
 
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
-  }, [isProfileOpen, isNotificationsOpen]);
+  }, [isProfileOpen, isNotificationsOpen, isFilterOpen]);
   const suggestions = [
     'Anime Figures',
     'Keychains',
@@ -270,12 +282,16 @@ export const Navbar = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim()) {
-      router.push(`/products?search=${encodeURIComponent(query.trim())}`);
-    } else {
-      router.push('/products');
-    }
+    let url = `/products?`;
+    const params = [];
+    if (query.trim()) params.push(`search=${encodeURIComponent(query.trim())}`);
+    if (selectedFilterSort) params.push(`filter=${selectedFilterSort}`);
+    if (selectedFilterCategory) params.push(`category=${selectedFilterCategory}`);
+    
+    url += params.join('&');
+    router.push(url);
     setIsSearchFocused(false);
+    setIsFilterOpen(false);
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -321,6 +337,20 @@ export const Navbar = () => {
                 className="w-full py-3 px-4 bg-transparent text-primary-text placeholder-muted-text text-sm focus:outline-none tracking-wide"
               />
               <button
+                type="button"
+                data-filter-btn
+                onClick={() => {
+                  setIsFilterOpen(!isFilterOpen);
+                  setIsSearchFocused(false);
+                }}
+                className={`p-2 rounded-xl text-muted-text hover:text-primary-text smooth-transition shrink-0 mr-1 cursor-pointer hover:bg-white/5 ${
+                  isFilterOpen ? 'text-primary' : ''
+                }`}
+                title="Search Filter Options"
+              >
+                <SlidersHorizontal className="w-4.5 h-4.5" />
+              </button>
+              <button
                 type="submit"
                 onClick={handleSearchSubmit}
                 className="mr-2 px-4 py-2 bg-primary hover:bg-primary/95 text-white text-xs font-semibold rounded-xl transition-all duration-300 shadow-lg"
@@ -328,6 +358,88 @@ export const Navbar = () => {
                 Search
               </button>
             </div>
+
+            {/* Filter Options Panel */}
+            {isFilterOpen && (
+              <div data-filter-menu className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-2xl p-4.5 shadow-2xl z-50 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-border">
+                  <span className="text-primary-text text-xs font-black uppercase tracking-wider">Search Filters</span>
+                  <button
+                    onClick={() => {
+                      setSelectedFilterSort('');
+                      setSelectedFilterCategory('');
+                    }}
+                    className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                
+                {/* Sort Section */}
+                <div>
+                  <span className="text-[10px] text-muted-text font-black uppercase tracking-widest block mb-2">Sort By</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'price_asc', label: 'Price: Low to High' },
+                      { id: 'price_desc', label: 'Price: High to Low' },
+                      { id: 'bestsellers', label: 'Best Sellers' },
+                      { id: 'newest', label: 'Newest Arrivals' }
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setSelectedFilterSort(opt.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border text-center transition-all cursor-pointer ${
+                          selectedFilterSort === opt.id
+                            ? 'bg-primary border-primary text-white font-extrabold'
+                            : 'bg-secondary/40 border-border text-secondary-text hover:border-muted-text'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Category Section */}
+                <div>
+                  <span className="text-[10px] text-muted-text font-black uppercase tracking-widest block mb-2">Category</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'anime-figures', label: 'Anime Figures' },
+                      { id: 'keychains', label: 'Keychains' },
+                      { id: 'miniatures', label: 'Miniatures' },
+                      { id: 'desk-decor', label: 'Desk Decor' },
+                      { id: 'engineering-models', label: 'Engineering' }
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedFilterCategory(cat.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border text-center transition-all cursor-pointer ${
+                          selectedFilterCategory === cat.id
+                            ? 'bg-primary border-primary text-white font-extrabold'
+                            : 'bg-secondary/40 border-border text-secondary-text hover:border-muted-text'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Apply Button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSearchSubmit}
+                    className="w-full py-2.5 bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer"
+                  >
+                    Apply Filters & Search
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Dropdown Suggestions */}
             {isSearchFocused && (
