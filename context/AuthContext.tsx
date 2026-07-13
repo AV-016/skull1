@@ -61,7 +61,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     router.push('/auth/login')
   }
 
-  const isAdmin = user?.role?.toLowerCase() === 'admin'
+  const getIsAdmin = () => {
+    if (user?.role?.toLowerCase() === 'admin') return true
+    if (typeof window !== 'undefined' && user?.email) {
+      const savedUsersStr = localStorage.getItem('skulture_admin_users')
+      if (savedUsersStr) {
+        try {
+          const savedUsers = JSON.parse(savedUsersStr)
+          const matchedUser = savedUsers.find((u: any) => u.email.toLowerCase() === user.email.toLowerCase())
+          if (matchedUser && matchedUser.roleId !== 'customer') {
+            return true
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+    return false
+  }
+
+  const isAdmin = getIsAdmin()
+
+  useEffect(() => {
+    if (user) {
+      const hasAdminAccess = getIsAdmin()
+      if (hasAdminAccess) {
+        setCookie('userRole', 'admin')
+      } else {
+        setCookie('userRole', user.role || 'customer')
+      }
+    }
+  }, [user])
 
   const value: AuthContextType = {
     user,

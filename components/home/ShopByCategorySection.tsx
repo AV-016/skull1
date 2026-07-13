@@ -102,7 +102,7 @@ export const ShopByCategorySection = () => {
   }
 
   return (
-    <section className="py-24 bg-background border-b border-border">
+    <section className="py-24 bg-background bg-drafting-grid border-b border-border">
       <div className="container mx-auto px-4 md:px-6">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-4">

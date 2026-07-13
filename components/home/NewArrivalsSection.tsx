@@ -76,7 +76,7 @@ export function NewArrivalsSection() {
   }
 
   return (
-    <section id="new-arrivals" className="py-24 bg-background border-b border-border relative">
+    <section id="new-arrivals" className="py-24 bg-background bg-drafting-grid border-b border-border relative">
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Section Heading with navigation buttons */}

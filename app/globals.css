@@ -132,6 +132,14 @@
 
 /* Glassmorphism & Premium Effects */
 @layer utilities {
+  .bg-drafting-grid {
+    background-image: 
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-position: center center;
+  }
+
   .glassmorphic {
     @apply backdrop-blur-xl border border-border rounded-lg bg-card/20;
   }

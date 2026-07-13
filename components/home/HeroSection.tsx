@@ -94,13 +94,13 @@ export const HeroSection = () => {
   }
 
   return (
-    <section className="min-h-screen flex items-center justify-center relative overflow-hidden bg-background pt-28 pb-16">
+    <section className="min-h-screen flex items-center justify-center relative overflow-hidden bg-transparent bg-drafting-grid pt-28 pb-16">
       {/* Soft background glow */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl -z-10 pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent-hover/5 rounded-full blur-3xl -z-10 pointer-events-none" />
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl z-0 pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent/5 rounded-full blur-3xl z-0 pointer-events-none" />
 
       {/* Technical Watermarks, Grid Marks & Abstract Drafting Backdrop */}
-      <div className="absolute inset-0 pointer-events-none select-none -z-5 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
         <div className="absolute top-28 left-6 font-mono text-[9px] text-muted-text/30 tracking-widest">
           SYS_STATUS: ACTIVE // BED_TEMP: 60°C // NOZZLE_DIA: 0.4MM
         </div>
@@ -177,7 +177,7 @@ export const HeroSection = () => {
         <div className="absolute bottom-6 right-6 w-4 h-4 border-b-2 border-r-2 border-primary/30" />
       </div>
 
-      <div className="container mx-auto px-4 md:px-6 w-full">
+      <div className="container mx-auto px-4 md:px-6 w-full relative z-10">
         <motion.div
           className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center"
           variants={containerVariants}
@@ -386,6 +386,19 @@ export const HeroSection = () => {
             </motion.div>
           </div>
         </motion.div>
+      </div>
+
+      {/* Bottom gradient fade to blend with the rest of the dark sections */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none z-10" />
+
+      {/* Scroll Down Indicator */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none z-20">
+        <span className="text-[8px] font-mono tracking-widest text-muted-text/50 uppercase">Scroll to explore</span>
+        <motion.div 
+          animate={{ y: [0, 6, 0] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          className="w-1 h-3 bg-primary rounded-full"
+        />
       </div>
     </section>
   )

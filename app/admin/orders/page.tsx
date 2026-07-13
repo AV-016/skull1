@@ -22,6 +22,29 @@ export default function AdminOrders() {
   const [openStatusMenuOrderId, setOpenStatusMenuOrderId] = useState<string | null>(null)
   const [revertAlert, setRevertAlert] = useState<{ orderId: string, status: string, secondsLeft: number } | null>(null)
 
+  const [sortField, setSortField] = useState<string>('createdAt')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const renderSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ChevronDown className="w-3 h-3 text-muted-text/40 shrink-0" />
+    }
+    return sortDirection === 'asc' ? (
+      <ChevronUp className="w-3 h-3 text-primary shrink-0" />
+    ) : (
+      <ChevronDown className="w-3 h-3 text-primary shrink-0" />
+    )
+  }
+
   // Countdown timer for status revert warning
   useEffect(() => {
     if (!revertAlert) return
@@ -136,9 +159,27 @@ export default function AdminOrders() {
     return matchesSearch && matchesStatus
   })
 
-  const totalItems = filteredOrders.length
+  const sortedOrders = [...filteredOrders].sort((a: any, b: any) => {
+    let comparison = 0
+    if (sortField === 'id') {
+      const aVal = a.orderNumber || a.id
+      const bVal = b.orderNumber || b.id
+      comparison = aVal.localeCompare(bVal)
+    } else if (sortField === 'createdAt') {
+      const aVal = new Date(a.createdAt).getTime()
+      const bVal = new Date(b.createdAt).getTime()
+      comparison = aVal - bVal
+    } else if (sortField === 'totalAmount') {
+      const aVal = a.totalAmount || a.total || 0
+      const bVal = b.totalAmount || b.total || 0
+      comparison = aVal - bVal
+    }
+    return sortDirection === 'asc' ? comparison : -comparison
+  })
+
+  const totalItems = sortedOrders.length
   const totalPages = Math.ceil(totalItems / currentLimit)
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * currentLimit, currentPage * currentLimit)
+  const paginatedOrders = sortedOrders.slice((currentPage - 1) * currentLimit, currentPage * currentLimit)
 
   const handleStatusChangeRaw = async (id: string, status: string) => {
     let trackingId = ''
@@ -290,10 +331,34 @@ export default function AdminOrders() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border/60 bg-secondary/40 text-[10px] font-bold text-muted-text uppercase tracking-widest">
-                  <th className="px-6 py-4">Order ID</th>
+                  <th className="px-6 py-4">
+                    <button
+                      onClick={() => handleSort('id')}
+                      className="flex items-center gap-1 hover:text-primary-text smooth-transition uppercase font-bold tracking-widest focus:outline-none"
+                    >
+                      <span>Order ID</span>
+                      {renderSortIcon('id')}
+                    </button>
+                  </th>
                   <th className="px-6 py-4">Customer Email</th>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Total Amount</th>
+                  <th className="px-6 py-4">
+                    <button
+                      onClick={() => handleSort('createdAt')}
+                      className="flex items-center gap-1 hover:text-primary-text smooth-transition uppercase font-bold tracking-widest focus:outline-none"
+                    >
+                      <span>Date</span>
+                      {renderSortIcon('createdAt')}
+                    </button>
+                  </th>
+                  <th className="px-6 py-4">
+                    <button
+                      onClick={() => handleSort('totalAmount')}
+                      className="flex items-center gap-1 hover:text-primary-text smooth-transition uppercase font-bold tracking-widest focus:outline-none"
+                    >
+                      <span>Total Amount</span>
+                      {renderSortIcon('totalAmount')}
+                    </button>
+                  </th>
                   <th className="px-6 py-4">Payment</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>

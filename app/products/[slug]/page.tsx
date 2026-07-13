@@ -18,7 +18,7 @@ import { useOrders } from '@/hooks/useOrders'
 export default function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = React.use(params)
   const slug = resolvedParams.slug
-  
+
   const { data: product, isLoading, error } = useProductDetail(slug)
   const { formatPrice } = useSettings()
 
@@ -29,8 +29,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const router = useRouter()
   const [isDescExpanded, setIsDescExpanded] = useState(false)
   const { user } = useAuth()
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [selectedVariant, setSelectedVariant] = useState<any>(null)
 
   const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({
     transform: 'scale(1)',
@@ -53,10 +51,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
       transformOrigin: 'center center'
     })
   }
-
   const sanitizedProduct = useMemo(() => {
     return product ? sanitizeProducts([product])[0] : null
   }, [product])
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [selectedVariant, setSelectedVariant] = useState<any>(null)
 
   const { data: orders = [] } = useOrders()
 
@@ -144,12 +144,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const displayImages = (selectedVariant && selectedVariant.images && selectedVariant.images.length > 0)
     ? selectedVariant.images
     : (sanitizedProduct?.images && sanitizedProduct.images.length > 0
-        ? sanitizedProduct.images
-        : [sanitizedProduct?.image || '/placeholder.jpg']);
+      ? sanitizedProduct.images
+      : [sanitizedProduct?.image || '/placeholder.jpg']);
 
   useEffect(() => {
     if (displayImages.length <= 1) return;
-    
+
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
     }, 4000); // auto slide every 4 seconds
@@ -230,7 +230,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
     if (typeof window !== 'undefined') {
       const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]')
       let updatedWishlist = []
-      
+
       if (isInWishlist) {
         updatedWishlist = wishlist.filter((item: any) => item.id !== sanitizedProduct.id)
         setIsInWishlist(false)
@@ -238,7 +238,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
         updatedWishlist = [...wishlist, sanitizedProduct]
         setIsInWishlist(true)
       }
-      
+
       localStorage.setItem('wishlist', JSON.stringify(updatedWishlist))
       window.dispatchEvent(new Event('wishlist-updated'))
     }
@@ -248,21 +248,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
 
   const recommendedProducts = (sanitizedProduct && allProducts.length > 0)
     ? (() => {
-        const dbProducts = sanitizeProducts(allProducts)
-        const otherProducts = dbProducts.filter(p => p.id !== sanitizedProduct.id)
-        return [
-          ...otherProducts.filter(p => {
-            const pCat = typeof p.category === 'object' && p.category !== null ? (p.category as any).name : p.category
-            const sCat = typeof sanitizedProduct.category === 'object' && sanitizedProduct.category !== null ? (sanitizedProduct.category as any).name : sanitizedProduct.category
-            return pCat === sCat
-          }),
-          ...otherProducts.filter(p => {
-            const pCat = typeof p.category === 'object' && p.category !== null ? (p.category as any).name : p.category
-            const sCat = typeof sanitizedProduct.category === 'object' && sanitizedProduct.category !== null ? (sanitizedProduct.category as any).name : sanitizedProduct.category
-            return pCat !== sCat
-          })
-        ].slice(0, 4)
-      })()
+      const dbProducts = sanitizeProducts(allProducts)
+      const otherProducts = dbProducts.filter(p => p.id !== sanitizedProduct.id)
+      return [
+        ...otherProducts.filter(p => {
+          const pCat = typeof p.category === 'object' && p.category !== null ? (p.category as any).name : p.category
+          const sCat = typeof sanitizedProduct.category === 'object' && sanitizedProduct.category !== null ? (sanitizedProduct.category as any).name : sanitizedProduct.category
+          return pCat === sCat
+        }),
+        ...otherProducts.filter(p => {
+          const pCat = typeof p.category === 'object' && p.category !== null ? (p.category as any).name : p.category
+          const sCat = typeof sanitizedProduct.category === 'object' && sanitizedProduct.category !== null ? (sanitizedProduct.category as any).name : sanitizedProduct.category
+          return pCat !== sCat
+        })
+      ].slice(0, 4)
+    })()
     : []
 
   useEffect(() => {
@@ -293,7 +293,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
       const currentCart = JSON.parse(localStorage.getItem('cart') || '[]')
       const cartItemId = selectedVariant ? `${sanitizedProduct.id}_${selectedVariant.id}` : sanitizedProduct.id
       const existing = currentCart.find((item: any) => item.id === cartItemId)
-      
+
       const currentQty = existing ? existing.quantity : 0
       if (currentQty + quantity > stock) {
         const allowed = stock - currentQty
@@ -427,7 +427,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
           >
             {/* Image Slider */}
             <div className="space-y-4">
-              <div 
+              <div
                 className="relative aspect-square rounded-lg overflow-hidden bg-secondary border border-border group cursor-zoom-in"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
@@ -480,9 +480,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                         key={idx}
                         type="button"
                         onClick={() => setCurrentImageIndex(idx)}
-                        className={`w-2 h-2 rounded-full smooth-transition ${
-                          idx === currentImageIndex ? 'bg-primary w-4' : 'bg-white/40 hover:bg-white/70'
-                        }`}
+                        className={`w-2 h-2 rounded-full smooth-transition ${idx === currentImageIndex ? 'bg-primary w-4' : 'bg-white/40 hover:bg-white/70'
+                          }`}
                       />
                     ))}
                   </div>
@@ -497,9 +496,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                       key={idx}
                       type="button"
                       onClick={() => setCurrentImageIndex(idx)}
-                      className={`relative w-20 aspect-square rounded overflow-hidden border smooth-transition bg-secondary flex-shrink-0 ${
-                        idx === currentImageIndex ? 'border-primary shadow-md' : 'border-border opacity-70 hover:opacity-100'
-                      }`}
+                      className={`relative w-20 aspect-square rounded overflow-hidden border smooth-transition bg-secondary flex-shrink-0 ${idx === currentImageIndex ? 'border-primary shadow-md' : 'border-border opacity-70 hover:opacity-100'
+                        }`}
                     >
                       <img src={url} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
                     </button>
@@ -516,258 +514,255 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                   ← Products
                 </Link>
 
-                 {/* Title & Wishlist */}
-                 <div className="flex items-center justify-between gap-4 mt-4 mb-2">
-                   <h1 className="heading-2 text-primary-text">{sanitizedProduct.name}</h1>
-                   <button
-                     type="button"
-                     onClick={toggleWishlist}
-                     className="p-2.5 border border-border text-primary-text rounded-full hover:bg-secondary smooth-transition cursor-pointer flex items-center justify-center"
-                     title={isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
-                   >
-                     <Heart
-                       className={`w-5 h-5 transition-colors ${
-                         isInWishlist ? 'fill-red-500 text-red-500' : 'text-secondary-text'
-                       }`}
-                     />
-                   </button>
-                 </div>
-
-                 {/* Rating below title */}
-                 {sanitizedProduct.reviewsCount > 0 && (
-                   <div className="flex items-center gap-2 mb-4">
-                     <div className="flex text-primary">
-                       {[...Array(5)].map((_, i) => (
-                         <Star
-                           key={i}
-                           className={`w-4 h-4 ${
-                             i < Math.floor(sanitizedProduct.rating)
-                               ? 'fill-primary text-primary'
-                               : 'text-white/10'
-                           }`}
-                         />
-                       ))}
-                     </div>
-                     <span className="text-sm text-secondary-text font-medium">
-                       {sanitizedProduct.rating} / 5 ({sanitizedProduct.reviewsCount} {sanitizedProduct.reviewsCount === 1 ? 'review' : 'reviews'})
-                     </span>
-                   </div>
-                 )}
-
-                 {/* Category */}
-                 <div className="flex items-center gap-2 mb-6">
-                   <span className="text-xs bg-secondary text-primary border border-border px-3 py-1 rounded-full font-semibold">
-                     {sanitizedProduct.category}
-                   </span>
-                 </div>
-
-                 {/* Variant Selector */}
-                 {sanitizedProduct.variants && sanitizedProduct.variants.length > 0 && (
-                   <div className="mb-6 space-y-2">
-                     <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
-                       Select Option
-                     </span>
-                     <div className="flex flex-wrap gap-2">
-                       {sanitizedProduct.variants.map((v: any) => {
-                         const isSelected = selectedVariant?.id === v.id;
-                         return (
-                           <button
-                             key={v.id}
-                             type="button"
-                             onClick={() => {
-                               setSelectedVariant(v);
-                               setCurrentImageIndex(0);
-                             }}
-                             className={`px-4 py-2 border text-xs font-semibold rounded-lg smooth-transition cursor-pointer ${
-                               isSelected
-                                 ? 'bg-primary text-white border-primary shadow-sm font-bold'
-                                 : 'border-border bg-secondary/35 text-secondary-text hover:border-primary/50 hover:text-primary-text'
-                             }`}
-                           >
-                             {v.name}
-                           </button>
-                         );
-                       })}
-                     </div>
-                   </div>
-                 )}
-
-                 {/* Description */}
-                 <div className="text-secondary-text leading-relaxed mb-8">
-                   {sanitizedProduct.description.length > 250 ? (
-                     <p className="whitespace-pre-line">
-                       {isDescExpanded
-                         ? sanitizedProduct.description
-                         : `${sanitizedProduct.description.slice(0, 250)}...`}
-                       <button
-                         type="button"
-                         onClick={() => setIsDescExpanded(!isDescExpanded)}
-                         className="text-primary hover:underline font-bold ml-2 focus:outline-none inline-block cursor-pointer"
-                       >
-                         {isDescExpanded ? 'Read Less' : 'Read More'}
-                       </button>
-                     </p>
-                   ) : (
-                     <p className="whitespace-pre-line">{sanitizedProduct.description}</p>
-                   )}
-                 </div>
-
-                 {/* Specifications */}
-                 {sanitizedProduct.specifications && Object.keys(sanitizedProduct.specifications).length > 0 && (
-                   <div className="mb-8">
-                     <h3 className="font-semibold text-primary-text mb-4">Specifications</h3>
-                     <div className="space-y-3">
-                       {Object.entries(sanitizedProduct.specifications).map(([key, value]) => (
-                         <div key={key} className="flex justify-between border-b border-border pb-2">
-                           <span className="text-secondary-text capitalize">{key}</span>
-                           <span className="text-primary-text font-medium">{value}</span>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-                 )}
-               </div>
-
-                {/* Pincode Checker */}
-                <div className="mb-6 border-t border-border/60 pt-6 space-y-2">
-                  <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
-                    Delivery Availability
-                  </span>
-                  <div className="flex gap-2 max-w-sm">
-                    <input
-                      type="text"
-                      placeholder="Enter 6-digit Pincode"
-                      value={pincode}
-                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="flex-1 px-3 py-2 bg-secondary border border-border text-xs text-primary-text focus:outline-none focus:border-primary/55 rounded-lg"
+                {/* Title & Wishlist */}
+                <div className="flex items-center justify-between gap-4 mt-4 mb-2">
+                  <h1 className="heading-2 text-primary-text">{sanitizedProduct.name}</h1>
+                  <button
+                    type="button"
+                    onClick={toggleWishlist}
+                    className="p-2.5 border border-border text-primary-text rounded-full hover:bg-secondary smooth-transition cursor-pointer flex items-center justify-center"
+                    title={isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                  >
+                    <Heart
+                      className={`w-5 h-5 transition-colors ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-secondary-text'
+                        }`}
                     />
-                    <button
-                      type="button"
-                      onClick={() => handleCheckPincode(pincode)}
-                      disabled={checkingPincode || pincode.length !== 6}
-                      className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-                    >
-                      {checkingPincode ? 'Checking...' : 'Check'}
-                    </button>
-                  </div>
-                  {pincodeResult && (
-                    <div className="mt-2 text-xs max-w-sm">
-                      {pincodeResult.success ? (
-                        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 space-y-1">
-                          <p className="font-bold flex items-center gap-1.5">
-                            <span>✓ Deliverable</span>
-                          </p>
-                          <p className="text-secondary-text">
-                            Estimated Delivery: <span className="text-primary-text font-semibold">{pincodeResult.estimatedDelivery}</span>
-                          </p>
-                          <p className="text-secondary-text">
-                            Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge)}</span>
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
-                          <p className="font-bold">✗ Not Deliverable</p>
-                          <p className="text-secondary-text mt-0.5">{pincodeResult.error}</p>
-                        </div>
-                      )}
+                  </button>
+                </div>
+
+                {/* Rating below title */}
+                {sanitizedProduct.reviewsCount > 0 && (
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex text-primary">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${i < Math.floor(sanitizedProduct.rating)
+                            ? 'fill-primary text-primary'
+                            : 'text-white/10'
+                            }`}
+                        />
+                      ))}
                     </div>
+                    <span className="text-sm text-secondary-text font-medium">
+                      {sanitizedProduct.rating} / 5 ({sanitizedProduct.reviewsCount} {sanitizedProduct.reviewsCount === 1 ? 'review' : 'reviews'})
+                    </span>
+                  </div>
+                )}
+
+                {/* Category */}
+                <div className="flex items-center gap-2 mb-6">
+                  <span className="text-xs bg-secondary text-primary border border-border px-3 py-1 rounded-full font-semibold">
+                    {sanitizedProduct.category}
+                  </span>
+                </div>
+
+                {/* Variant Selector */}
+                {sanitizedProduct.variants && sanitizedProduct.variants.length > 0 && (
+                  <div className="mb-6 space-y-2">
+                    <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                      Select Option
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {sanitizedProduct.variants.map((v: any) => {
+                        const isSelected = selectedVariant?.id === v.id;
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedVariant(v);
+                              setCurrentImageIndex(0);
+                            }}
+                            className={`px-4 py-2 border text-xs font-semibold rounded-lg smooth-transition cursor-pointer ${isSelected
+                              ? 'bg-primary text-white border-primary shadow-sm font-bold'
+                              : 'border-border bg-secondary/35 text-secondary-text hover:border-primary/50 hover:text-primary-text'
+                              }`}
+                          >
+                            {v.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Description */}
+                <div className="text-secondary-text leading-relaxed mb-8">
+                  {sanitizedProduct.description.length > 250 ? (
+                    <p className="whitespace-pre-line">
+                      {isDescExpanded
+                        ? sanitizedProduct.description
+                        : `${sanitizedProduct.description.slice(0, 250)}...`}
+                      <button
+                        type="button"
+                        onClick={() => setIsDescExpanded(!isDescExpanded)}
+                        className="text-primary hover:underline font-bold ml-2 focus:outline-none inline-block cursor-pointer"
+                      >
+                        {isDescExpanded ? 'Read Less' : 'Read More'}
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="whitespace-pre-line">{sanitizedProduct.description}</p>
                   )}
                 </div>
 
-                {/* Purchase Section */}
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">
-                 {/* Left Side: Pricing & Quantity */}
-                 <div className="space-y-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-baseline gap-2">
-                        {sanitizedProduct.eventPromo ? (
-                          <>
-                            <span className="text-4xl font-bold text-primary">
-                              {formatPrice(currentFinalPrice)}
-                            </span>
-                            <span className="text-xl text-muted-text line-through font-semibold">
-                              {formatPrice(currentOriginalPrice)}
-                            </span>
-                          </>
-                        ) : sanitizedProduct.compareAtPrice && sanitizedProduct.compareAtPrice > currentOriginalPrice ? (
-                          <>
-                            <span className="text-4xl font-bold text-primary-text">
-                              {formatPrice(currentOriginalPrice)}
-                            </span>
-                            <span className="text-xl text-muted-text line-through font-semibold">
-                              {formatPrice(sanitizedProduct.compareAtPrice)}
-                            </span>
-                          </>
-                        ) : (
+                {/* Specifications */}
+                {sanitizedProduct.specifications && Object.keys(sanitizedProduct.specifications).length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="font-semibold text-primary-text mb-4">Specifications</h3>
+                    <div className="space-y-3">
+                      {Object.entries(sanitizedProduct.specifications).map(([key, value]) => (
+                        <div key={key} className="flex justify-between border-b border-border pb-2">
+                          <span className="text-secondary-text capitalize">{key}</span>
+                          <span className="text-primary-text font-medium">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pincode Checker */}
+              <div className="mb-6 border-t border-border/60 pt-6 space-y-2">
+                <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                  Delivery Availability
+                </span>
+                <div className="flex gap-2 max-w-sm">
+                  <input
+                    type="text"
+                    placeholder="Enter 6-digit Pincode"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="flex-1 px-3 py-2 bg-secondary border border-border text-xs text-primary-text focus:outline-none focus:border-primary/55 rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleCheckPincode(pincode)}
+                    disabled={checkingPincode || pincode.length !== 6}
+                    className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    {checkingPincode ? 'Checking...' : 'Check'}
+                  </button>
+                </div>
+                {pincodeResult && (
+                  <div className="mt-2 text-xs max-w-sm">
+                    {pincodeResult.success ? (
+                      <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 space-y-1">
+                        <p className="font-bold flex items-center gap-1.5">
+                          <span>✓ Deliverable</span>
+                        </p>
+                        <p className="text-secondary-text">
+                          Estimated Delivery: <span className="text-primary-text font-semibold">{pincodeResult.estimatedDelivery}</span>
+                        </p>
+                        <p className="text-secondary-text">
+                          Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge)}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+                        <p className="font-bold">✗ Not Deliverable</p>
+                        <p className="text-secondary-text mt-0.5">{pincodeResult.error}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Purchase Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">
+                {/* Left Side: Pricing & Quantity */}
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-baseline gap-2">
+                      {sanitizedProduct.eventPromo ? (
+                        <>
+                          <span className="text-4xl font-bold text-primary">
+                            {formatPrice(currentFinalPrice)}
+                          </span>
+                          <span className="text-xl text-muted-text line-through font-semibold">
+                            {formatPrice(currentOriginalPrice)}
+                          </span>
+                        </>
+                      ) : sanitizedProduct.compareAtPrice && sanitizedProduct.compareAtPrice > currentOriginalPrice ? (
+                        <>
                           <span className="text-4xl font-bold text-primary-text">
                             {formatPrice(currentOriginalPrice)}
                           </span>
-                        )}
-                        <span className="text-secondary-text text-sm">per unit</span>
+                          <span className="text-xl text-muted-text line-through font-semibold">
+                            {formatPrice(sanitizedProduct.compareAtPrice)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-4xl font-bold text-primary-text">
+                          {formatPrice(currentOriginalPrice)}
+                        </span>
+                      )}
+                      <span className="text-secondary-text text-sm">per unit</span>
+                    </div>
+                    {sanitizedProduct.eventPromo ? (
+                      <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
+                        {sanitizedProduct.eventPromo.discountPercentage}% OFF — Under {sanitizedProduct.eventPromo.eventTitle}
+                      </span>
+                    ) : sanitizedProduct.compareAtPrice && sanitizedProduct.compareAtPrice > currentOriginalPrice ? (
+                      <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
+                        ↓{Math.round(((sanitizedProduct.compareAtPrice - currentOriginalPrice) / sanitizedProduct.compareAtPrice) * 100)}% OFF
+                      </span>
+                    ) : null}
+                    {sanitizedProduct.bestSellerOrder && sanitizedProduct.bestSellerOrder > 0 ? (
+                      <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1.5 flex items-center gap-1.5 shadow-sm">
+                        🔥 #{sanitizedProduct.bestSellerOrder} Best Seller
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Stock Info */}
+                  <div className="text-sm">
+                    {(() => {
+                      const stock = selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0);
+                      if (stock <= 0) {
+                        return <span className="text-red-500 font-semibold">Out of Stock</span>;
+                      }
+                      if (stock < 5) {
+                        return <span className="text-orange-500 font-semibold">Few stock left!!</span>;
+                      }
+                      return <span className="text-green-500 font-semibold">In Stock</span>;
+                    })()}
+                  </div>
+
+                  {/* Quantity */}
+                  {(selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0)) > 0 && (
+                    <div className="flex items-center gap-4">
+                      <label className="text-sm font-medium text-primary-text">Quantity:</label>
+                      <div className="flex items-center border border-border rounded-lg bg-secondary/35">
+                        <button
+                          type="button"
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
+                        >
+                          −
+                        </button>
+                        <span className="px-6 py-2 text-primary-text border-l border-r border-border">
+                          {quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuantity(
+                              Math.min(
+                                selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0),
+                                quantity + 1
+                              )
+                            )
+                          }
+                          className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
+                        >
+                          +
+                        </button>
                       </div>
-                      {sanitizedProduct.eventPromo ? (
-                        <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
-                          {sanitizedProduct.eventPromo.discountPercentage}% OFF — Under {sanitizedProduct.eventPromo.eventTitle}
-                        </span>
-                      ) : sanitizedProduct.compareAtPrice && sanitizedProduct.compareAtPrice > currentOriginalPrice ? (
-                        <span className="text-xs bg-green-500/10 text-green-500 border border-green-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1">
-                          ↓{Math.round(((sanitizedProduct.compareAtPrice - currentOriginalPrice) / sanitizedProduct.compareAtPrice) * 100)}% OFF
-                        </span>
-                      ) : null}
-                      {sanitizedProduct.bestSellerOrder && sanitizedProduct.bestSellerOrder > 0 ? (
-                        <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider w-max mt-1.5 flex items-center gap-1.5 shadow-sm">
-                          🔥 #{sanitizedProduct.bestSellerOrder} Best Seller
-                        </span>
-                      ) : null}
                     </div>
-
-                    {/* Stock Info */}
-                    <div className="text-sm">
-                      {(() => {
-                        const stock = selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0);
-                        if (stock <= 0) {
-                          return <span className="text-red-500 font-semibold">Out of Stock</span>;
-                        }
-                        if (stock < 5) {
-                          return <span className="text-orange-500 font-semibold">Few stock left!!</span>;
-                        }
-                        return <span className="text-green-500 font-semibold">In Stock</span>;
-                      })()}
-                    </div>
-
-                   {/* Quantity */}
-                   {(selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0)) > 0 && (
-                     <div className="flex items-center gap-4">
-                       <label className="text-sm font-medium text-primary-text">Quantity:</label>
-                       <div className="flex items-center border border-border rounded-lg bg-secondary/35">
-                         <button
-                           type="button"
-                           onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                           className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
-                         >
-                           −
-                         </button>
-                         <span className="px-6 py-2 text-primary-text border-l border-r border-border">
-                           {quantity}
-                         </span>
-                         <button
-                           type="button"
-                           onClick={() =>
-                             setQuantity(
-                               Math.min(
-                                 selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0),
-                                 quantity + 1
-                               )
-                             )
-                           }
-                           className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
-                         >
-                           +
-                         </button>
-                       </div>
-                     </div>
-                   )}
-                 </div>
+                  )}
+                </div>
 
                 {/* Right Side: Stacked Add to Cart and Buy Now Buttons */}
                 <div className="flex flex-col gap-3">
@@ -804,7 +799,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
       <div className="border-t border-border mt-16 py-16 bg-secondary/5">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="heading-3 mb-8">Ratings & Reviews</h2>
-          
+
           {loadingReviews ? (
             <p className="text-secondary-text">Loading reviews...</p>
           ) : reviews.length === 0 ? (
@@ -826,31 +821,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex text-primary gap-0.5">
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          className={`w-4 h-4 ${
-                            i < review.rating ? 'fill-primary text-primary' : 'text-white/10'
-                          }`}
+                          className={`w-4 h-4 ${i < review.rating ? 'fill-primary text-primary' : 'text-white/10'
+                            }`}
                         />
                       ))}
                     </div>
                   </div>
-                  
+
                   <p className="text-secondary-text text-sm leading-relaxed whitespace-pre-wrap pl-1">
                     {review.comment || 'No comment provided.'}
                   </p>
-                  
+
                   {review.images && review.images.length > 0 && (
                     <div className="flex flex-wrap gap-2.5 pt-3 pl-1">
                       {review.images.map((img: any) => (
-                        <a 
-                          key={img.id} 
-                          href={img.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
+                        <a
+                          key={img.id}
+                          href={img.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="relative w-16 h-16 border border-border/80 hover:border-primary rounded-lg overflow-hidden bg-secondary smooth-transition block cursor-zoom-in"
                         >
                           <img src={img.url} alt="Review attachment" className="w-full h-full object-cover" />
@@ -910,7 +904,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
               onClick={() => setIsSupportModalOpen(false)}
               className="absolute inset-0 bg-background/80 backdrop-blur-sm"
             />
-            
+
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

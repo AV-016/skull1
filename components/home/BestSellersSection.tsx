@@ -88,7 +88,7 @@ export function BestSellersSection() {
   }
 
   return (
-    <section id="best-sellers" className="py-24 bg-secondary border-b border-border">
+    <section id="best-sellers" className="py-24 bg-secondary bg-drafting-grid border-b border-border">
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Section Heading */}

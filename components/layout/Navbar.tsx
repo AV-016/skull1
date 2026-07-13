@@ -21,7 +21,7 @@ export const Navbar = () => {
   const [cartCount, setCartCount] = useState(0);
   const router = useRouter();
   const { appearance, accent, setAppearance, setAccent } = useSettings();
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
 
   // Notification States
   const [notifications, setNotifications] = useState<any[]>([])
@@ -507,7 +507,7 @@ export const Navbar = () => {
                       </div>
                       
                       {/* Dropdown Links */}
-                      {user.role?.toLowerCase() === 'admin' && (
+                      {isAdmin && (
                         <Link
                           href="/admin"
                           onClick={() => setIsProfileOpen(false)}
