@@ -1252,7 +1252,7 @@ export default function OrderDetailPage() {
               <div className="pt-4 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
                 {status === 'CANCELLED' ? (
                   <p className="text-xs text-red-400 font-medium">No invoice available for cancelled orders.</p>
-                ) : order.paymentStatus === 'PAID' || status === 'DELIVERED' ? (
+                ) : order.paymentStatus === 'PAID' || status === 'DELIVERED' || order.paymentMethod === 'COD' || ['CONFIRMED', 'PROCESSING', 'SHIPPED'].includes(status) ? (
                   <>
                     <p className="text-xs text-muted-text">A detailed tax invoice and packaging slip is ready for print.</p>
                     <Link

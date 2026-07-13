@@ -46,9 +46,20 @@ export default function OrderInvoicePage() {
   // Redirect customer if they try to access admin-only delivery label
   useEffect(() => {
     if (layoutMode === 'delivery' && !isAdmin) {
-      setLayoutMode('label')
+      setLayoutMode('invoice')
     }
   }, [layoutMode, isAdmin])
+
+  // Set default layout mode based on user role (invoice for customers, label for admins)
+  useEffect(() => {
+    if (user) {
+      if (isAdmin) {
+        setLayoutMode('label')
+      } else {
+        setLayoutMode('invoice')
+      }
+    }
+  }, [user, isAdmin])
 
   // Auto trigger print dialog if query param is set and data is loaded
   useEffect(() => {
