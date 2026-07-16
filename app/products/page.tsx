@@ -304,7 +304,9 @@ function ProductsContent() {
                       >
                         All Themes
                       </button>
-                      {serverTags.map((tag: any) => (
+                      {serverTags
+                        .filter((tag: any) => !['resin', 'tabletop', 'pla'].includes(tag.slug.toLowerCase()))
+                        .map((tag: any) => (
                         <button
                           key={tag.id}
                           onClick={() => setSelectedTag(tag.slug)}

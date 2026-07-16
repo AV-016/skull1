@@ -27,11 +27,11 @@ export function BestSellersSection() {
   }
 
   // Select the large featured hero product
-  const heroProduct = featuredDbProducts[0]
-    || sanitizedServer.find((p) => p.slug === 'shogun-cyber-oni-figure') 
-    || sanitizedServer[0] 
-    || mockProducts.find((p) => p.slug === 'shogun-cyber-oni-figure') 
-    || mockProducts[0]
+  const heroProduct = featuredDbProducts[0] || sanitizedServer[0]
+
+  if (!heroProduct) {
+    return null
+  }
 
   // Select supporting products (up to 4 items)
   const supportingProducts: any[] = []
@@ -40,33 +40,10 @@ export function BestSellersSection() {
   supportingProducts.push(...featuredDbProducts.slice(1))
 
   // 2. Add other active database products to fill up slots if needed
-  if (supportingProducts.length < 4) {
-    const otherDbProducts = sanitizedServer.filter(
-      (p) => p.id !== heroProduct.id && !supportingProducts.some((sp) => sp.id === p.id) && p.isActive
-    )
-    supportingProducts.push(...otherDbProducts)
-  }
-
-  // 3. Fallback to mock popular products if we still have fewer than 4 items
-  const defaultSupporting = [
-    mockProducts.find((p) => p.slug === 'fractal-kinetic-sculpture') || mockProducts[1],
-    mockProducts.find((p) => p.slug === 'parametric-origami-vase') || mockProducts[4],
-    mockProducts.find((p) => p.slug === 'articulated-crystal-dragon') || mockProducts[3],
-    mockProducts.find((p) => p.slug === 'cyberpunk-artisan-keycaps') || mockProducts[2]
-  ]
-
-  let fallbackIdx = 0
-  while (supportingProducts.length < 4 && fallbackIdx < defaultSupporting.length) {
-    const fallbackItem = defaultSupporting[fallbackIdx]
-    if (
-      fallbackItem.id !== heroProduct.id && 
-      fallbackItem.slug !== heroProduct.slug &&
-      !supportingProducts.some((sp) => sp.id === fallbackItem.id || sp.slug === fallbackItem.slug)
-    ) {
-      supportingProducts.push(fallbackItem)
-    }
-    fallbackIdx++
-  }
+  const otherDbProducts = sanitizedServer.filter(
+    (p) => p.id !== heroProduct.id && !supportingProducts.some((sp) => sp.id === p.id) && p.isActive
+  )
+  supportingProducts.push(...otherDbProducts)
 
   const finalSupporting = supportingProducts.slice(0, 4)
 

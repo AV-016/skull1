@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { LoginForm } from '@/components/auth/LoginForm'
 
@@ -7,7 +8,9 @@ export default function LoginPage() {
       title="Welcome Back"
       subtitle="Sign in to access your account"
     >
-      <LoginForm />
+      <Suspense fallback={<div className="text-xs text-muted-text">Loading form...</div>}>
+        <LoginForm />
+      </Suspense>
     </AuthLayout>
   )
 }

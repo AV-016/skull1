@@ -221,7 +221,7 @@ export const mockProducts: ExtendedProduct[] = [
 
 export const sanitizeProducts = (products: Product[]): ExtendedProduct[] => {
   if (!products || products.length === 0) {
-    return mockProducts
+    return []
   }
 
   return products.map((prod) => {

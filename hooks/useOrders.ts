@@ -3,7 +3,7 @@ import { api } from '@/lib/api'
 import { queryKeys } from '@/lib/queryKeys'
 import type { Order } from '@/lib/types'
 
-export function useOrders() {
+export function useOrders(options?: { enabled?: boolean }) {
   return useQuery<Order[]>({
     queryKey: queryKeys.orders(),
     queryFn: async () => {
@@ -11,6 +11,7 @@ export function useOrders() {
       return response.data.data
     },
     staleTime: 5 * 60 * 1000,
+    ...options
   })
 }
 

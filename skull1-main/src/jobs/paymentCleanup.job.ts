@@ -1,3 +1,4 @@
+// Payment Cleanup Job: Automatically runs periodically to cancel unpaid orders and return reserved products to inventory stock.
 import logger from '../utils/logger';
 import { prisma } from '../config/database';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
@@ -9,10 +10,11 @@ export const startPaymentCleanupJob = () => {
     try {
       logger.info('Running Payment Cleanup Job...');
       
+      // Define cleanup threshold (e.g., unpaid order is older than 30 minutes)
       const cutoffDate = new Date();
-      cutoffDate.setMinutes(cutoffDate.getMinutes() - 30); // 30 minutes limit
+      cutoffDate.setMinutes(cutoffDate.getMinutes() - 30); 
 
-      // Query orders that have been pending payment for more than 30 minutes
+      // Step 1: Query orders that remain pending payment for more than 30 minutes
       const expiredOrders = await prisma.order.findMany({
         where: {
           status: OrderStatus.PENDING,
@@ -26,14 +28,16 @@ export const startPaymentCleanupJob = () => {
 
       logger.info(`Found ${expiredOrders.length} expired orders to cleanup.`);
 
+      // Step 2: Process cancellation and inventory replenishment for each expired order
       for (const order of expiredOrders) {
         await prisma.$transaction(async (tx) => {
-          // 1. Cancel order
+          // Cancel order status
           await tx.order.update({
             where: { id: order.id },
             data: { status: OrderStatus.CANCELLED },
           });
 
+          // Log status history transition
           await tx.orderStatusHistory.create({
             data: {
               orderId: order.id,
@@ -42,7 +46,7 @@ export const startPaymentCleanupJob = () => {
             },
           });
 
-          // 2. Return products or variants to stock atomically
+          // Replenish stock for each item in the cancelled order
           for (const item of order.items) {
             if (item.variantId) {
               await tx.productVariant.update({
@@ -72,7 +76,7 @@ export const startPaymentCleanupJob = () => {
     } catch (error) {
       logger.error('Error running Payment Cleanup Job:', error);
     }
-  }, 30 * 60 * 1000); // 30 minutes interval
+  }, 30 * 60 * 1000); // Run interval: 30 minutes
 };
 
 export default startPaymentCleanupJob;

@@ -26,6 +26,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [reviews, setReviews] = useState<any[]>([])
   const [loadingReviews, setLoadingReviews] = useState(true)
+  const [visibleReviewsCount, setVisibleReviewsCount] = useState(3)
   const router = useRouter()
   const [isDescExpanded, setIsDescExpanded] = useState(false)
   const { user } = useAuth()
@@ -58,7 +59,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
 
-  const { data: orders = [] } = useOrders()
+  const { data: orders = [] } = useOrders({ enabled: !!user })
 
   const [pincode, setPincode] = useState('')
   const [pincodeResult, setPincodeResult] = useState<{
@@ -350,6 +351,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
 
   const handleBuyNow = () => {
     if (!sanitizedProduct) return
+
+    if (!user) {
+      router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))
+      return
+    }
 
     const stock = selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0)
     if (stock <= 0) {
@@ -656,7 +662,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                           Estimated Delivery: <span className="text-primary-text font-semibold">{pincodeResult.estimatedDelivery}</span>
                         </p>
                         <p className="text-secondary-text">
-                          Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge)}</span>
+                          Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge ?? 0)}</span>
                         </p>
                       </div>
                     ) : (
@@ -805,55 +811,121 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
           ) : reviews.length === 0 ? (
             <p className="text-secondary-text italic bg-secondary/10 p-6 rounded-lg border border-border">No reviews yet for this product. Be the first to leave one!</p>
           ) : (
-            <div className="space-y-6 max-w-3xl">
-              {reviews.map((review: any) => (
-                <div key={review.id} className="bg-card border border-border p-6 rounded-xl space-y-3 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-primary">
-                        {review.user?.name ? review.user.name.charAt(0).toUpperCase() : 'U'}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column: Reviews List */}
+              <div className="lg:col-span-7 space-y-6">
+                {reviews.slice(0, visibleReviewsCount).map((review: any) => (
+                  <div key={review.id} className="bg-card border border-border p-6 rounded-xl space-y-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-primary">
+                          {review.user?.name ? review.user.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-primary-text">{review.user?.name || 'Anonymous User'}</h4>
+                          <p className="text-xs text-muted-text flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(review.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-primary-text">{review.user?.name || 'Anonymous User'}</h4>
-                        <p className="text-xs text-muted-text flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(review.createdAt).toLocaleDateString()}
-                        </p>
+
+                      <div className="flex text-primary gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${i < review.rating ? 'fill-primary text-primary' : 'text-white/10'
+                              }`}
+                          />
+                        ))}
                       </div>
                     </div>
 
-                    <div className="flex text-primary gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${i < review.rating ? 'fill-primary text-primary' : 'text-white/10'
-                            }`}
-                        />
-                      ))}
+                    <p className="text-secondary-text text-sm leading-relaxed whitespace-pre-wrap pl-1">
+                      {review.comment || 'No comment provided.'}
+                    </p>
+
+                    {review.images && review.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2.5 pt-3 pl-1">
+                        {review.images.map((img: any) => (
+                          <a
+                            key={img.id}
+                            href={img.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="relative w-16 h-16 border border-border/80 hover:border-primary rounded-lg overflow-hidden bg-secondary smooth-transition block cursor-zoom-in"
+                          >
+                            <img src={img.url} alt="Review attachment" className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {reviews.length > visibleReviewsCount && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={() => setVisibleReviewsCount(prev => prev + 5)}
+                      className="px-6 py-2.5 border border-border hover:bg-secondary text-primary-text font-bold uppercase tracking-wider text-[10px] smooth-transition rounded-xl cursor-pointer"
+                    >
+                      View More Reviews
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Rating Distribution Breakdown */}
+              <div className="lg:col-span-5 bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                <h3 className="font-bold text-xs uppercase tracking-widest text-primary-text">
+                  Product Ratings & Reviews
+                </h3>
+                
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="text-center sm:border-r sm:border-border/80 sm:pr-8 py-2">
+                    <div className="text-5xl font-black text-primary flex items-center justify-center gap-1">
+                      {(() => {
+                        const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
+                        return (totalRating / reviews.length).toFixed(1);
+                      })()}
+                      <span className="text-3xl text-primary">★</span>
                     </div>
+                    <p className="text-[10px] text-muted-text uppercase tracking-wider mt-2 font-semibold whitespace-nowrap">
+                      {reviews.length} Ratings, {reviews.length} Reviews
+                    </p>
                   </div>
 
-                  <p className="text-secondary-text text-sm leading-relaxed whitespace-pre-wrap pl-1">
-                    {review.comment || 'No comment provided.'}
-                  </p>
+                  <div className="flex-1 w-full space-y-2.5">
+                    {(() => {
+                      const total = reviews.length;
+                      const counts = [
+                        { label: 'Excellent', stars: 5, color: 'bg-green-500' },
+                        { label: 'Very Good', stars: 4, color: 'bg-green-500' },
+                        { label: 'Good', stars: 3, color: 'bg-yellow-500' },
+                        { label: 'Average', stars: 2, color: 'bg-orange-500' },
+                        { label: 'Poor', stars: 1, color: 'bg-red-500' }
+                      ].map(item => {
+                        const count = reviews.filter(r => r.rating === item.stars).length;
+                        const percentage = total > 0 ? (count / total) * 100 : 0;
+                        return { ...item, count, percentage };
+                      });
 
-                  {review.images && review.images.length > 0 && (
-                    <div className="flex flex-wrap gap-2.5 pt-3 pl-1">
-                      {review.images.map((img: any) => (
-                        <a
-                          key={img.id}
-                          href={img.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="relative w-16 h-16 border border-border/80 hover:border-primary rounded-lg overflow-hidden bg-secondary smooth-transition block cursor-zoom-in"
-                        >
-                          <img src={img.url} alt="Review attachment" className="w-full h-full object-cover" />
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                      return counts.map((item) => (
+                        <div key={item.stars} className="flex items-center justify-between gap-3 text-[10px]">
+                          <span className="w-16 font-semibold text-secondary-text">{item.label}</span>
+                          <div className="flex-1 h-2 bg-secondary/60 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${item.color} rounded-full`} 
+                              style={{ width: `${item.percentage}%` }}
+                            />
+                          </div>
+                          <span className="w-8 text-right font-bold text-primary-text">{item.count}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>

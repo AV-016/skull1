@@ -51,7 +51,6 @@ api.interceptors.response.use(
       if (
         url === '/products' ||
         url === '/products/featured' ||
-        url === '/categories' ||
         url.includes('/products/slug/')
       ) {
         try {
@@ -72,7 +71,6 @@ api.interceptors.response.use(
       if (
         url === '/products' ||
         url === '/products/featured' ||
-        url === '/categories' ||
         url.includes('/products/slug/')
       ) {
         const cached = localStorage.getItem(`api-cache:${url}`)
@@ -96,15 +94,13 @@ api.interceptors.response.use(
         console.log(`[API Cache] No cache for ${url}, constructing mock fallback response`)
         let fallbackData: any = null
         if (url === '/products') {
-          fallbackData = { success: true, data: mockProducts }
+          fallbackData = { success: true, data: [] }
         } else if (url === '/products/featured') {
-          fallbackData = { success: true, data: mockProducts.filter(p => p.featured) }
+          fallbackData = { success: true, data: [] }
         } else if (url === '/categories') {
           fallbackData = { success: true, data: mockCategories }
         } else if (url.includes('/products/slug/')) {
-          const slug = url.split('/').pop() || ''
-          const product = mockProducts.find(p => p.slug === slug)
-          fallbackData = { success: true, data: product || mockProducts[0] }
+          fallbackData = { success: true, data: null }
         }
 
         if (fallbackData) {

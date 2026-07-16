@@ -486,18 +486,24 @@ function CheckoutContent() {
         window.dispatchEvent(new Event('cart-updated'))
       }
 
-      // If online card payment, trigger Razorpay checkout
+      // =========================================================
+      // 5. Payment Gateway Handling (Razorpay / Cash-On-Delivery)
+      // =========================================================
+      
+      // If online card payment, trigger Razorpay checkout flow
       if (paymentMethod === 'CARD') {
+        // Ensure Razorpay SDK script is loaded in window
         if (typeof window === 'undefined' || !(window as any).Razorpay) {
           throw new Error('Razorpay SDK failed to load. Please refresh the page and try again.')
         }
 
-        // Call backend to create Razorpay order
+        // Call backend API endpoint to initialize/get Razorpay Order Session ID
         const paymentRes = await api.post('/payments/create-order', {
           orderId: order.id
         })
         const rzpOrder = paymentRes.data.data
 
+        // Configure Razorpay Checkout overlay options
         const options = {
           key: rzpOrder.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
           amount: rzpOrder.amount,
@@ -505,12 +511,13 @@ function CheckoutContent() {
           name: 'Skulture',
           description: `Order #${rzpOrder.orderNumber}`,
           order_id: rzpOrder.razorpayOrderId,
+          // Callback handler executed when payment succeeds on Razorpay popup
           handler: async function (response: any) {
             try {
               setIsSubmitting(true)
               setSubmitError(null)
               
-              // Verify payment signature on backend
+              // Verify the payment signature securely on the backend server
               await api.post('/payments/verify', {
                 orderId: order.id,
                 razorpayOrderId: response.razorpay_order_id,
@@ -518,7 +525,7 @@ function CheckoutContent() {
                 razorpaySignature: response.razorpay_signature,
               })
 
-              // Refresh profile data to clear stamps/discount in context
+              // Refresh user profile details in application context to update stamps/discounts
               try {
                 const userRes = await api.get('/auth/me')
                 if (userRes.data?.success && userRes.data?.data) {
@@ -528,7 +535,7 @@ function CheckoutContent() {
                 console.error('Error refreshing profile:', e)
               }
 
-              // 4. Clear local storage cart
+              // Clear matching shopping items from local storage
               if (typeof window !== 'undefined') {
                 if (isBuyNow) {
                   localStorage.removeItem('buyNowItem')
@@ -537,6 +544,7 @@ function CheckoutContent() {
                   window.dispatchEvent(new Event('cart-updated'))
                 }
               }
+              // Redirect user to the order confirmation page
               router.push(`/orders/${order.id}?payment_success=true`)
             } catch (verifyErr: any) {
               console.error('Payment verification error:', verifyErr)
@@ -554,12 +562,14 @@ function CheckoutContent() {
             color: '#000000',
           },
           modal: {
+            // Callback when user cancels payment by closing Razorpay checkout popup
             ondismiss: function () {
               handlePaymentFailure(order.id, 'cancelled', '', cartItems)
             }
           }
         }
 
+        // Initialize and open Razorpay Checkout UI Modal
         const rzp = new (window as any).Razorpay(options)
         rzp.on('payment.failed', function (response: any) {
           console.error('Razorpay payment failed:', response.error)
@@ -567,9 +577,9 @@ function CheckoutContent() {
         })
         rzp.open()
       } else {
-        // Cash on delivery: complete order directly
+        // Cash on delivery: complete order directly without starting Razorpay gateway flow
         
-        // Refresh profile data to clear stamps/discount in context
+        // Refresh user profile details in application context to update stamps/discounts
         try {
           const userRes = await api.get('/auth/me')
           if (userRes.data?.success && userRes.data?.data) {
@@ -579,7 +589,7 @@ function CheckoutContent() {
           console.error('Error refreshing profile:', e)
         }
 
-        // 4. Clear local storage cart
+        // Clear matching shopping items from local storage
         if (typeof window !== 'undefined') {
           if (isBuyNow) {
             localStorage.removeItem('buyNowItem')

@@ -6,7 +6,12 @@ export class CategoryService {
   async getCategories(): Promise<Category[]> {
     return prisma.category.findMany({
       orderBy: { name: 'asc' },
-    });
+      include: {
+        _count: {
+          select: { products: true }
+        }
+      }
+    }) as any;
   }
 
   async getCategoryById(id: string): Promise<Category> {

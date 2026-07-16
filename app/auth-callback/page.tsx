@@ -27,8 +27,16 @@ function CallbackHandler() {
       api.get('/auth/me')
         .then((response) => {
           if (response.data?.success && response.data?.data) {
+            let targetRedirect = '/dashboard'
+            if (typeof window !== 'undefined') {
+              const oauthRedirect = sessionStorage.getItem('oauth_redirect')
+              if (oauthRedirect) {
+                targetRedirect = oauthRedirect
+                sessionStorage.removeItem('oauth_redirect')
+              }
+            }
             login(token, response.data.data)
-            router.replace('/dashboard')
+            router.replace(targetRedirect)
           } else {
             removeToken()
             router.replace('/auth/login?error=invalid_token')

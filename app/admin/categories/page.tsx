@@ -221,7 +221,7 @@ export default function AdminCategories() {
                     </p>
                   </div>
                   <div className="mt-6 pt-4 border-t border-border/40 flex justify-between items-center text-[10px] text-muted-text uppercase font-bold tracking-widest">
-                    <span>Slug: {cat.slug}</span>
+                    <span>Slug: {cat.slug} ({cat._count?.products || 0} products)</span>
                     <span className="flex items-center gap-1">
                       <Info className="w-3.5 h-3.5" /> Active
                     </span>

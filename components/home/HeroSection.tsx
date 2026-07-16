@@ -62,9 +62,30 @@ export const HeroSection = () => {
     return name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 16) + '.STL'
   }
 
-  // Helper to dynamically cycle through available products or mockProducts fallback
+  const PLACEHOLDER_PRODUCT = {
+    id: 'placeholder',
+    slug: 'no-product',
+    name: 'Featured Model',
+    description: 'Add products in your admin dashboard to feature them here.',
+    price: 0,
+    stock: 0,
+    image: '/placeholder.jpg',
+    images: ['/placeholder.jpg'],
+    category: 'General',
+    specifications: {
+      'Material': 'PLA/Resin',
+      'Scale': 'N/A',
+      'Dimensions': 'N/A'
+    },
+    featured: false,
+    rating: 0,
+    reviewsCount: 0
+  }
+
+  // Helper to dynamically cycle through available products or placeholder fallback
   const getProduct = (index: number) => {
-    const list = products.length > 0 ? products : mockProducts
+    const list = products.length > 0 ? products : []
+    if (list.length === 0) return PLACEHOLDER_PRODUCT
     return list[index % list.length]
   }
 

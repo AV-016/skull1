@@ -6,12 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema, LoginFormData } from '@/lib/validators'
 import { useLogin } from '@/hooks/useAuth'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ShieldAlert } from 'lucide-react'
 
 export const LoginForm = () => {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const { register, handleSubmit, formState: { errors }, watch } = useForm<LoginFormData>({
@@ -23,12 +25,15 @@ export const LoginForm = () => {
   const onSubmit = (data: LoginFormData) => {
     login(data, {
       onSuccess: () => {
-        router.push('/dashboard')
+        router.push(redirect || '/dashboard')
       },
     })
   }
 
   const handleGoogleLogin = () => {
+    if (typeof window !== 'undefined' && redirect) {
+      sessionStorage.setItem('oauth_redirect', redirect)
+    }
     // In production, direct to API OAuth endpoint
     window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/google`
   }

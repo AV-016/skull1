@@ -1,3 +1,4 @@
+// PaymentController: Orchestrates incoming Express requests, calling PaymentService for payment business logic.
 import { Request, Response, NextFunction } from 'express';
 import { PaymentService } from '../services/payment.service';
 import MESSAGES from '../constants/messages';
@@ -5,6 +6,7 @@ import MESSAGES from '../constants/messages';
 const paymentService = new PaymentService();
 
 export class PaymentController {
+  // POST /api/payments/create-order: Creates a transaction/session order on Razorpay for a given order ID.
   async createOrder(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
@@ -20,6 +22,7 @@ export class PaymentController {
     }
   }
 
+  // POST /api/payments/verify: Verifies the authenticity of Razorpay signature response submitted by frontend.
   async verify(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
@@ -40,6 +43,7 @@ export class PaymentController {
     }
   }
 
+  // POST /api/payments/webhook: Public endpoint to handle event status updates sent directly from Razorpay (e.g. captured or failed payments).
   async webhook(req: Request, res: Response, next: NextFunction) {
     try {
       const signature = req.headers['x-razorpay-signature'] as string;
@@ -54,6 +58,7 @@ export class PaymentController {
     }
   }
 
+  // GET /api/admin/payments: Retrieves a paginated list of all payment logs (Admin only).
   async getAllPayments(req: Request, res: Response, next: NextFunction) {
     try {
       const page = req.query.page ? Number(req.query.page) : 1;
@@ -70,6 +75,7 @@ export class PaymentController {
     }
   }
 
+  // GET /api/admin/payments/:id: Retrieves a single payment record by database ID (Admin only).
   async getPaymentById(req: Request, res: Response, next: NextFunction) {
     try {
       const payment = await paymentService.getPaymentById(req.params.id);
