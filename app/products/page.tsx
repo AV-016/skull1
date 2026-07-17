@@ -24,6 +24,7 @@ function ProductsContent() {
   const [maxPrice, setMaxPrice] = useState(85900)
   const [selectedDeal, setSelectedDeal] = useState('all')
   const [selectedColour, setSelectedColour] = useState<string | null>(null)
+  const [minRating, setMinRating] = useState<number | null>(null)
 
   const COLOURS = [
     { name: 'Black', value: '#000000' },
@@ -138,8 +139,13 @@ function ProductsContent() {
       );
     }
 
+    // Rating Filter
+    if (minRating !== null) {
+      list = list.filter((p: any) => p.rating >= minRating);
+    }
+
     return list;
-  }, [sanitizedProducts, minPrice, maxPrice, selectedDeal, selectedColour])
+  }, [sanitizedProducts, minPrice, maxPrice, selectedDeal, selectedColour, minRating])
 
   return (
     <main className="min-h-screen bg-background bg-drafting-grid text-primary-text transition-colors duration-300">
@@ -152,11 +158,34 @@ function ProductsContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
+            className="flex flex-col md:flex-row md:items-center justify-between gap-4"
           >
-            <h1 className="heading-2 text-primary-text mb-1">Our Products</h1>
-            <p className="text-secondary-text max-w-2xl text-xs">
-              Discover our premium 3D printing products and custom manufacturing solutions
-            </p>
+            <div>
+              <h1 className="heading-2 text-primary-text mb-1">Our Products</h1>
+              <p className="text-secondary-text max-w-2xl text-xs">
+                Discover our premium 3D printing products and custom manufacturing solutions
+              </p>
+            </div>
+            
+            {/* Rating Filter */}
+            <div className="flex items-center gap-2 bg-secondary/20 border border-border/80 px-3 py-2 rounded-xl w-max">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-text mr-1">Rating:</span>
+              <div className="flex gap-1">
+                {[null, 4, 3, 2].map((rVal) => (
+                  <button
+                    key={rVal ?? 'all'}
+                    onClick={() => setMinRating(rVal)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                      minRating === rVal
+                        ? 'bg-primary text-white shadow-md'
+                        : 'bg-secondary/40 hover:bg-secondary text-primary-text'
+                    }`}
+                  >
+                    {rVal === null ? 'All' : `${rVal}★ & Up`}
+                  </button>
+                ))}
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
@@ -168,7 +197,7 @@ function ProductsContent() {
             {/* Filters Sidebar */}
             <div className="lg:col-span-1">
               <motion.div
-                className="sticky top-24 space-y-6"
+                className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pr-2 pb-6 space-y-6 scrollbar-none"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6 }}

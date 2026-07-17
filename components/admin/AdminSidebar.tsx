@@ -39,7 +39,6 @@ export function AdminSidebar() {
     { label: 'Custom Requests', href: '/admin/custom-requests', icon: Sparkles },
     { label: 'Reviews', href: '/admin/reviews', icon: Star },
     { label: 'Email Inquiries', href: '/admin/inquiries', icon: Mail },
-    { label: 'Loyalty Stamps', href: '/admin/loyalty', icon: Award },
     // { label: 'Roles & Permissions', href: '/admin/roles', icon: Shield },
     { label: 'Settings', href: '/admin/settings', icon: Settings },
   ]

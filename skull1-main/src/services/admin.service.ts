@@ -97,7 +97,12 @@ export class AdminService {
 
   async getPendingLoyaltyDiscounts(): Promise<any> {
     return prisma.user.findMany({
-      where: { loyaltyDiscountPending: true },
+      where: {
+        OR: [
+          { loyaltyDiscountPending: true },
+          { loyaltyDiscountSet: true }
+        ]
+      },
       select: {
         id: true,
         name: true,
@@ -105,6 +110,8 @@ export class AdminService {
         phone: true,
         loyaltyStamps: true,
         loyaltyDiscountValue: true,
+        loyaltyDiscountSet: true,
+        loyaltyDiscountPending: true,
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -115,7 +122,7 @@ export class AdminService {
       where: { id: userId },
       data: {
         loyaltyDiscountValue: discountValue,
-        loyaltyDiscountSet: true,
+        loyaltyDiscountSet: discountValue > 0,
         loyaltyDiscountPending: false,
       },
     });

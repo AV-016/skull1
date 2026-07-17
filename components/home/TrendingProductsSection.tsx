@@ -163,54 +163,27 @@ export const TrendingProductsSection = () => {
     <section id="trending" className="py-24 bg-background bg-drafting-grid border-b border-border relative">
       <div className="container mx-auto px-4 md:px-6">
         
-        {/* Section Heading with Carousel Buttons */}
-        <div className="flex justify-between items-end mb-12">
-          <div>
-            <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-3">Trending Now</h2>
-            <h3 className="heading-2 text-primary-text">Featured Products</h3>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => scroll('left')}
-              className="w-12 h-12 rounded-xl border border-border bg-card hover:border-primary hover:text-primary text-primary-text flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => scroll('right')}
-              className="w-12 h-12 rounded-xl border border-border bg-card hover:border-primary hover:text-primary text-primary-text flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+        {/* Section Heading */}
+        <div className="mb-12">
+          <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-3">Trending Now</h2>
+          <h3 className="heading-2 text-primary-text">Featured Products</h3>
         </div>
 
-        {/* Carousel Container */}
-        <div
-          ref={scrollContainerRef}
-          className="flex overflow-x-auto gap-6 pb-8 scroll-smooth scrollbar-none snap-x snap-mandatory cursor-grab active:cursor-grabbing select-none"
-          style={{ scrollbarWidth: 'none' }}
-          onMouseDown={handleMouseDown}
-          onMouseLeave={handleMouseLeave}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleMouseUp}
-          onTouchMove={handleTouchMove}
-        >
+        {/* Grid Container */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {isLoading ? (
             // Skeleton Loader
-            [...Array(4)].map((_, i) => (
+            [...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="w-[280px] sm:w-[320px] shrink-0 bg-secondary rounded-2xl h-[450px] animate-pulse border border-border"
+                className="w-full bg-secondary rounded-2xl h-[450px] animate-pulse border border-border"
               />
             ))
           ) : (
-            products.map((product) => (
+            products.slice(0, 16).map((product) => (
               <div
                 key={product.id}
-                className="w-[280px] sm:w-[320px] shrink-0 snap-start bg-card border border-border hover:border-primary/20 rounded-2xl overflow-hidden shadow-lg group transition-all duration-300 flex flex-col justify-between"
+                className="w-full bg-card border border-border hover:border-primary/20 rounded-2xl overflow-hidden shadow-lg group transition-all duration-300 flex flex-col justify-between"
               >
                 <Link
                   href={`/products/${product.slug}`}
@@ -223,7 +196,7 @@ export const TrendingProductsSection = () => {
                       src={product.image}
                       alt={product.name}
                       draggable={false}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out pointer-events-none"
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700 ease-out pointer-events-none"
                     />
 
                     {/* New Badge */}
@@ -333,6 +306,16 @@ export const TrendingProductsSection = () => {
               </div>
             ))
           )}
+        </div>
+
+        {/* Explore More Button */}
+        <div className="flex justify-center mt-12">
+          <Link
+            href="/products"
+            className="inline-flex items-center justify-center px-8 py-3.5 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl transition-all duration-300 text-xs uppercase tracking-wider cursor-pointer shadow-lg hover:scale-105 active:scale-95"
+          >
+            Explore More
+          </Link>
         </div>
       </div>
 

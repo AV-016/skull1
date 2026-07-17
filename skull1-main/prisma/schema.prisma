@@ -343,6 +343,8 @@ model Settings {
   platformFeeValue  Float    @default(0.0)
   volumetricDivisor Float    @default(5000.0)
   returnAddress     String   @default("123 Maker Street, Print City, Filament State, 12345")
+  loyaltyMinDiscount Float   @default(15.0)
+  loyaltyMaxDiscount Float   @default(25.0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }

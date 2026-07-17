@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AdminLayout } from '@/components/admin/AdminLayout'
-import { Save, Loader2, Plus, Trash2, Edit2, Check, X, ShieldAlert } from 'lucide-react'
+import { Save, Loader2, Plus, Trash2, Edit2, Check, X, ShieldAlert, Sparkles, Award, Settings } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useAdminPendingLoyalty, useApproveLoyaltyDiscount } from '@/hooks/useAdmin'
 
 interface ShippingRate {
   id: string
@@ -29,7 +30,12 @@ export default function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'general' | 'payment' | 'support' | 'shipping'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'payment' | 'support' | 'shipping' | 'loyalty'>('general')
+  const [loyaltyMinDiscount, setLoyaltyMinDiscount] = useState<number>(15)
+  const [loyaltyMaxDiscount, setLoyaltyMaxDiscount] = useState<number>(25)
+  const [discountInputs, setDiscountInputs] = useState<Record<string, number>>({})
+  const { data: pendingUsers, refetch: refetchLoyalty } = useAdminPendingLoyalty()
+  const approveMutation = useApproveLoyaltyDiscount()
 
   // Support Email OTP states & handlers
   const [supportEmail, setSupportEmail] = useState('sanchit7613@gmail.com')
@@ -115,6 +121,8 @@ export default function AdminSettings() {
           setVolumetricDivisor(res.data.data.volumetricDivisor ?? 5000.0)
           setSupportEmail(res.data.data.supportEmail || 'sanchit7613@gmail.com')
           setReturnAddress(res.data.data.returnAddress || '123 Maker Street, Print City, Filament State, 12345')
+          setLoyaltyMinDiscount(res.data.data.loyaltyMinDiscount ?? 15)
+          setLoyaltyMaxDiscount(res.data.data.loyaltyMaxDiscount ?? 25)
         }
       })
       .catch(err => {
@@ -141,7 +149,9 @@ export default function AdminSettings() {
         platformFeeType,
         platformFeeValue: Number(platformFeeValue),
         volumetricDivisor: Number(volumetricDivisor),
-        returnAddress
+        returnAddress,
+        loyaltyMinDiscount: Number(loyaltyMinDiscount),
+        loyaltyMaxDiscount: Number(loyaltyMaxDiscount),
       })
       setSuccessMsg('Settings updated successfully!')
       setTimeout(() => setSuccessMsg(null), 3000)
@@ -205,6 +215,28 @@ export default function AdminSettings() {
     }
   }
 
+  const handleLoyaltyInputChange = (userId: string, val: string) => {
+    const num = Number(val)
+    if (!isNaN(num) && num >= 0 && num <= 100) {
+      setDiscountInputs((prev) => ({
+        ...prev,
+        [userId]: num,
+      }))
+    }
+  }
+
+  const handleLoyaltyApprove = async (userId: string, defaultValue: number) => {
+    const value = discountInputs[userId] ?? defaultValue ?? 20
+    try {
+      await approveMutation.mutateAsync({ userId, discountValue: value })
+      alert(value > 0 ? 'Discount successfully updated!' : 'Discount successfully revoked!')
+      refetchLoyalty()
+    } catch (err) {
+      console.error(err)
+      alert('Failed to update discount.')
+    }
+  }
+
   return (
     <AdminLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 max-w-4xl pb-16">
@@ -220,6 +252,7 @@ export default function AdminSettings() {
             { id: 'payment', label: 'Payment & Tax Settings' },
             { id: 'support', label: 'Support Contacts' },
             { id: 'shipping', label: 'Shipping Slabs' },
+            { id: 'loyalty', label: 'Loyalty Stamps' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -654,6 +687,136 @@ export default function AdminSettings() {
                       </table>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: LOYALTY STAMPS */}
+            {activeTab === 'loyalty' && (
+              <div className="space-y-6">
+                {/* Slab settings card */}
+                <div className="glass-card p-6 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-1">Loyalty Discount Slab Settings</h3>
+                    <p className="text-xs text-white/50 mb-6">Configure the minimum and maximum range of next-order discount percentages automatically awarded upon filling 8 stamps.</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-[10px] font-black text-white/70 uppercase tracking-wider mb-2">Min Discount %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={loyaltyMinDiscount}
+                          onChange={(e) => setLoyaltyMinDiscount(Number(e.target.value))}
+                          className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-white/70 uppercase tracking-wider mb-2">Max Discount %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={loyaltyMaxDiscount}
+                          onChange={(e) => setLoyaltyMaxDiscount(Number(e.target.value))}
+                          className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:border-white/30 text-white focus:outline-none text-sm transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Save Slab settings */}
+                  <div className="border-t border-white/10 pt-6 flex justify-end">
+                    <button
+                      onClick={handleSaveSettings}
+                      disabled={isSaving}
+                      className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white font-semibold rounded-lg text-sm transition-all duration-300 shadow-lg shadow-primary/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="w-4.5 h-4.5" />
+                      {isSaving ? 'Saving...' : 'Save Slab Settings'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Loyalty users card */}
+                <div className="glass-card p-6 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-1 font-bold">Active & Pending Loyalty Discounts</h3>
+                    <p className="text-xs text-white/50 mb-6">Manage individual user discounts. Set value to 0 and save to revoke.</p>
+
+                    {pendingUsers && pendingUsers.length > 0 ? (
+                      <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/5">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-white/10 bg-white/5 text-white/60 font-bold uppercase tracking-wider">
+                              <th className="p-3">Name</th>
+                              <th className="p-3">Email</th>
+                              <th className="p-3 text-center">Stamps</th>
+                              <th className="p-3">Status</th>
+                              <th className="p-3">Discount % Off</th>
+                              <th className="p-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/10 text-white/85">
+                            {pendingUsers.map((user: any) => (
+                              <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                                <td className="p-3 font-semibold text-white">{user.name}</td>
+                                <td className="p-3 text-white/70">{user.email}</td>
+                                <td className="p-3 text-center font-bold text-yellow-500">{user.loyaltyStamps}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                    user.loyaltyDiscountSet
+                                      ? 'bg-green-500/10 text-green-500 border border-green-500/25'
+                                      : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/25'
+                                  }`}>
+                                    {user.loyaltyDiscountSet ? 'Active' : 'Pending'}
+                                  </span>
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="100"
+                                      value={discountInputs[user.id] !== undefined ? discountInputs[user.id] : (user.loyaltyDiscountValue || 20)}
+                                      onChange={(e) => handleLoyaltyInputChange(user.id, e.target.value)}
+                                      className="w-14 px-2 py-1 bg-white/5 border border-white/10 focus:outline-none focus:border-primary/50 text-xs font-semibold rounded text-center text-white"
+                                    />
+                                    <span>%</span>
+                                  </div>
+                                </td>
+                                <td className="p-3 text-right flex justify-end gap-2">
+                                  <button
+                                    onClick={() => handleLoyaltyApprove(user.id, user.loyaltyDiscountValue)}
+                                    disabled={approveMutation.isPending}
+                                    className="px-2.5 py-1 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white text-[10px] font-bold uppercase rounded transition cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    {user.loyaltyDiscountSet ? 'Update' : 'Approve'}
+                                  </button>
+                                  {user.loyaltyDiscountSet && (
+                                    <button
+                                      onClick={() => handleLoyaltyApprove(user.id, 0)}
+                                      disabled={approveMutation.isPending}
+                                      className="px-2.5 py-1 bg-red-600/10 hover:bg-red-600 border border-red-500/20 text-red-500 hover:text-white disabled:opacity-50 text-[10px] font-bold uppercase rounded transition cursor-pointer flex items-center gap-1"
+                                      title="Revoke"
+                                    >
+                                      Revoke
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 border border-dashed border-white/10 rounded-xl bg-white/5 text-white/40 text-xs">
+                        No users currently have active or pending loyalty discounts.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

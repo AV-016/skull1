@@ -160,9 +160,18 @@ export class OrderRepository {
         };
         
         if (newStamps >= 8) {
-          updates.loyaltyDiscountPending = true;
-          // Assign random discount between 15 and 25 percent
-          updates.loyaltyDiscountValue = Math.floor(Math.random() * 11) + 15;
+          const settings = await tx.settings.findUnique({
+            where: { id: 'global' },
+            select: { loyaltyMinDiscount: true, loyaltyMaxDiscount: true },
+          });
+          const minD = settings?.loyaltyMinDiscount ?? 15;
+          const maxD = settings?.loyaltyMaxDiscount ?? 25;
+          const diff = Math.max(0, maxD - minD);
+          const randomDiscount = Math.floor(Math.random() * (diff + 1)) + minD;
+
+          updates.loyaltyDiscountPending = false;
+          updates.loyaltyDiscountSet = true;
+          updates.loyaltyDiscountValue = randomDiscount;
         }
 
         await tx.user.update({

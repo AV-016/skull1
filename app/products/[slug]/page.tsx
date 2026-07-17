@@ -8,7 +8,7 @@ import { useProductDetail, useProducts } from '@/hooks/useProducts'
 import React, { useState, useEffect, useMemo } from 'react'
 import { sanitizeProducts } from '@/lib/mockProducts'
 import { useSettings } from '@/context/SettingsContext'
-import { ShoppingCart, Star, Calendar, Heart, MessageSquare, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ShoppingCart, Star, Calendar, Heart, MessageSquare, X, ChevronLeft, ChevronRight, ShieldCheck, Truck, Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { ProductCard } from '@/components/products/ProductCard'
@@ -434,17 +434,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             {/* Image Slider */}
             <div className="space-y-4">
               <div
-                className="relative aspect-square rounded-lg overflow-hidden bg-secondary border border-border group cursor-zoom-in"
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
+                className="relative aspect-square rounded-lg overflow-hidden bg-secondary border border-border group"
               >
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={currentImageIndex}
                     src={displayImages[currentImageIndex]}
                     alt={sanitizedProduct.name}
-                    style={zoomStyle}
-                    className="w-full h-full object-cover transition-transform duration-100 ease-out"
+                    className="w-full h-full object-contain"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -510,6 +507,32 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                   ))}
                 </div>
               )}
+              {/* Product Highlights & Trust Badges */}
+              <div className="mt-8 border border-border/80 rounded-2xl p-5 bg-secondary/15 space-y-4">
+                <h4 className="text-[10px] font-black text-secondary-text uppercase tracking-widest border-b border-border/60 pb-2">Why Buy From Skulture?</h4>
+                <div className="space-y-4">
+                  <div className="border-l-2 border-primary pl-3.5">
+                    <h5 className="text-[11px] font-black text-primary-text uppercase tracking-wide">Premium Craftsmanship</h5>
+                    <p className="text-[10px] text-muted-text mt-0.5 leading-relaxed">
+                      Precision 3D printed with premium engineering resins and composite filaments for flawless details and structural strength.
+                    </p>
+                  </div>
+
+                  <div className="border-l-2 border-primary pl-3.5">
+                    <h5 className="text-[11px] font-black text-primary-text uppercase tracking-wide">Safe & Secure Checkout</h5>
+                    <p className="text-[10px] text-muted-text mt-0.5 leading-relaxed">
+                      All payments are processed securely via fully encrypted gateways and verified by Razorpay.
+                    </p>
+                  </div>
+
+                  <div className="border-l-2 border-primary pl-3.5">
+                    <h5 className="text-[11px] font-black text-primary-text uppercase tracking-wide">Nationwide Delivery</h5>
+                    <p className="text-[10px] text-muted-text mt-0.5 leading-relaxed">
+                      Fast and trackable shipping across all major locations in India with secure transit packaging.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Details */}
@@ -629,55 +652,93 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                 )}
               </div>
 
-              {/* Pincode Checker */}
-              <div className="mb-6 border-t border-border/60 pt-6 space-y-2">
-                <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
-                  Delivery Availability
-                </span>
-                <div className="flex gap-2 max-w-sm">
-                  <input
-                    type="text"
-                    placeholder="Enter 6-digit Pincode"
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="flex-1 px-3 py-2 bg-secondary border border-border text-xs text-primary-text focus:outline-none focus:border-primary/55 rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleCheckPincode(pincode)}
-                    disabled={checkingPincode || pincode.length !== 6}
-                    className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-                  >
-                    {checkingPincode ? 'Checking...' : 'Check'}
-                  </button>
+              {/* Pincode Checker & Quantity Section */}
+              <div className="flex flex-col sm:flex-row gap-8 sm:gap-16 mb-6 border-t border-border/60 pt-6 items-start">
+                {/* Pincode Checker */}
+                <div className="space-y-2 w-full sm:w-auto">
+                  <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                    Delivery Availability
+                  </span>
+                  <div className="flex gap-2 max-w-sm">
+                    <input
+                      type="text"
+                      placeholder="Enter 6-digit Pincode"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="flex-1 px-3 py-2 bg-secondary border border-border text-xs text-primary-text focus:outline-none focus:border-primary/55 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleCheckPincode(pincode)}
+                      disabled={checkingPincode || pincode.length !== 6}
+                      className="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      {checkingPincode ? 'Checking...' : 'Check'}
+                    </button>
+                  </div>
+                  {pincodeResult && (
+                    <div className="mt-2 text-xs max-w-sm">
+                      {pincodeResult.success ? (
+                        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 space-y-1">
+                          <p className="font-bold flex items-center gap-1.5">
+                            <span>✓ Deliverable</span>
+                          </p>
+                          <p className="text-secondary-text">
+                            Estimated Delivery: <span className="text-primary-text font-semibold">{pincodeResult.estimatedDelivery}</span>
+                          </p>
+                          <p className="text-secondary-text">
+                            Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge ?? 0)}</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+                          <p className="font-bold">✗ Not Deliverable</p>
+                          <p className="text-secondary-text mt-0.5">{pincodeResult.error}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {pincodeResult && (
-                  <div className="mt-2 text-xs max-w-sm">
-                    {pincodeResult.success ? (
-                      <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 space-y-1">
-                        <p className="font-bold flex items-center gap-1.5">
-                          <span>✓ Deliverable</span>
-                        </p>
-                        <p className="text-secondary-text">
-                          Estimated Delivery: <span className="text-primary-text font-semibold">{pincodeResult.estimatedDelivery}</span>
-                        </p>
-                        <p className="text-secondary-text">
-                          Shipping Charge: <span className="text-primary-text font-semibold">{pincodeResult.shippingCharge === 0 ? 'Free' : formatPrice(pincodeResult.shippingCharge ?? 0)}</span>
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
-                        <p className="font-bold">✗ Not Deliverable</p>
-                        <p className="text-secondary-text mt-0.5">{pincodeResult.error}</p>
-                      </div>
-                    )}
+
+                {/* Quantity */}
+                {(selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0)) > 0 && (
+                  <div className="space-y-2 w-full sm:w-auto">
+                    <span className="block text-[10px] font-bold text-secondary-text uppercase tracking-wider">
+                      Quantity
+                    </span>
+                    <div className="flex items-center border border-border rounded-lg bg-secondary/35 w-max">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
+                      >
+                        −
+                      </button>
+                      <span className="px-6 py-2 text-primary-text border-l border-r border-border text-xs">
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setQuantity(
+                            Math.min(
+                              selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0),
+                              quantity + 1
+                            )
+                          )
+                        }
+                        className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Purchase Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 items-center border-t border-border/60">
-                {/* Left Side: Pricing & Quantity */}
+                {/* Left Side: Pricing */}
                 <div className="space-y-4">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-baseline gap-2">
@@ -735,39 +796,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                       return <span className="text-green-500 font-semibold">In Stock</span>;
                     })()}
                   </div>
-
-                  {/* Quantity */}
-                  {(selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0)) > 0 && (
-                    <div className="flex items-center gap-4">
-                      <label className="text-sm font-medium text-primary-text">Quantity:</label>
-                      <div className="flex items-center border border-border rounded-lg bg-secondary/35">
-                        <button
-                          type="button"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
-                        >
-                          −
-                        </button>
-                        <span className="px-6 py-2 text-primary-text border-l border-r border-border">
-                          {quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setQuantity(
-                              Math.min(
-                                selectedVariant ? (selectedVariant.stock ?? 0) : (sanitizedProduct.stock ?? 0),
-                                quantity + 1
-                              )
-                            )
-                          }
-                          className="px-3 py-2 text-secondary-text hover:text-primary smooth-transition"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Right Side: Stacked Add to Cart and Buy Now Buttons */}

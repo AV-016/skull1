@@ -74,7 +74,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
               '/placeholder.jpg'
             }
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 smooth-transition"
+            className="w-full h-full object-cover object-top group-hover:scale-105 smooth-transition"
           />
           
           {/* Overlay on Hover */}

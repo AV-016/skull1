@@ -9,6 +9,7 @@ import { sanitizeProducts } from '@/lib/mockProducts'
 import api from '@/lib/api'
 import Link from 'next/link'
 import { Calendar, Loader2 } from 'lucide-react'
+import { useProducts } from '@/hooks/useProducts'
 
 const EventCountdown = ({ endDate }: { endDate: string }) => {
   const [timeLeft, setTimeLeft] = useState('')
@@ -75,7 +76,29 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
     }
   }, [id])
 
-  const sanitizedProducts = event?.products ? sanitizeProducts(event.products) : []
+  const sanitizedProducts = event?.products
+    ? sanitizeProducts(
+        event.products.map((prod: any) => ({
+          ...prod,
+          eventPromo: {
+            eventId: event.id,
+            eventTitle: event.title,
+            discountPercentage: event.discountPercentage,
+            discountedPrice: Number((prod.price * (1 - event.discountPercentage / 100)).toFixed(2))
+          }
+        }))
+      )
+    : []
+
+  const { data: allProducts = [] } = useProducts()
+
+  const remainingProducts = allProducts.length > 0
+    ? sanitizeProducts(allProducts).filter(
+        (p: any) => p.isActive && !sanitizedProducts.some((ep: any) => ep.id === p.id)
+      )
+    : []
+
+  const recommendedProducts = remainingProducts.slice(0, 4)
 
   if (isLoading) {
     return (
@@ -170,6 +193,40 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
       </div>
+
+      {/* Recommended Products / Explore More Section */}
+      {recommendedProducts.length > 0 && (
+        <div className="py-16 border-t border-border/60 bg-secondary/15">
+          <div className="container mx-auto px-4 md:px-8 max-w-7xl">
+            <div className="space-y-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-bold text-primary tracking-widest uppercase mb-2">Discover More</h2>
+                  <h3 className="text-2xl font-black text-primary-text uppercase tracking-tight">Trending Items You May Like</h3>
+                </div>
+                <Link
+                  href="/products"
+                  className="text-xs bg-primary hover:bg-primary/95 text-white px-5 py-2.5 rounded-xl font-bold uppercase tracking-wider smooth-transition shadow-md self-start md:self-auto"
+                >
+                  View All Products →
+                </Link>
+              </div>
+
+              <motion.div 
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+              >
+                {recommendedProducts.map((product: any) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </motion.div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </main>
