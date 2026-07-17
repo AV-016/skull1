@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import { useSettings } from '@/context/SettingsContext'
 import api from '@/lib/api'
-import { useProducts } from '@/hooks/useProducts'
+import { useProducts, useCategories } from '@/hooks/useProducts'
 import { sanitizeProducts } from '@/lib/mockProducts'
 
 export const Navbar = () => {
@@ -256,13 +256,16 @@ export const Navbar = () => {
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isProfileOpen, isNotificationsOpen, isFilterOpen]);
-  const suggestions = [
-    'Anime Figures',
-    'Keychains',
-    'Miniatures',
-    'Desk Decor',
-    'Engineering Models',
-  ];
+  const { data: categories = [] } = useCategories();
+  const suggestions = categories.length > 0
+    ? categories.map((cat: any) => cat.name).slice(0, 5)
+    : [
+        'Anime Figures',
+        'Keychains',
+        'Miniatures',
+        'Desk Decor',
+        'Engineering Models',
+      ];
 
   const { data: rawProducts = [] } = useProducts({ limit: 100 });
   const allProducts = sanitizeProducts(rawProducts);
@@ -401,30 +404,31 @@ export const Navbar = () => {
                   </div>
                 </div>
 
-                {/* Category Section */}
+                 {/* Category Section */}
                 <div>
                   <span className="text-[10px] text-muted-text font-black uppercase tracking-widest block mb-2">Category</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'anime-figures', label: 'Anime Figures' },
-                      { id: 'keychains', label: 'Keychains' },
-                      { id: 'miniatures', label: 'Miniatures' },
-                      { id: 'desk-decor', label: 'Desk Decor' },
-                      { id: 'engineering-models', label: 'Engineering' }
-                    ].map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => setSelectedFilterCategory(cat.id)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border text-center transition-all cursor-pointer ${
-                          selectedFilterCategory === cat.id
-                            ? 'bg-primary border-primary text-white font-extrabold'
-                            : 'bg-secondary/40 border-border text-secondary-text hover:border-muted-text'
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {categories.length > 0 ? (
+                      categories
+                        .filter((cat: any) => cat.slug !== 'custom-orders')
+                        .map((cat: any) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setSelectedFilterCategory(selectedFilterCategory === cat.slug ? '' : cat.slug)}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border text-center transition-all cursor-pointer truncate ${
+                              selectedFilterCategory === cat.slug
+                                ? 'bg-primary border-primary text-white font-extrabold'
+                                : 'bg-secondary/40 border-border text-secondary-text hover:border-muted-text'
+                            }`}
+                            title={cat.name}
+                          >
+                            {cat.name}
+                          </button>
+                        ))
+                    ) : (
+                      <span className="text-[10px] text-muted-text italic col-span-2">Loading categories...</span>
+                    )}
                   </div>
                 </div>
 

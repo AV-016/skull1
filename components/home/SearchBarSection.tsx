@@ -4,18 +4,22 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useCategories } from '@/hooks/useProducts'
 
 export const SearchBarSection = () => {
   const [query, setQuery] = useState('')
   const router = useRouter()
+  const { data: categories = [] } = useCategories()
 
-  const suggestions = [
-    'Anime Figures',
-    'Keychains',
-    'Miniatures',
-    'Desk Decor',
-    'Engineering Models'
-  ]
+  const suggestions = categories.length > 0
+    ? categories.map((cat: any) => cat.name).slice(0, 5)
+    : [
+        'Anime Figures',
+        'Keychains',
+        'Miniatures',
+        'Desk Decor',
+        'Engineering Models'
+      ]
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()

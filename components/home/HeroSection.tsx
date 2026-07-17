@@ -122,15 +122,6 @@ export const HeroSection = () => {
 
       {/* Technical Watermarks, Grid Marks & Abstract Drafting Backdrop */}
       <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
-        <div className="absolute top-28 left-6 font-mono text-[9px] text-muted-text/30 tracking-widest">
-          SYS_STATUS: ACTIVE // BED_TEMP: 60°C // NOZZLE_DIA: 0.4MM
-        </div>
-        <div className="absolute bottom-8 left-6 font-mono text-[9px] text-muted-text/30 tracking-widest">
-          AXIS_COORDS: [X: 0.00 Y: 0.00 Z: 0.00]
-        </div>
-        <div className="absolute bottom-8 right-6 font-mono text-[9px] text-muted-text/30 tracking-widest text-right">
-          WORKSPACE: DRAFT_A3_GRID
-        </div>
         <div className="absolute inset-6 border border-border/20 border-dashed" />
 
         {/* Concentric circles bottom-right */}

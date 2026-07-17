@@ -123,7 +123,7 @@ export const ShopByCategorySection = () => {
           whileInView="visible"
           viewport={{ once: true, amount: 0.1 }}
         >
-          {categories.map((category) => (
+          {categories.slice(0, 6).map((category) => (
             <motion.div
               key={category.title}
               variants={itemVariants}
@@ -162,6 +162,33 @@ export const ShopByCategorySection = () => {
               </Link>
             </motion.div>
           ))}
+
+          {categories.length > 6 && (
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ y: -6 }}
+              className="group relative h-80 rounded-2xl overflow-hidden border border-border hover:border-primary/40 transition-all duration-300 bg-secondary/35 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
+            >
+              <Link href="/products" className="block w-full h-full flex flex-col items-center justify-center relative">
+                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                
+                <h4 className="text-xl font-bold text-white tracking-wide group-hover:text-primary transition-colors duration-300">
+                  Search More
+                </h4>
+                <p className="text-xs text-muted-text/80 mt-2 max-w-[200px]">
+                  Explore all our custom designs, models, and specialized collections.
+                </p>
+                
+                <div className="mt-6 px-5 py-2 bg-primary/10 border border-primary/20 group-hover:bg-primary group-hover:text-white rounded-full text-xs font-semibold text-primary transition-all duration-300">
+                  View All Products →
+                </div>
+              </Link>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </section>

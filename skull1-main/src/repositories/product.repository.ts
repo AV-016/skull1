@@ -161,6 +161,9 @@ export class ProductRepository {
       whereClause.OR = [
         { name: { contains: q, mode: 'insensitive' } },
         { description: { contains: q, mode: 'insensitive' } },
+        { tags: { some: { name: { contains: q, mode: 'insensitive' } } } },
+        { tags: { some: { slug: { contains: q, mode: 'insensitive' } } } },
+        { category: { name: { contains: q, mode: 'insensitive' } } },
       ];
     }
 
@@ -185,6 +188,25 @@ export class ProductRepository {
       }),
       prisma.product.count({ where: whereClause }),
     ]);
+
+    if (q) {
+      const qLower = q.toLowerCase();
+      (products as any[]).sort((a: any, b: any) => {
+        const aTagMatch = a.tags?.some((t: any) => t.name.toLowerCase().includes(qLower) || t.slug.toLowerCase().includes(qLower));
+        const bTagMatch = b.tags?.some((t: any) => t.name.toLowerCase().includes(qLower) || t.slug.toLowerCase().includes(qLower));
+
+        if (aTagMatch && !bTagMatch) return -1;
+        if (!aTagMatch && bTagMatch) return 1;
+
+        const aNameMatch = a.name.toLowerCase().includes(qLower);
+        const bNameMatch = b.name.toLowerCase().includes(qLower);
+
+        if (aNameMatch && !bNameMatch) return -1;
+        if (!aNameMatch && bNameMatch) return 1;
+
+        return 0;
+      });
+    }
 
     return {
       products: products as ProductWithDetails[],

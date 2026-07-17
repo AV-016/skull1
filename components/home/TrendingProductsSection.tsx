@@ -28,6 +28,78 @@ export const TrendingProductsSection = () => {
     retry: false
   })
 
+  const [isDragging, setIsDragging] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const [dragMoved, setDragMoved] = useState(false)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return
+    setIsDragging(true)
+    setDragMoved(false)
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft)
+    setScrollLeft(scrollContainerRef.current.scrollLeft)
+    // Disable smooth scrolling temporarily so drag is direct/responsive
+    scrollContainerRef.current.style.scrollBehavior = 'auto'
+    scrollContainerRef.current.style.scrollSnapType = 'none'
+  }
+
+  const handleMouseLeave = () => {
+    if (!isDragging) return
+    setIsDragging(false)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.scrollBehavior = 'smooth'
+      scrollContainerRef.current.style.scrollSnapType = 'x mandatory'
+    }
+  }
+
+  const handleMouseUp = () => {
+    if (!isDragging) return
+    setIsDragging(false)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.scrollBehavior = 'smooth'
+      scrollContainerRef.current.style.scrollSnapType = 'x mandatory'
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollContainerRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollContainerRef.current.offsetLeft
+    const walk = (x - startX) * 1.5 // Scroll speed multiplier
+    if (Math.abs(x - startX) > 5) {
+      setDragMoved(true)
+    }
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!scrollContainerRef.current) return
+    setIsDragging(true)
+    setDragMoved(false)
+    setStartX(e.touches[0].pageX - scrollContainerRef.current.offsetLeft)
+    setScrollLeft(scrollContainerRef.current.scrollLeft)
+    scrollContainerRef.current.style.scrollBehavior = 'auto'
+    scrollContainerRef.current.style.scrollSnapType = 'none'
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !scrollContainerRef.current) return
+    const x = e.touches[0].pageX - scrollContainerRef.current.offsetLeft
+    const walk = (x - startX) * 1.5
+    if (Math.abs(x - startX) > 5) {
+      setDragMoved(true)
+    }
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk
+  }
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    if (dragMoved) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
   // Combine or prioritize. Sanitized to remove backpacks / generic factory imagery.
   const activeServerProducts = serverProducts.length > 0
     ? sanitizeProducts(serverProducts).filter((p) => p.isActive && p.image && !p.image.includes('placeholder.jpg'))
@@ -116,8 +188,15 @@ export const TrendingProductsSection = () => {
         {/* Carousel Container */}
         <div
           ref={scrollContainerRef}
-          className="flex overflow-x-auto gap-6 pb-8 scroll-smooth scrollbar-none snap-x snap-mandatory"
+          className="flex overflow-x-auto gap-6 pb-8 scroll-smooth scrollbar-none snap-x snap-mandatory cursor-grab active:cursor-grabbing select-none"
           style={{ scrollbarWidth: 'none' }}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleMouseUp}
+          onTouchMove={handleTouchMove}
         >
           {isLoading ? (
             // Skeleton Loader
@@ -133,13 +212,18 @@ export const TrendingProductsSection = () => {
                 key={product.id}
                 className="w-[280px] sm:w-[320px] shrink-0 snap-start bg-card border border-border hover:border-primary/20 rounded-2xl overflow-hidden shadow-lg group transition-all duration-300 flex flex-col justify-between"
               >
-                <Link href={`/products/${product.slug}`} className="block relative">
+                <Link
+                  href={`/products/${product.slug}`}
+                  className="block relative"
+                  onClick={handleLinkClick}
+                >
                   {/* Image Container with Actions overlay on hover */}
                   <div className="h-64 sm:h-72 w-full relative bg-secondary overflow-hidden">
                     <img
                       src={product.image}
                       alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                      draggable={false}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out pointer-events-none"
                     />
 
                     {/* New Badge */}
