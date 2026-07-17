@@ -576,7 +576,7 @@ export default function AdminProducts() {
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Stock</th>
                   <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Saled</th>
+                  <th className="px-6 py-4">Sold</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
