@@ -161,6 +161,8 @@ export class OrderRepository {
         
         if (newStamps >= 8) {
           updates.loyaltyDiscountPending = true;
+          // Assign random discount between 15 and 25 percent
+          updates.loyaltyDiscountValue = Math.floor(Math.random() * 11) + 15;
         }
 
         await tx.user.update({

@@ -23,8 +23,8 @@ export default function AdminLoyaltyPage() {
     }
   }
 
-  const handleApprove = async (userId: string) => {
-    const value = discountInputs[userId] ?? 10 // Default to 10%
+  const handleApprove = async (userId: string, defaultValue: number) => {
+    const value = discountInputs[userId] ?? defaultValue ?? 20 // Default to 20%
     try {
       await approveMutation.mutateAsync({ userId, discountValue: value })
       alert('Discount successfully approved and assigned to user!')
@@ -99,8 +99,8 @@ export default function AdminLoyaltyPage() {
                             type="number"
                             min="1"
                             max="100"
-                            placeholder="10"
-                            value={discountInputs[user.id] ?? ''}
+                            placeholder="20"
+                            value={discountInputs[user.id] !== undefined ? discountInputs[user.id] : (user.loyaltyDiscountValue || 20)}
                             onChange={(e) => handleInputChange(user.id, e.target.value)}
                             className="w-16 px-2 py-1 bg-secondary/60 border border-border focus:outline-none focus:border-primary/50 text-xs font-semibold rounded text-center text-primary-text"
                           />
@@ -109,7 +109,7 @@ export default function AdminLoyaltyPage() {
                       </td>
                       <td className="py-4 px-4 text-right">
                         <button
-                          onClick={() => handleApprove(user.id)}
+                          onClick={() => handleApprove(user.id, user.loyaltyDiscountValue)}
                           disabled={approveMutation.isPending}
                           className="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white text-xs font-bold uppercase rounded-lg transition shadow-md shadow-yellow-600/10 cursor-pointer flex items-center gap-1.5 ml-auto"
                         >

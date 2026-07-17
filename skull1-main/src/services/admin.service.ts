@@ -104,6 +104,7 @@ export class AdminService {
         email: true,
         phone: true,
         loyaltyStamps: true,
+        loyaltyDiscountValue: true,
       },
       orderBy: { updatedAt: 'desc' },
     });
