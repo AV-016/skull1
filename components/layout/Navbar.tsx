@@ -316,7 +316,9 @@ export const Navbar = () => {
                <Menu className="w-6 h-6 text-primary-text" />
              </button>
           {/* Logo */}
-          <Link href="/" className="text-2xl font-black text-primary-text hover:text-primary smooth-transition tracking-wider select-none">
+          <Link href="/" className="text-2xl font-bold text-primary-text hover:text-primary smooth-transition flex items-center gap-2.5 tracking-wider select-none">
+            <img src="/logo_light.png" alt="Skulture Logo" className="h-[46px] w-auto object-contain dark:hidden ml-[-25px]" />
+            <img src="/logo_dark.png" alt="Skulture Logo" className="h-8 w-auto object-contain hidden dark:block ml-[-25px]" />
             SKULTURE
           </Link>
 

@@ -202,7 +202,9 @@ export const AuthLayout = ({ children, title, subtitle }: AuthLayoutProps) => {
         <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-primary/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
         {/* Logo / Header Link */}
-        <Link href="/" className="inline-flex items-center text-2xl font-black text-primary-text hover:text-primary smooth-transition tracking-wider z-20 select-none">
+        <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary-text hover:text-primary smooth-transition tracking-wider z-20 select-none">
+          <img src="/logo_light.png" alt="Skulture Logo" className="h-[46px] w-auto object-contain dark:hidden ml-[-25px]" />
+          <img src="/logo_dark.png" alt="Skulture Logo" className="h-8 w-auto object-contain hidden dark:block ml-[-25px]" />
           SKULTURE
         </Link>
 
@@ -370,7 +372,9 @@ export const AuthLayout = ({ children, title, subtitle }: AuthLayoutProps) => {
 
         {/* Mobile Header / Logo Link */}
         <div className="lg:hidden mb-8 text-center z-10">
-          <Link href="/" className="inline-flex items-center text-2xl font-black text-primary-text tracking-wider justify-center select-none">
+          <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary-text tracking-wider justify-center select-none">
+            <img src="/logo_light.png" alt="Skulture Logo" className="h-[46px] w-auto object-contain dark:hidden ml-[-25px]" />
+            <img src="/logo_dark.png" alt="Skulture Logo" className="h-8 w-auto object-contain hidden dark:block ml-[-25px]" />
             SKULTURE
           </Link>
         </div>
