@@ -87,9 +87,8 @@ export const Footer = () => {
           {/* Divider */}
           <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <img src="/logo.png" alt="Skulture Logo" className="w-7 h-7 dark:invert-0 invert" />
-                <span className="text-primary-text font-bold tracking-wider text-lg">SKULTURE</span>
+              <div className="flex items-center">
+                <span className="text-primary-text font-black tracking-wider text-xl select-none">SKULTURE</span>
               </div>
               <p className="text-muted-text text-xs mt-1">
                 Premium 3D printed products & custom prototyping solutions.

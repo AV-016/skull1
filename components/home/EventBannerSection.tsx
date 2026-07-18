@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -59,6 +60,7 @@ const EventCountdown = ({ endDate, themeColor }: { endDate: string, themeColor?:
 }
 
 export function EventBannerSection() {
+  const router = useRouter()
   const [activeEvents, setActiveEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -146,7 +148,8 @@ export function EventBannerSection() {
                 x: { type: "spring", stiffness: 300, damping: 30 },
                 opacity: { duration: 0.2 }
               }}
-              className="relative p-6 md:p-8 flex flex-col gap-6 min-h-[280px] w-full"
+              className="relative p-6 md:p-8 flex flex-col gap-6 min-h-[280px] w-full cursor-pointer"
+              onClick={() => router.push(`/events/${currentEvent.id}`)}
             >
               {/* Banner background with gradient overlay constrained to the text area */}
               {currentEvent.bannerUrl && (
@@ -185,6 +188,7 @@ export function EventBannerSection() {
                   <div className="pt-2">
                     <Link 
                       href={`/events/${currentEvent.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold text-[10px] uppercase tracking-wider rounded transition-all shadow-md cursor-pointer"
                       style={{ backgroundColor: currentEvent.themeColor || 'var(--primary)' }}
                       onMouseEnter={(e) => {
@@ -212,6 +216,7 @@ export function EventBannerSection() {
                           <Link 
                             href={`/products/${prod.slug}`} 
                             key={prod.id}
+                            onClick={(e) => e.stopPropagation()}
                             className="group p-2.5 bg-background border border-border/80 hover:border-primary/45 rounded-xl smooth-transition flex items-center gap-3 cursor-pointer shadow-sm"
                           >
                             <div className="w-10 h-10 rounded border border-border overflow-hidden bg-secondary flex-shrink-0">

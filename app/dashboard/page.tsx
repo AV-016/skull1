@@ -676,11 +676,7 @@ export default function DashboardPage() {
                   >
                     {/* Card Front inline */}
                     <div className="absolute inset-0 w-full h-full bg-white border border-[#eaeaea] rounded-2xl p-6 flex flex-col justify-between shadow-md">
-                      <div className="flex items-center gap-4">
-                        {/* Website Logo on Card Front */}
-                        <div className="w-14 h-14 bg-red-500/5 rounded-xl flex items-center justify-center border border-red-500/10">
-                          <img src="/logo.png" alt="Skulture Logo" className="w-10 h-10 object-contain invert" />
-                        </div>
+                      <div className="flex items-center">
                         <div>
                           <h2 className="text-[#d12626] font-black tracking-wider text-xl leading-none">SKULTURE.ag</h2>
                           <p className="text-[#4f5d75] font-semibold text-[10px] tracking-widest uppercase mt-1">Ideation & Creation</p>
@@ -741,10 +737,7 @@ export default function DashboardPage() {
                     }`}>
                       {/* Card Front - Expanded */}
                       <div className="absolute inset-0 w-full h-full bg-white border border-[#eaeaea] rounded-2xl p-6 sm:p-8 flex flex-col justify-between backface-hidden shadow-2xl">
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-red-500/5 rounded-xl flex items-center justify-center border border-red-500/10">
-                            <img src="/logo.png" alt="Skulture Logo" className="w-12 h-12 sm:w-16 sm:h-16 object-contain invert" />
-                          </div>
+                        <div className="flex items-center">
                           <div>
                             <h2 className="text-[#d12626] font-black tracking-wider text-2xl sm:text-3xl leading-none">SKULTURE.ag</h2>
                             <p className="text-[#4f5d75] font-semibold text-[10px] sm:text-xs tracking-widest uppercase mt-2">Ideation & Creation</p>

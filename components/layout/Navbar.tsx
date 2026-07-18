@@ -316,8 +316,7 @@ export const Navbar = () => {
                <Menu className="w-6 h-6 text-primary-text" />
              </button>
           {/* Logo */}
-          <Link href="/" className="text-2xl font-bold text-primary-text hover:text-primary smooth-transition flex items-center gap-2 tracking-wider">
-            <img src="/logo.png" alt="Skulture Logo" className="w-8 h-8 dark:invert-0 invert" />
+          <Link href="/" className="text-2xl font-black text-primary-text hover:text-primary smooth-transition tracking-wider select-none">
             SKULTURE
           </Link>
 
