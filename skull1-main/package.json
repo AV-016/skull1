@@ -4,9 +4,9 @@
   "description": "Production-ready backend for Skulture 3D-printing e-commerce platform",
   "main": "dist/src/server.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/src/server.js",
-    "dev": "nodemon",
+    "build": "node init && tsc",
+    "start": "node init && node dist/src/server.js",
+    "dev": "node init && nodemon",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
