@@ -32,6 +32,26 @@ export const Navbar = () => {
   const [notifications, setNotifications] = useState<any[]>([])
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
 
+  const [showMobileSearch, setShowMobileSearch] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Only show mobile search when user is near the very top of the page
+      if (currentScrollY <= 20) {
+        setShowMobileSearch(true);
+      } else if (currentScrollY > 70) {
+        setShowMobileSearch(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Fetch unread support replies, order updates, and project updates
   useEffect(() => {
     if (!user) {
@@ -51,10 +71,12 @@ export const Navbar = () => {
               .map((inq: any) => ({
                 id: `inquiry_${inq.id}`,
                 type: 'support',
-                title: 'Support Reply',
-                message: inq.messages?.[inq.messages.length - 1]?.message || `Update on: ${inq.subject}`,
+                title: inq.status === 'RESOLVED' ? 'Support Resolved' : 'Support Reply',
+                message: inq.status === 'RESOLVED'
+                  ? `Your inquiry regarding "${inq.subject}" has been marked as resolved.`
+                  : (inq.messages?.[inq.messages.length - 1]?.message || `Update on: ${inq.subject}`),
                 link: '/dashboard',
-                color: 'text-red-500',
+                color: inq.status === 'RESOLVED' ? 'text-green-500' : 'text-red-500',
                 updatedAt: inq.updatedAt,
                 markRead: () => {
                   api.get(`/inquiries/${inq.id}`).catch((err) => console.error('Failed to mark inquiry read:', err))
@@ -73,6 +95,7 @@ export const Navbar = () => {
             const orders = res.data.data
             const cachedStatuses = JSON.parse(localStorage.getItem('notification_orders') || '{}')
             const newStatuses: Record<string, string> = { ...cachedStatuses }
+            const readPending = JSON.parse(localStorage.getItem('notification_read_pending') || '[]')
             
             orders.forEach((order: any) => {
               const prevStatus = cachedStatuses[order.id]
@@ -93,6 +116,33 @@ export const Navbar = () => {
                 })
               }
               newStatuses[order.id] = order.status
+
+              // Check if 20% advance is pending for custom order
+              const isCustom = order.orderNumber?.startsWith('CR-')
+              if (isCustom && order.status === 'PENDING') {
+                const successfulPayments = order.payments?.filter((p: any) => p.status === 'success') || []
+                const hasPaidAdvance = successfulPayments.length > 0
+                
+                if (!hasPaidAdvance && !readPending.includes(order.id)) {
+                  orderNotifications.push({
+                    id: `order_adv_pending_${order.id}`,
+                    type: 'order_payment',
+                    title: `Advance Payment Pending`,
+                    message: `Please pay the 20% advance of ₹${((order.totalAmount || order.total) * 0.20).toFixed(2)} for Order #${order.orderNumber.slice(-6)}.`,
+                    link: `/orders/${order.id}`,
+                    color: 'text-amber-500 animate-pulse',
+                    updatedAt: order.createdAt,
+                    markRead: () => {
+                      const currentRead = JSON.parse(localStorage.getItem('notification_read_pending') || '[]')
+                      if (!currentRead.includes(order.id)) {
+                        currentRead.push(order.id)
+                        localStorage.setItem('notification_read_pending', JSON.stringify(currentRead))
+                      }
+                      window.dispatchEvent(new Event('notifications-updated'))
+                    }
+                  })
+                }
+              }
             })
             localStorage.setItem('notification_orders', JSON.stringify(newStatuses))
           }
@@ -139,6 +189,26 @@ export const Navbar = () => {
 
         // Combine and sort by updatedAt descending
         const combined = [...unreadInquiries, ...orderNotifications, ...requestNotifications]
+
+        // Check for Loyalty Discount
+        if (user && user.loyaltyDiscountSet && (user.loyaltyDiscountValue ?? 0) > 0) {
+          const isRead = localStorage.getItem(`loyalty_discount_read_${user.loyaltyDiscountValue}`) === 'true'
+          if (!isRead) {
+            combined.push({
+              id: `loyalty_discount_${user.loyaltyDiscountValue}`,
+              type: 'loyalty',
+              title: 'Congratulations! 🎉',
+              message: `You have received a loyalty discount of ${user.loyaltyDiscountValue}% off! Click to check it out.`,
+              link: '/checkout',
+              color: 'text-yellow-500 font-bold',
+              updatedAt: new Date().toISOString(),
+              markRead: () => {
+                localStorage.setItem(`loyalty_discount_read_${user.loyaltyDiscountValue}`, 'true')
+              }
+            })
+          }
+        }
+
         combined.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         setNotifications(combined)
 
@@ -197,6 +267,26 @@ export const Navbar = () => {
         })
         localStorage.setItem('notification_requests', JSON.stringify(reqStatuses))
       }
+
+      // Mark all pending advances as read too on mark all read
+      const pendingOrders = notifications.filter(notif => notif.type === 'order_payment')
+      if (pendingOrders.length > 0) {
+        const currentRead = JSON.parse(localStorage.getItem('notification_read_pending') || '[]')
+        pendingOrders.forEach(notif => {
+          const orderId = notif.id.replace('order_adv_pending_', '')
+          if (!currentRead.includes(orderId)) {
+            currentRead.push(orderId)
+          }
+        })
+        localStorage.setItem('notification_read_pending', JSON.stringify(currentRead))
+      }
+
+      // Mark all loyalty notifications read on mark all read
+      const loyaltyNotifs = notifications.filter(notif => notif.type === 'loyalty')
+      loyaltyNotifs.forEach(notif => {
+        const val = notif.id.replace('loyalty_discount_', '')
+        localStorage.setItem(`loyalty_discount_read_${val}`, 'true')
+      })
 
       window.dispatchEvent(new Event('notifications-updated'))
     } catch (e) {
@@ -278,7 +368,7 @@ export const Navbar = () => {
           image: p.image || '/placeholder.jpg'
         }))
         .filter((val, idx, self) => self.findIndex((t) => t.name === val.name) === idx)
-    : suggestions.map((s) => ({
+    : suggestions.map((s: string) => ({
         name: s,
         image: null
       }));
@@ -305,7 +395,7 @@ export const Navbar = () => {
 
 
   return ( <>
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/85 backdrop-blur-xl border-b border-border premium-shadow smooth-transition">
+    <nav className="sticky top-0 z-50 bg-background/85 backdrop-blur-xl border-b border-border premium-shadow smooth-transition">
       <div className="container mx-auto px-4 md:px-6 py-4">
         <div className="flex items-center justify-between">
           <button
@@ -317,8 +407,8 @@ export const Navbar = () => {
              </button>
           {/* Logo */}
           <Link href="/" className="text-2xl font-bold text-primary-text hover:text-primary smooth-transition flex items-center gap-2.5 tracking-wider select-none">
-            <img src="/logo_light.png" alt="Skulture Logo" className="h-[46px] w-auto object-contain dark:hidden ml-[-25px]" />
-            <img src="/logo_dark.png" alt="Skulture Logo" className="h-8 w-auto object-contain hidden dark:block ml-[-25px]" />
+            <img src="/logo_light_v2.png" alt="Skulture Logo" className="h-9 w-auto object-contain dark:hidden" style={{ filter: 'drop-shadow(0px 1px 3px rgba(0,0,0,0.35))' }} />
+            <img src="/logo_light_v3.png" alt="Skulture Logo" className="h-9 w-auto object-contain hidden dark:block" />
             SKULTURE
           </Link>
 
@@ -343,7 +433,8 @@ export const Navbar = () => {
               <button
                 type="button"
                 data-filter-btn
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsFilterOpen(!isFilterOpen);
                   setIsSearchFocused(false);
                 }}
@@ -454,7 +545,7 @@ export const Navbar = () => {
                 </span>
                 <div className="grid grid-cols-1 gap-1">
                   {filteredSuggestions.length > 0 ? (
-                    filteredSuggestions.map((item) => (
+                    filteredSuggestions.map((item: any) => (
                       <button
                         key={item.name}
                         onMouseDown={() => handleSuggestionClick(item.name)}
@@ -773,7 +864,179 @@ export const Navbar = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Search Bar Row */}
+      <div className={`absolute top-full left-0 right-0 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-3.5 shadow-xl md:hidden transition-all duration-300 ease-in-out origin-top ${
+        showMobileSearch 
+          ? 'opacity-100 translate-y-0 scale-y-100 pointer-events-auto visible' 
+          : 'opacity-0 -translate-y-2 scale-y-95 pointer-events-none invisible overflow-hidden'
+      }`}>
+        <div className="relative w-full max-w-md mx-auto">
+          <div className="flex items-center bg-secondary/85 backdrop-blur-md border border-border focus-within:border-primary/50 rounded-2xl overflow-hidden shadow-md transition-all duration-300">
+            <Search className="w-5 h-5 text-muted-text ml-4 transition-colors duration-300" />
+            <input
+              type="text"
+              placeholder="Search products, categories..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearchSubmit(e);
+                }
+              }}
+              className="w-full py-2.5 px-3 bg-transparent text-primary-text placeholder-muted-text text-sm focus:outline-none tracking-wide"
+            />
+            <button
+              type="button"
+              data-filter-btn
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFilterOpen(!isFilterOpen);
+                setIsSearchFocused(false);
+              }}
+              className={`p-2 rounded-xl text-muted-text hover:text-primary-text smooth-transition shrink-0 mr-1 cursor-pointer hover:bg-white/5 ${
+                isFilterOpen ? 'text-primary' : ''
+              }`}
+              title="Search Filter Options"
+            >
+              <SlidersHorizontal className="w-4.5 h-4.5" />
+            </button>
+            <button
+              type="submit"
+              onClick={handleSearchSubmit}
+              className="mr-2 px-3 py-1.5 bg-primary hover:bg-primary/95 text-white text-xs font-semibold rounded-xl transition-all duration-300"
+            >
+              Search
+            </button>
+          </div>
+
+          {/* Mobile Filter Options Panel */}
+          {isFilterOpen && (
+            <div data-filter-menu className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-2xl p-4.5 shadow-2xl z-50 space-y-4 max-h-[350px] overflow-y-auto">
+              <div className="flex justify-between items-center pb-2 border-b border-border">
+                <span className="text-primary-text text-xs font-black uppercase tracking-wider">Search Filters</span>
+                <button
+                  onClick={() => {
+                    setSelectedFilterSort('');
+                    setSelectedFilterCategory('');
+                  }}
+                  className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider"
+                >
+                  Clear All
+                </button>
+              </div>
+              
+              {/* Sort Section */}
+              <div>
+                <span className="text-[10px] text-muted-text font-black uppercase tracking-widest block mb-2">Sort By</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'price_asc', label: 'Price: Low to High' },
+                    { id: 'price_desc', label: 'Price: High to Low' },
+                    { id: 'bestsellers', label: 'Best Sellers' },
+                    { id: 'newest', label: 'Newest Arrivals' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedFilterSort(selectedFilterSort === opt.id ? '' : opt.id)}
+                      className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide border text-center transition-all cursor-pointer ${
+                        selectedFilterSort === opt.id
+                          ? 'bg-primary border-primary text-white font-extrabold'
+                          : 'bg-secondary/40 border-border text-secondary-text hover:border-muted-text'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+               {/* Category Section */}
+              <div>
+                <span className="text-[10px] text-muted-text font-black uppercase tracking-widest block mb-2">Category</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {categories.length > 0 ? (
+                    categories
+                      .filter((cat: any) => cat.slug !== 'custom-orders')
+                      .map((cat: any) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setSelectedFilterCategory(selectedFilterCategory === cat.slug ? '' : cat.slug)}
+                          className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide border text-center transition-all cursor-pointer truncate ${
+                            selectedFilterCategory === cat.slug
+                              ? 'bg-primary border-primary text-white font-extrabold'
+                              : 'bg-secondary/40 border-border text-secondary-text hover:border-muted-text'
+                          }`}
+                          title={cat.name}
+                        >
+                          {cat.name}
+                        </button>
+                      ))
+                  ) : (
+                    <span className="text-[10px] text-muted-text italic col-span-2">Loading categories...</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Apply Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleSearchSubmit}
+                  className="w-full py-2 bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg cursor-pointer"
+                >
+                  Apply Filters & Search
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Dropdown Suggestions */}
+          {isSearchFocused && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-2xl p-4 shadow-2xl z-50 max-h-[300px] overflow-y-auto">
+              <span className="text-muted-text text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">
+                {filteredSuggestions.length > 0 ? 'Try searching:' : 'No Product found'}
+              </span>
+              <div className="grid grid-cols-1 gap-1">
+                {filteredSuggestions.length > 0 ? (
+                  filteredSuggestions.map((item: any) => (
+                    <button
+                      key={item.name}
+                      onMouseDown={() => handleSuggestionClick(item.name)}
+                      className="w-full text-left px-3 py-2 hover:bg-secondary hover:text-primary rounded-lg text-primary-text text-xs font-semibold smooth-transition cursor-pointer flex items-center gap-3"
+                    >
+                      {item.image && (
+                        <div className="w-8 h-8 rounded border border-border overflow-hidden shrink-0 bg-secondary flex items-center justify-center">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder.jpg'
+                            }}
+                          />
+                        </div>
+                      )}
+                      <span>{item.name}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-muted-text text-xs italic">
+                    No matching products found in suggestions
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </nav>
+    {/* Non-sticky spacer on mobile to offset the absolute search bar when at the top */}
+    <div className="md:hidden h-[72px] w-full bg-transparent pointer-events-none" />
     <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
   </> )
 }
